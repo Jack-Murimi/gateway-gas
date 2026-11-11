@@ -106,7 +106,14 @@ export default function RiderPage() {
               >
                 {/* Order Top Bar: strictly NO money amounts! */}
                 <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                  <span className="font-mono font-bold text-xs text-orange-600">{order.order_number}</span>
+                    <div>
+                      <span className="font-mono font-bold text-xs text-orange-600">{order.order_number}</span>
+                      {order.receipt_number && (
+                        <span className="ml-2 font-mono text-[11px] text-slate-500 font-semibold bg-slate-100 px-1.5 py-0.5 rounded">
+                          Rcpt: {order.receipt_number}
+                        </span>
+                      )}
+                    </div>
                   <div className="flex items-center gap-2">
                     {/* Paid / Pending Status Tag (No monetary value) */}
                     <span

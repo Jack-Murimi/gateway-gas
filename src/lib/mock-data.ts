@@ -1,4 +1,4 @@
-import { Branch, StaffProfile, Product, BranchInventory, Order, RiderLeaderboardEntry } from '@/types';
+import { Branch, StaffProfile, Product, BranchInventory, Order, RiderLeaderboardEntry, Customer } from '@/types';
 
 export const INITIAL_BRANCHES: Branch[] = [
   {
@@ -315,5 +315,56 @@ export const INITIAL_LEADERBOARD: RiderLeaderboardEntry[] = [
     completed_deliveries: 10,
     active_deliveries: 0,
     avg_delivery_minutes: 29,
+  },
+];
+
+export const INITIAL_CUSTOMERS: Customer[] = [
+  {
+    id: 'cust-1',
+    name: 'Faith Auma',
+    created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
+    phones: [
+      { id: 'cp-1', customer_id: 'cust-1', phone_number: '+254712345678', is_primary: true },
+      { id: 'cp-2', customer_id: 'cust-1', phone_number: '+254722998877', is_primary: false },
+    ],
+    locations: [
+      { id: 'cl-1', customer_id: 'cust-1', estate: 'Westlands', specific_address: 'Rhapta Road, Apt 4B', is_default: true },
+      { id: 'cl-2', customer_id: 'cust-1', estate: 'Parklands', specific_address: '3rd Avenue, Hse 12', is_default: false },
+    ],
+  },
+  {
+    id: 'cust-2',
+    name: 'Martin Mwangi',
+    created_at: new Date(Date.now() - 25 * 86400000).toISOString(),
+    phones: [
+      { id: 'cp-3', customer_id: 'cust-2', phone_number: '+254723456789', is_primary: true },
+    ],
+    locations: [
+      { id: 'cl-3', customer_id: 'cust-2', estate: 'Kilimani', specific_address: 'Wood Avenue, Court 12', is_default: true },
+      { id: 'cl-4', customer_id: 'cust-2', estate: 'Lavington', specific_address: 'James Gichuru Gate 8', is_default: false },
+    ],
+  },
+  {
+    id: 'cust-3',
+    name: 'Brenda Kerubo',
+    created_at: new Date(Date.now() - 14 * 86400000).toISOString(),
+    phones: [
+      { id: 'cp-4', customer_id: 'cust-3', phone_number: '+254734567890', is_primary: true },
+      { id: 'cp-5', customer_id: 'cust-3', phone_number: '+254711223344', is_primary: false },
+    ],
+    locations: [
+      { id: 'cl-5', customer_id: 'cust-3', estate: 'Roysambu', specific_address: 'Lumumba Drive, Block C2', is_default: true },
+    ],
+  },
+  {
+    id: 'cust-4',
+    name: 'Peter Ochieng',
+    created_at: new Date(Date.now() - 7 * 86400000).toISOString(),
+    phones: [
+      { id: 'cp-6', customer_id: 'cust-4', phone_number: '+254701234567', is_primary: true },
+    ],
+    locations: [
+      { id: 'cl-6', customer_id: 'cust-4', estate: 'South C', specific_address: 'Mugoya Phase 2, Hse 45', is_default: true },
+    ],
   },
 ];

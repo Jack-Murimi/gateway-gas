@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '@/context/store-context';
-import { OrderType, PaymentMethod, PaymentStatus, Product } from '@/types';
+import { OrderType, PaymentMethod, PaymentStatus, Product, Customer, CustomerPhone, CustomerLocation } from '@/types';
 import {
   ShoppingCart,
   Plus,
@@ -10,29 +10,57 @@ import {
   Trash2,
   CheckCircle,
   Building2,
-  DollarSign,
+  Calendar,
+  Receipt,
+  Search,
+  UserCheck,
+  UserPlus,
+  X,
+  AlertCircle,
   ArrowRight,
   Flame,
-  AlertCircle,
-  Zap,
-  User,
-  Phone,
-  MapPin,
-  ChevronDown,
   Droplets,
   Wrench,
+  Check,
 } from 'lucide-react';
 
 export default function SalesPage() {
-  const { currentUser, branches, products, orders, createOrder } = useStore();
+  const { currentUser, branches, products, customers, createCustomer, createOrder } = useStore();
 
-  const [isPosWalkin, setIsPosWalkin] = useState(true); // Default to Walk-In for instant speed
   const [selectedBranchId, setSelectedBranchId] = useState(branches[0]?.id || '');
-  const [customerName, setCustomerName] = useState('Walk-in Customer');
-  const [customerPhone, setCustomerPhone] = useState('+254700000000');
-  const [deliveryEstate, setDeliveryEstate] = useState('Westlands');
-  const [deliveryAddress, setDeliveryAddress] = useState('');
-  const [deliveryFee, setDeliveryFee] = useState(0); // FREE DELIVERY!
+  const activeBranch = branches.find((b) => b.id === selectedBranchId) || branches[0];
+
+  // Header: Date & Physical Receipt Book #
+  const [saleDate, setSaleDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [receiptNumber, setReceiptNumber] = useState('');
+
+  // Auto-suggest receipt number with branch code prefix
+  useEffect(() => {
+    if (activeBranch) {
+      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+      setReceiptNumber(`${activeBranch.code}-${randomSuffix}`);
+    }
+  }, [activeBranch]);
+
+  // Customer state: default to null (anonymous Walk-in)
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [selectedPhone, setSelectedPhone] = useState<string>('');
+  const [selectedLocation, setSelectedLocation] = useState<{ estate: string; address: string }>({
+    estate: '',
+    address: '',
+  });
+
+  // Search & New Customer state
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
+  const [newCustName, setNewCustName] = useState('');
+  const [newCustPhone, setNewCustPhone] = useState('');
+  const [newCustEstate, setNewCustEstate] = useState('');
+  const [newCustAddress, setNewCustAddress] = useState('');
+
+  // Order mode: Walk-In vs Delivery
+  const [isPosWalkin, setIsPosWalkin] = useState(true);
 
   // Payment fields
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('mpesa');
@@ -57,9 +85,9 @@ export default function SalesPage() {
   const [productFilterCat, setProductFilterCat] = useState<'all' | 'cylinder' | 'water' | 'accessory'>('all');
   const [incomingBrand, setIncomingBrand] = useState('Afrigas');
   const [itemQuantity, setItemQuantity] = useState(1);
-  const [quickAddTab, setQuickAddTab] = useState<'gas' | 'accessories' | 'water'>('gas');
   const [successOrderNumber, setSuccessOrderNumber] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showAddressPicker, setShowAddressPicker] = useState(false);
 
   if (!currentUser || !['admin', 'director', 'operator', 'sales_rep'].includes(currentUser.role)) {
     return (
@@ -71,10 +99,58 @@ export default function SalesPage() {
     );
   }
 
-  const activeBranch = branches.find((b) => b.id === selectedBranchId) || branches[0];
+  const canEditDate = ['admin', 'director', 'operator'].includes(currentUser.role);
   const selectedProduct = products.find((p) => p.id === selectedProductId) || products[0];
 
-  // Helper to add or merge item into cart (DEDUPLICATION FIX)
+  // Search matching customers by name, phone, or location
+  const matchingCustomers = customerSearchQuery.trim()
+    ? customers.filter((c) => {
+        const q = customerSearchQuery.toLowerCase();
+        const matchesName = c.name.toLowerCase().includes(q);
+        const matchesPhone = c.phones.some((p) => p.phone_number.includes(q));
+        const matchesLoc = c.locations.some(
+          (l) => l.estate.toLowerCase().includes(q) || (l.specific_address && l.specific_address.toLowerCase().includes(q))
+        );
+        return matchesName || matchesPhone || matchesLoc;
+      })
+    : [];
+
+  const handleSelectCustomer = (c: Customer) => {
+    setSelectedCustomer(c);
+    const primPhone = c.phones.find((p) => p.is_primary) || c.phones[0];
+    const defLoc = c.locations.find((l) => l.is_default) || c.locations[0];
+    setSelectedPhone(primPhone ? primPhone.phone_number : '');
+    setSelectedLocation({
+      estate: defLoc ? defLoc.estate : '',
+      address: defLoc?.specific_address || '',
+    });
+    setCustomerSearchQuery('');
+    setShowSearchResults(false);
+  };
+
+  const handleClearCustomerToWalkin = () => {
+    setSelectedCustomer(null);
+    setSelectedPhone('');
+    setSelectedLocation({ estate: '', address: '' });
+    setIsPosWalkin(true); // Anonymous must be walk-in
+  };
+
+  const handleCreateCustomerSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCustName || !newCustPhone) {
+      alert('Customer name and phone are required.');
+      return;
+    }
+    const created = createCustomer(newCustName, newCustPhone, newCustEstate || 'Nairobi', newCustAddress);
+    handleSelectCustomer(created);
+    setShowNewCustomerForm(false);
+    setNewCustName('');
+    setNewCustPhone('');
+    setNewCustEstate('');
+    setNewCustAddress('');
+  };
+
+  // Cart helper with deduplication
   const addProductToCart = (prod: Product, type: OrderType, incoming: string, qty: number) => {
     let price = 0;
     if (type === 'refill') price = prod.refill_price_kes;
@@ -85,13 +161,11 @@ export default function SalesPage() {
     const incBrand = type === 'refill' && isExchange ? (incoming || prod.brand) : '';
 
     setCart((prev) => {
-      // Find existing item with matching productId, orderType, and incomingBrand
       const existingIdx = prev.findIndex(
         (i) => i.productId === prod.id && i.orderType === type && i.incomingBrand === incBrand
       );
 
       if (existingIdx >= 0) {
-        // Merge into existing item
         const copy = [...prev];
         copy[existingIdx] = {
           ...copy[existingIdx],
@@ -100,7 +174,6 @@ export default function SalesPage() {
         return copy;
       }
 
-      // Add new item
       const newItem: CartItem = {
         id: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         productId: prod.id,
@@ -121,13 +194,6 @@ export default function SalesPage() {
     setItemQuantity(1);
   };
 
-  // 1-Tap Fast Add Preset for Top Sellers
-  const handleQuickAdd = (productName: string, type: OrderType) => {
-    const prod = products.find((p) => p.name.toLowerCase().includes(productName.toLowerCase()));
-    if (!prod) return;
-    addProductToCart(prod, type, prod.brand, 1);
-  };
-
   const updateCartItemQuantity = (id: string, delta: number) => {
     setCart((prev) =>
       prev
@@ -146,31 +212,23 @@ export default function SalesPage() {
 
   const totalCartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
   const subtotal = cart.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0);
-  // Free delivery across the board
-  const finalDeliveryFee = 0;
-  const grandTotal = subtotal + finalDeliveryFee;
-
-  // Toggle walkin defaults
-  const handleToggleMode = (walkin: boolean) => {
-    setIsPosWalkin(walkin);
-    if (walkin) {
-      if (!customerName || customerName === '') setCustomerName('Walk-in Customer');
-      if (!customerPhone || customerPhone === '') setCustomerPhone('+254700000000');
-    } else {
-      if (customerName === 'Walk-in Customer') setCustomerName('');
-      if (customerPhone === '+254700000000') setCustomerPhone('');
-    }
-  };
+  const grandTotal = subtotal; // Free delivery
 
   // Submit order
   const handleCreateOrder = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (cart.length === 0) {
-      alert('Please add at least one cylinder, accessory, or water item to the order.');
+      alert('Please add at least one item to the cart.');
       return;
     }
-    if (!customerName || !customerPhone) {
-      alert('Please enter customer name and phone.');
+    if (!receiptNumber.trim()) {
+      alert('Physical receipt number is required.');
+      return;
+    }
+
+    // Business rule: anonymous walk-in cannot use delivery
+    if (!isPosWalkin && !selectedCustomer) {
+      alert('Deliveries require customer details. Please select or add a customer.');
       return;
     }
 
@@ -179,11 +237,14 @@ export default function SalesPage() {
       const order = await createOrder({
         branch_id: selectedBranchId,
         is_pos_walkin: isPosWalkin,
-        customer_name: customerName,
-        customer_phone: customerPhone,
-        delivery_estate: isPosWalkin ? 'Walk-In POS' : deliveryEstate,
-        delivery_address: isPosWalkin ? 'Counter' : deliveryAddress,
-        delivery_fee_kes: finalDeliveryFee,
+        customer_id: selectedCustomer ? selectedCustomer.id : null,
+        receipt_number: receiptNumber.trim(),
+        created_at: new Date(saleDate).toISOString(),
+        customer_name: selectedCustomer ? selectedCustomer.name : 'Walk-in Customer',
+        customer_phone: selectedCustomer ? selectedPhone : '+254700000000',
+        delivery_estate: isPosWalkin ? 'Walk-In POS' : selectedLocation.estate,
+        delivery_address: isPosWalkin ? 'Counter' : selectedLocation.address,
+        delivery_fee_kes: 0,
         payment_method: paymentMethod,
         payment_status: paymentStatus,
         payment_reference: paymentReference || undefined,
@@ -200,383 +261,397 @@ export default function SalesPage() {
 
       setSuccessOrderNumber(order.order_number);
       setCart([]);
-      if (!isPosWalkin) {
-        setCustomerName('');
-        setCustomerPhone('');
-        setDeliveryAddress('');
-      }
+      handleClearCustomerToWalkin();
       setPaymentReference('');
+      // regenerate next receipt number
+      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+      setReceiptNumber(`${activeBranch.code}-${randomSuffix}`);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Filter products for dropdown
   const filteredProductsForSelect = products.filter((p) => {
     if (productFilterCat !== 'all' && p.category !== productFilterCat) return false;
-    if (itemType === 'refill') {
-      return p.refill_price_kes > 0;
-    }
-    if (itemType === 'complete') {
-      return p.complete_price_kes > 0;
-    }
-    // Accessory or disposable
+    if (itemType === 'refill') return p.refill_price_kes > 0;
+    if (itemType === 'complete') return p.complete_price_kes > 0;
     return p.accessory_price_kes > 0;
   });
 
   const isWaterProduct = selectedProduct?.category === 'water';
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-28 md:pb-12 space-y-6">
-      {/* Page Title & Fast Status */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" /> POS & Fast Order Entry
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Gas cylinders, water refills (Keringet/Aquamist), Japeli, and accessories with free delivery.
-          </p>
-        </div>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 pb-24 md:pb-12 space-y-4">
+      {/* 1. TOP INFO BAR: Date, Physical Receipt #, Branch Hub */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+          {/* Date */}
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-slate-500 shrink-0" />
+            <div className="flex-1">
+              <label className="block text-[10px] uppercase font-bold text-slate-400">Date</label>
+              {canEditDate ? (
+                <input
+                  type="date"
+                  value={saleDate}
+                  onChange={(e) => setSaleDate(e.target.value)}
+                  className="w-full text-xs font-semibold text-slate-800 border border-slate-300 rounded-lg px-2 py-1 bg-slate-50 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                />
+              ) : (
+                <span className="text-xs font-bold text-slate-800">{saleDate}</span>
+              )}
+            </div>
+          </div>
 
-        {/* Branch Quick Pill */}
-        <div className="flex items-center gap-2 self-start sm:self-auto bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-sm">
-          <Building2 className="w-4 h-4 text-orange-600 shrink-0" />
-          <span className="text-xs font-semibold text-slate-700">Hub:</span>
-          <select
-            value={selectedBranchId}
-            onChange={(e) => setSelectedBranchId(e.target.value)}
-            className="text-xs font-bold text-slate-900 bg-transparent focus:outline-none cursor-pointer"
-          >
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name} ({b.code})
-              </option>
-            ))}
-          </select>
+          {/* Physical Receipt # */}
+          <div className="flex items-center gap-2">
+            <Receipt className="w-4 h-4 text-orange-600 shrink-0" />
+            <div className="flex-1">
+              <label className="block text-[10px] uppercase font-bold text-slate-400">
+                Receipt # (Paper Book) <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={receiptNumber}
+                onChange={(e) => setReceiptNumber(e.target.value)}
+                placeholder="e.g. WST-1049"
+                className="w-full text-xs font-mono font-bold text-slate-900 border border-slate-300 rounded-lg px-2.5 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-orange-500"
+              />
+            </div>
+          </div>
+
+          {/* Branch Hub Selector */}
+          <div className="flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-slate-500 shrink-0" />
+            <div className="flex-1">
+              <label className="block text-[10px] uppercase font-bold text-slate-400">Branch Hub</label>
+              <select
+                value={selectedBranchId}
+                onChange={(e) => setSelectedBranchId(e.target.value)}
+                className="w-full text-xs font-bold text-slate-900 border border-slate-300 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer"
+              >
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name} ({b.code})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
+      {/* 2. CUSTOMER & ORDER MODE BAR */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {/* Left: Customer status / clean view */}
+          <div className="flex-1">
+            <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Customer</label>
+
+            {selectedCustomer ? (
+              /* Selected Known Customer: Clean Minimalist Card */
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-900">
+                  <UserCheck className="w-4 h-4 text-emerald-600" />
+                  <span>{selectedCustomer.name}</span>
+                  {selectedLocation.estate && (
+                    <span className="text-emerald-700 font-medium">({selectedLocation.estate})</span>
+                  )}
+                </div>
+
+                {/* Multiple locations/phones selector toggle */}
+                {(selectedCustomer.locations.length > 1 || selectedCustomer.phones.length > 1) && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddressPicker(!showAddressPicker)}
+                    className="text-[11px] text-slate-500 hover:text-slate-800 underline font-medium"
+                  >
+                    Change phone/address
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleClearCustomerToWalkin}
+                  className="inline-flex items-center gap-1 text-[11px] text-red-600 hover:text-red-700 font-bold ml-1"
+                >
+                  <X className="w-3.5 h-3.5" /> Clear to Walk-in
+                </button>
+              </div>
+            ) : (
+              /* Walk-in Default with Live Search */
+              <div className="relative">
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={customerSearchQuery}
+                      onChange={(e) => {
+                        setCustomerSearchQuery(e.target.value);
+                        setShowSearchResults(true);
+                      }}
+                      onFocus={() => setShowSearchResults(true)}
+                      placeholder="Walk-in Customer (type name, phone, or estate to search)..."
+                      className="w-full text-xs border border-slate-300 rounded-xl pl-8 pr-3 py-2 bg-slate-50/70 focus:bg-white focus:outline-none focus:ring-1 focus:ring-orange-500"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowNewCustomerForm(true)}
+                    className="min-h-[38px] px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition flex items-center gap-1 shrink-0"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" /> + New Customer
+                  </button>
+                </div>
+
+                {/* Live Search Dropdown */}
+                {showSearchResults && customerSearchQuery.trim() && (
+                  <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl z-30 max-h-56 overflow-y-auto divide-y divide-slate-100">
+                    {matchingCustomers.length > 0 ? (
+                      matchingCustomers.map((c) => {
+                        const primPhone = c.phones.find((p) => p.is_primary) || c.phones[0];
+                        const defLoc = c.locations.find((l) => l.is_default) || c.locations[0];
+                        return (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => handleSelectCustomer(c)}
+                            className="w-full text-left px-3 py-2.5 hover:bg-orange-50/70 transition flex items-center justify-between text-xs"
+                          >
+                            <div>
+                              <span className="font-bold text-slate-900 block">{c.name}</span>
+                              <span className="text-[11px] text-slate-500">
+                                {primPhone?.phone_number} • {defLoc ? `${defLoc.estate} (${defLoc.specific_address || ''})` : ''}
+                              </span>
+                            </div>
+                            <span className="text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded">
+                              Select
+                            </span>
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <div className="p-3 text-center text-xs text-slate-400">
+                        No customer found.{' '}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewCustName(customerSearchQuery);
+                            setShowNewCustomerForm(true);
+                            setShowSearchResults(false);
+                          }}
+                          className="text-orange-600 font-bold hover:underline"
+                        >
+                          Create &quot;{customerSearchQuery}&quot;?
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Right: Order Mode Segmented Control */}
+          <div className="shrink-0 self-start sm:self-auto">
+            <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Order Mode</label>
+            <div className="flex bg-slate-100 p-0.5 rounded-xl border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setIsPosWalkin(true)}
+                className={`min-h-[34px] px-3.5 py-1 text-xs font-bold rounded-lg transition ${
+                  isPosWalkin ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                Walk-In (Counter)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!selectedCustomer) {
+                    alert('Delivery requires a customer. Please search or add a customer first.');
+                    setShowNewCustomerForm(true);
+                    return;
+                  }
+                  setIsPosWalkin(false);
+                }}
+                className={`min-h-[34px] px-3.5 py-1 text-xs font-bold rounded-lg transition ${
+                  !isPosWalkin ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                Free Delivery
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Address / Phone picker drawer for customer with multiple locations/phones */}
+        {selectedCustomer && showAddressPicker && (
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2">
+            <div className="font-bold text-slate-700 text-[11px] uppercase">
+              Select Delivery Address & Phone for {selectedCustomer.name}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Phone Number</label>
+                <select
+                  value={selectedPhone}
+                  onChange={(e) => setSelectedPhone(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg p-1.5 bg-white text-xs"
+                >
+                  {selectedCustomer.phones.map((p) => (
+                    <option key={p.id} value={p.phone_number}>
+                      {p.phone_number} {p.is_primary ? '(Primary)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Estate / Location</label>
+                <select
+                  value={`${selectedLocation.estate}|${selectedLocation.address}`}
+                  onChange={(e) => {
+                    const [estate, address] = e.target.value.split('|');
+                    setSelectedLocation({ estate, address: address || '' });
+                  }}
+                  className="w-full border border-slate-300 rounded-lg p-1.5 bg-white text-xs"
+                >
+                  {selectedCustomer.locations.map((l) => (
+                    <option key={l.id} value={`${l.estate}|${l.specific_address || ''}`}>
+                      {l.estate} - {l.specific_address || 'Standard'} {l.is_default ? '(Default)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Inline New Customer Creation Form */}
+        {showNewCustomerForm && (
+          <form
+            onSubmit={handleCreateCustomerSubmit}
+            className="p-4 bg-orange-50/60 border border-orange-200 rounded-xl space-y-3"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-orange-900 uppercase">Create & Attach New Customer</span>
+              <button
+                type="button"
+                onClick={() => setShowNewCustomerForm(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-600 mb-0.5">Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={newCustName}
+                  onChange={(e) => setNewCustName(e.target.value)}
+                  placeholder="e.g. Samuel Kiptoo"
+                  className="w-full min-h-[36px] text-xs px-2.5 border border-slate-300 rounded-lg bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-600 mb-0.5">Phone Number *</label>
+                <input
+                  type="tel"
+                  required
+                  value={newCustPhone}
+                  onChange={(e) => setNewCustPhone(e.target.value)}
+                  placeholder="+2547..."
+                  className="w-full min-h-[36px] text-xs px-2.5 border border-slate-300 rounded-lg bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-600 mb-0.5">Estate / Area</label>
+                <input
+                  type="text"
+                  value={newCustEstate}
+                  onChange={(e) => setNewCustEstate(e.target.value)}
+                  placeholder="e.g. Westlands"
+                  className="w-full min-h-[36px] text-xs px-2.5 border border-slate-300 rounded-lg bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-600 mb-0.5">Apt / House #</label>
+                <input
+                  type="text"
+                  value={newCustAddress}
+                  onChange={(e) => setNewCustAddress(e.target.value)}
+                  placeholder="e.g. Delta 3B"
+                  className="w-full min-h-[36px] text-xs px-2.5 border border-slate-300 rounded-lg bg-white"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowNewCustomerForm(false)}
+                className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-1.5 text-xs font-bold bg-orange-600 hover:bg-orange-700 text-white rounded-lg shadow"
+              >
+                Save & Attach
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+
       {successOrderNumber && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 text-center shadow-sm">
-          <CheckCircle className="w-9 h-9 text-emerald-600 mx-auto mb-1.5" />
-          <h3 className="text-base sm:text-lg font-bold text-emerald-950">
-            Order Complete: <span className="font-mono text-emerald-700">{successOrderNumber}</span>
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-center shadow-sm">
+          <CheckCircle className="w-8 h-8 text-emerald-600 mx-auto mb-1" />
+          <h3 className="text-base font-bold text-emerald-950">
+            Sale Completed: <span className="font-mono text-emerald-700">{successOrderNumber}</span>
           </h3>
           <p className="text-xs text-emerald-700 mt-0.5">
-            Stock automatically reconciled in {activeBranch.name}. Free delivery applied.
+            Stock reconciled in {activeBranch.name}. Free delivery applied.
           </p>
           <button
             onClick={() => setSuccessOrderNumber(null)}
-            className="mt-3 min-h-[44px] px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition shadow"
+            className="mt-2.5 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition shadow"
           >
             Start Next Sale
           </button>
         </div>
       )}
 
-      {/* 1-Tap Quick Add Presets with Category Tabs (SPEED UP SALE ENTRY) */}
-      <div className="bg-gradient-to-r from-orange-50 via-amber-50 to-sky-50 border border-orange-200/80 rounded-2xl p-4 shadow-sm space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-orange-900 uppercase tracking-wider">
-            <Zap className="w-4 h-4 text-orange-600" /> Fast-Add Presets (1 Tap to Cart)
-          </div>
-
-          {/* Quick preset category pills */}
-          <div className="flex items-center gap-1 bg-white/80 p-0.5 rounded-xl border border-orange-200/60 self-start sm:self-auto">
-            <button
-              type="button"
-              onClick={() => setQuickAddTab('gas')}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
-                quickAddTab === 'gas' ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Flame className="w-3 h-3" /> Gas Refills
-            </button>
-            <button
-              type="button"
-              onClick={() => setQuickAddTab('accessories')}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
-                quickAddTab === 'accessories' ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Wrench className="w-3 h-3" /> Accessories
-            </button>
-            <button
-              type="button"
-              onClick={() => setQuickAddTab('water')}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
-                quickAddTab === 'water' ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Droplets className="w-3 h-3" /> Water
-            </button>
-          </div>
-        </div>
-
-        {/* Tab 1: Gas Presets */}
-        {quickAddTab === 'gas' && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2">
-            <button
-              type="button"
-              onClick={() => handleQuickAdd('Pro Gas 6kg', 'refill')}
-              className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
-            >
-              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Pro Gas 6kg</div>
-              <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">Refill • 1,250/=</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickAdd('Pro Gas 13kg', 'refill')}
-              className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
-            >
-              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Pro Gas 13kg</div>
-              <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">Refill • 2,800/=</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickAdd('K-Gas 13kg', 'refill')}
-              className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
-            >
-              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">K-Gas 13kg</div>
-              <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">Refill • 2,850/=</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickAdd('Total Gas 13kg', 'refill')}
-              className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
-            >
-              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Total 13kg</div>
-              <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">Refill • 2,900/=</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickAdd('Afrigas 13kg', 'refill')}
-              className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
-            >
-              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Afrigas 13kg</div>
-              <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">Refill • 2,850/=</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickAdd('Ola Energy 13kg', 'refill')}
-              className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
-            >
-              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Ola 13kg</div>
-              <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">Refill • 2,800/=</div>
-            </button>
-          </div>
-        )}
-
-        {/* Tab 2: Accessories Presets (Exact User Prices) */}
-        {quickAddTab === 'accessories' && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2">
-            <button
-              type="button"
-              onClick={() => handleQuickAdd('Kabason Regulator 13kg', 'accessory')}
-              className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
-            >
-              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Kabason Reg 13kg</div>
-              <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">1,200/=</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickAdd('Kabason Regulator 6kg', 'accessory')}
-              className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
-            >
-              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Kabason Reg 6kg</div>
-              <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">1,200/=</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickAdd('Gas Burner', 'accessory')}
-              className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
-            >
-              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Gas Burner</div>
-              <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">1,200/=</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickAdd('Grill', 'accessory')}
-              className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
-            >
-              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Cylinder Grill</div>
-              <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">500/=</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickAdd('Clips', 'accessory')}
-              className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
-            >
-              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Gas Hose Clip</div>
-              <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">50/= each</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickAdd('Standard 1.5m', 'accessory')}
-              className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
-            >
-              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Hose Pipe (1.5m)</div>
-              <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">300/= std</div>
-            </button>
-          </div>
-        )}
-
-        {/* Tab 3: Water Presets (Keringet/Aquamist Refills + Japeli) */}
-        {quickAddTab === 'water' && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
-            <button
-              type="button"
-              onClick={() => handleQuickAdd('Keringet Water 20L', 'refill')}
-              className="min-h-[44px] p-2.5 bg-white hover:bg-sky-600 hover:text-white border border-sky-200 rounded-xl text-left transition shadow-sm group"
-            >
-              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Keringet 20L</div>
-              <div className="text-[10px] text-sky-600 group-hover:text-sky-100 font-semibold">Swap Refill • 650/=</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickAdd('Aquamist Water 20L', 'refill')}
-              className="min-h-[44px] p-2.5 bg-white hover:bg-sky-600 hover:text-white border border-sky-200 rounded-xl text-left transition shadow-sm group"
-            >
-              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Aquamist 20L</div>
-              <div className="text-[10px] text-sky-600 group-hover:text-sky-100 font-semibold">Swap Refill • 600/=</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickAdd('Japeli Water 500ml', 'accessory')}
-              className="min-h-[44px] p-2.5 bg-white hover:bg-sky-600 hover:text-white border border-sky-200 rounded-xl text-left transition shadow-sm group"
-            >
-              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Japeli 500ml</div>
-              <div className="text-[10px] text-slate-500 group-hover:text-sky-100 font-semibold">50/= disp</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickAdd('Japeli Water 1L', 'accessory')}
-              className="min-h-[44px] p-2.5 bg-white hover:bg-sky-600 hover:text-white border border-sky-200 rounded-xl text-left transition shadow-sm group"
-            >
-              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Japeli 1 Litre</div>
-              <div className="text-[10px] text-slate-500 group-hover:text-sky-100 font-semibold">80/= disp</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickAdd('Japeli Water 5L', 'accessory')}
-              className="min-h-[44px] p-2.5 bg-white hover:bg-sky-600 hover:text-white border border-sky-200 rounded-xl text-left transition shadow-sm group"
-            >
-              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Japeli 5 Litre</div>
-              <div className="text-[10px] text-slate-500 group-hover:text-sky-100 font-semibold">250/= disp</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickAdd('Japeli Water 20L', 'accessory')}
-              className="min-h-[44px] p-2.5 bg-white hover:bg-sky-600 hover:text-white border border-sky-200 rounded-xl text-left transition shadow-sm group"
-            >
-              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Japeli 20L Disp</div>
-              <div className="text-[10px] text-slate-500 group-hover:text-sky-100 font-semibold">550/= disp</div>
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Main Grid: Form Left, Cart Right */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left 2 Cols: Form Sections */}
-        <div className="lg:col-span-2 space-y-5">
-          {/* Section 1: Sale Mode (Walk-In vs Free Delivery) */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Step 1: Order Mode</span>
-              {/* Segmented Control */}
-              <div className="flex bg-slate-100 p-1 rounded-xl">
-                <button
-                  type="button"
-                  onClick={() => handleToggleMode(true)}
-                  className={`min-h-[40px] px-4 py-1.5 text-xs font-bold rounded-lg transition ${
-                    isPosWalkin ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-900'
-                  }`}
-                >
-                  Walk-In Counter (POS)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleToggleMode(false)}
-                  className={`min-h-[40px] px-4 py-1.5 text-xs font-bold rounded-lg transition ${
-                    !isPosWalkin ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-900'
-                  }`}
-                >
-                  Free Bike Delivery
-                </button>
-              </div>
-            </div>
-
-            {/* Customer Inputs */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Customer Name</label>
-                <input
-                  type="text"
-                  required
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="e.g. Alice Mutua"
-                  className="w-full min-h-[44px] px-3.5 py-2 text-base md:text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none bg-slate-50/50"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Customer Phone (M-Pesa)</label>
-                <input
-                  type="tel"
-                  required
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  placeholder="+2547..."
-                  className="w-full min-h-[44px] px-3.5 py-2 text-base md:text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none bg-slate-50/50"
-                />
-              </div>
-
-              {!isPosWalkin && (
-                <>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Estate / Neighborhood</label>
-                    <input
-                      type="text"
-                      value={deliveryEstate}
-                      onChange={(e) => setDeliveryEstate(e.target.value)}
-                      placeholder="e.g. Westlands, Kilimani, Roysambu"
-                      className="w-full min-h-[44px] px-3.5 py-2 text-base md:text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Building & Apt / House #</label>
-                    <input
-                      type="text"
-                      value={deliveryAddress}
-                      onChange={(e) => setDeliveryAddress(e.target.value)}
-                      placeholder="e.g. Delta Heights, House 4B"
-                      className="w-full min-h-[44px] px-3.5 py-2 text-base md:text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                    />
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Section 2: Custom Item / Universal Brand Swap */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+      {/* 3. PRODUCT ENTRY & CART GRID */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Left 2 Cols: Item Picker & Payment */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* Item Selector */}
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                Step 2: Choose Product (Gas, Water, or Accessories)
+                Select Product to Add
               </span>
 
-              {/* Category Filter Pills */}
-              <div className="flex items-center gap-1 self-start sm:self-auto overflow-x-auto pb-1">
+              {/* Filter Pills */}
+              <div className="flex items-center gap-1">
                 {(['all', 'cylinder', 'water', 'accessory'] as const).map((cat) => (
                   <button
                     key={cat}
                     type="button"
                     onClick={() => setProductFilterCat(cat)}
-                    className={`min-h-[34px] px-2.5 py-1 text-[11px] font-bold rounded-lg capitalize transition ${
+                    className={`min-h-[32px] px-2.5 py-1 text-[11px] font-bold rounded-lg capitalize transition ${
                       productFilterCat === cat ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'
                     }`}
                   >
@@ -592,18 +667,16 @@ export default function SalesPage() {
                 <select
                   value={itemType}
                   onChange={(e) => setItemType(e.target.value as OrderType)}
-                  className="w-full min-h-[44px] text-xs font-semibold border border-slate-300 rounded-xl px-2.5 bg-white text-slate-800"
+                  className="w-full min-h-[42px] text-xs font-semibold border border-slate-300 rounded-xl px-2.5 bg-white text-slate-800"
                 >
-                  <option value="refill">Refill (Swap Empty for Full)</option>
+                  <option value="refill">Refill (Swap Tare)</option>
                   <option value="complete">Complete Unit (New Cylinder/Bottle)</option>
-                  <option value="accessory">Accessory / Disposable (One-way)</option>
+                  <option value="accessory">Accessory / Disposable</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                  Product / Size
-                </label>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">Product</label>
                 <select
                   value={selectedProductId}
                   onChange={(e) => {
@@ -613,7 +686,7 @@ export default function SalesPage() {
                       setIncomingBrand(chosen.brand === 'Keringet' ? 'Keringet' : 'Aquamist');
                     }
                   }}
-                  className="w-full min-h-[44px] text-xs border border-slate-300 rounded-xl px-2 bg-white text-slate-800"
+                  className="w-full min-h-[42px] text-xs border border-slate-300 rounded-xl px-2 bg-white text-slate-800"
                 >
                   {filteredProductsForSelect.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -631,17 +704,17 @@ export default function SalesPage() {
               {itemType === 'refill' ? (
                 <div>
                   <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    Customer Tare In ({isWaterProduct ? 'Empty Bottle' : 'Empty Cylinder'})
+                    Incoming Empty Tare ({isWaterProduct ? 'Bottle' : 'Cylinder'})
                   </label>
                   <select
                     value={incomingBrand}
                     onChange={(e) => setIncomingBrand(e.target.value)}
-                    className="w-full min-h-[44px] text-xs border border-slate-300 rounded-xl px-2 bg-white text-slate-800"
+                    className="w-full min-h-[42px] text-xs border border-slate-300 rounded-xl px-2 bg-white text-slate-800"
                   >
                     {isWaterProduct ? (
                       <>
-                        <option value="Keringet">Keringet (Empty 20L Bottle)</option>
-                        <option value="Aquamist">Aquamist (Empty 20L Bottle)</option>
+                        <option value="Keringet">Keringet 20L Empty</option>
+                        <option value="Aquamist">Aquamist 20L Empty</option>
                       </>
                     ) : (
                       <>
@@ -655,26 +728,26 @@ export default function SalesPage() {
                   </select>
                 </div>
               ) : (
-                <div className="flex items-center text-xs text-slate-400 pt-6">No swap tare needed</div>
+                <div className="flex items-center text-xs text-slate-400 pt-6">No tare swap required</div>
               )}
             </div>
 
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3 pt-1">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold text-slate-600">Qty:</span>
                 <div className="flex items-center border border-slate-300 rounded-xl overflow-hidden bg-white">
                   <button
                     type="button"
                     onClick={() => setItemQuantity((q) => Math.max(1, q - 1))}
-                    className="w-10 h-10 flex items-center justify-center text-slate-600 hover:bg-slate-100"
+                    className="w-9 h-9 flex items-center justify-center text-slate-600 hover:bg-slate-100"
                   >
                     <Minus className="w-3.5 h-3.5" />
                   </button>
-                  <span className="w-10 text-center font-bold text-sm text-slate-800">{itemQuantity}</span>
+                  <span className="w-8 text-center font-bold text-xs text-slate-800">{itemQuantity}</span>
                   <button
                     type="button"
                     onClick={() => setItemQuantity((q) => q + 1)}
-                    className="w-10 h-10 flex items-center justify-center text-slate-600 hover:bg-slate-100"
+                    className="w-9 h-9 flex items-center justify-center text-slate-600 hover:bg-slate-100"
                   >
                     <Plus className="w-3.5 h-3.5" />
                   </button>
@@ -684,16 +757,16 @@ export default function SalesPage() {
               <button
                 type="button"
                 onClick={handleAddToCart}
-                className="min-h-[44px] px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition flex items-center gap-2 shadow"
+                className="min-h-[42px] px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition flex items-center gap-2 shadow"
               >
-                <Plus className="w-4 h-4" /> Add Item To Cart
+                <Plus className="w-4 h-4" /> Add to Ticket
               </button>
             </div>
           </div>
 
-          {/* Section 3: Payment Details */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Step 3: Payment Record</span>
+          {/* Payment Section */}
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Payment Details</span>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
@@ -701,10 +774,10 @@ export default function SalesPage() {
                 <select
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-                  className="w-full min-h-[44px] text-xs border border-slate-300 rounded-xl px-2.5 bg-white text-slate-800"
+                  className="w-full min-h-[42px] text-xs border border-slate-300 rounded-xl px-2.5 bg-white text-slate-800"
                 >
-                  <option value="mpesa">M-Pesa (Till / STK)</option>
-                  <option value="cash">Cash (Counter / Hand)</option>
+                  <option value="mpesa">M-Pesa (Till / Paybill)</option>
+                  <option value="cash">Cash (Counter)</option>
                   <option value="bank_transfer">Bank Transfer</option>
                 </select>
               </div>
@@ -714,7 +787,7 @@ export default function SalesPage() {
                 <select
                   value={paymentStatus}
                   onChange={(e) => setPaymentStatus(e.target.value as PaymentStatus)}
-                  className="w-full min-h-[44px] text-xs border border-slate-300 rounded-xl px-2.5 bg-white text-slate-800 font-bold"
+                  className="w-full min-h-[42px] text-xs border border-slate-300 rounded-xl px-2.5 bg-white text-slate-800 font-bold"
                 >
                   <option value="paid">PAID (Verified)</option>
                   <option value="pending">PENDING (Pay on delivery)</option>
@@ -722,69 +795,66 @@ export default function SalesPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Receipt / M-Pesa Code</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">M-Pesa / Reference Code</label>
                 <input
                   type="text"
                   value={paymentReference}
                   onChange={(e) => setPaymentReference(e.target.value.toUpperCase())}
                   placeholder="e.g. QGK81920X"
-                  className="w-full min-h-[44px] px-3 py-2 text-xs font-mono uppercase border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                  className="w-full min-h-[42px] px-3 py-2 text-xs font-mono uppercase border border-slate-300 rounded-xl focus:ring-1 focus:ring-orange-500 focus:outline-none"
                 />
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right 1 Col: Cart & Order Review */}
+        {/* Right 1 Col: Cart & Ticket Summary */}
         <div>
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm sticky top-20">
-            <h3 className="text-base font-bold text-slate-900 mb-3 pb-2 border-b border-slate-100 flex items-center justify-between">
-              <span>Cart & Total</span>
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm sticky top-20 space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <h3 className="text-sm font-bold text-slate-900">Ticket Items</h3>
               <span className="text-xs font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">
                 {totalCartCount} item{totalCartCount !== 1 ? 's' : ''}
               </span>
-            </h3>
+            </div>
 
             {cart.length === 0 ? (
-              <div className="py-10 text-center text-slate-400 text-xs">
-                <ShoppingCart className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                No items in cart. Tap a quick-add preset or custom item.
+              <div className="py-8 text-center text-slate-400 text-xs">
+                <ShoppingCart className="w-7 h-7 mx-auto mb-2 opacity-30" />
+                No items added. Select product and click &quot;Add to Ticket&quot;.
               </div>
             ) : (
-              <div className="divide-y divide-slate-100 mb-4 max-h-72 overflow-y-auto pr-1">
+              <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto pr-1">
                 {cart.map((item) => (
-                  <div key={item.id} className="py-3 flex items-center justify-between gap-3 text-xs">
+                  <div key={item.id} className="py-2.5 flex items-center justify-between gap-2 text-xs">
                     <div className="flex-1 min-w-0">
                       <div className="font-bold text-slate-900 truncate">
                         {item.outgoingBrand} {item.cylinderSizeKg ? `${item.cylinderSizeKg}kg` : ''}
                       </div>
-                      <div className="text-[10px] text-slate-500 mt-0.5">
-                        {item.orderType === 'refill' && (
-                          <span className="text-orange-600 font-medium">Swap: {item.incomingBrand} in</span>
-                        )}
+                      <div className="text-[10px] text-slate-500">
+                        {item.orderType === 'refill' && `Swap: ${item.incomingBrand} in`}
                         {item.orderType === 'complete' && 'Complete Unit'}
-                        {item.orderType === 'accessory' && 'Accessory / Disposable'}
+                        {item.orderType === 'accessory' && 'Accessory / Disp'}
                       </div>
-                      <div className="font-semibold text-slate-700 mt-0.5">
+                      <div className="font-semibold text-slate-800">
                         KES {(item.unitPrice * item.quantity).toLocaleString()}
                       </div>
                     </div>
 
-                    {/* Quantity Increment / Decrement directly in Cart */}
                     <div className="flex items-center gap-1">
                       <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden bg-slate-50">
                         <button
                           type="button"
                           onClick={() => updateCartItemQuantity(item.id, -1)}
-                          className="w-7 h-7 flex items-center justify-center text-slate-600 hover:bg-slate-200"
+                          className="w-6 h-6 flex items-center justify-center text-slate-600 hover:bg-slate-200"
                         >
                           <Minus className="w-3 h-3" />
                         </button>
-                        <span className="w-6 text-center font-bold text-xs">{item.quantity}</span>
+                        <span className="w-5 text-center font-bold text-xs">{item.quantity}</span>
                         <button
                           type="button"
                           onClick={() => updateCartItemQuantity(item.id, 1)}
-                          className="w-7 h-7 flex items-center justify-center text-slate-600 hover:bg-slate-200"
+                          className="w-6 h-6 flex items-center justify-center text-slate-600 hover:bg-slate-200"
                         >
                           <Plus className="w-3 h-3" />
                         </button>
@@ -793,10 +863,9 @@ export default function SalesPage() {
                       <button
                         type="button"
                         onClick={() => handleRemoveFromCart(item.id)}
-                        className="p-1.5 text-slate-400 hover:text-red-600 transition"
-                        title="Delete line"
+                        className="p-1 text-slate-400 hover:text-red-600"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
@@ -805,7 +874,7 @@ export default function SalesPage() {
             )}
 
             {/* Calculations Breakdown */}
-            <div className="space-y-1.5 pt-3 border-t border-slate-100 text-xs">
+            <div className="space-y-1.5 pt-2 border-t border-slate-100 text-xs">
               <div className="flex justify-between text-slate-600">
                 <span>Subtotal:</span>
                 <span className="font-semibold">KES {subtotal.toLocaleString()}</span>
@@ -813,11 +882,11 @@ export default function SalesPage() {
               <div className="flex justify-between text-emerald-600">
                 <span>Delivery Fee:</span>
                 <span className="font-bold uppercase tracking-wider text-[11px] bg-emerald-50 px-2 py-0.5 rounded">
-                  Free Delivery
+                  Free
                 </span>
               </div>
               <div className="flex justify-between text-slate-900 font-bold text-base pt-2 border-t border-slate-200">
-                <span>Total Amount:</span>
+                <span>Total Due:</span>
                 <span className="text-orange-600">KES {grandTotal.toLocaleString()}</span>
               </div>
             </div>
@@ -826,30 +895,12 @@ export default function SalesPage() {
               type="button"
               disabled={isSubmitting || cart.length === 0}
               onClick={() => handleCreateOrder()}
-              className="mt-5 w-full min-h-[48px] py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm rounded-xl transition shadow-md disabled:opacity-40 flex items-center justify-center gap-2"
+              className="w-full min-h-[46px] py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm rounded-xl transition shadow disabled:opacity-40 flex items-center justify-center gap-2"
             >
-              {isSubmitting ? 'Recording...' : 'Complete & Dispatch Sale'} <ArrowRight className="w-4 h-4" />
+              {isSubmitting ? 'Recording...' : isPosWalkin ? 'Finalize Counter Sale' : 'Dispatch Delivery'}
+              <ArrowRight className="w-4 h-4" />
             </button>
           </div>
-        </div>
-      </div>
-
-      {/* Mobile Sticky Quick-Checkout Bar (Touch-friendly Thumb Zone) */}
-      <div className="md:hidden fixed bottom-14 left-0 right-0 bg-white/95 backdrop-blur border-t border-slate-200 p-3 z-40 shadow-lg">
-        <div className="max-w-md mx-auto flex items-center justify-between gap-3">
-          <div>
-            <span className="text-[10px] uppercase font-bold text-emerald-600 block">Free Delivery • {totalCartCount} items</span>
-            <span className="text-base font-extrabold text-orange-600">KES {grandTotal.toLocaleString()}</span>
-          </div>
-
-          <button
-            type="button"
-            disabled={isSubmitting || cart.length === 0}
-            onClick={() => handleCreateOrder()}
-            className="flex-1 min-h-[44px] px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl shadow transition disabled:opacity-40 flex items-center justify-center gap-1.5"
-          >
-            {isSubmitting ? 'Recording...' : 'Finish Sale'} <ArrowRight className="w-4 h-4" />
-          </button>
         </div>
       </div>
     </div>

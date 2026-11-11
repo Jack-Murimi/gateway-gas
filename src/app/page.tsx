@@ -337,7 +337,9 @@ export default function HomePage() {
             return (
               <div key={order.id} className="py-3 space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-mono font-bold text-orange-600">{order.order_number}</span>
+                  <span className="font-mono font-bold text-orange-600">
+                    {order.order_number} {order.receipt_number ? `(${order.receipt_number})` : ''}
+                  </span>
                   <span className="font-bold text-slate-900">KES {order.total_kes.toLocaleString()}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs text-slate-600">
@@ -391,7 +393,12 @@ export default function HomePage() {
                 const branch = branches.find((b) => b.id === order.branch_id);
                 return (
                   <tr key={order.id} className="hover:bg-slate-50">
-                    <td className="py-3 px-4 font-mono font-bold text-xs text-slate-800">{order.order_number}</td>
+                    <td className="py-3 px-4 font-mono font-bold text-xs text-slate-800">
+                      {order.order_number}
+                      {order.receipt_number && (
+                        <span className="block text-[10px] text-slate-400 font-normal">{order.receipt_number}</span>
+                      )}
+                    </td>
                     <td className="py-3 px-4">
                       <div className="font-medium text-slate-900">{order.customer_name}</div>
                       <div className="text-xs text-slate-500">{order.customer_phone}</div>

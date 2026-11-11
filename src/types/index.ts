@@ -68,12 +68,37 @@ export interface OrderItem {
   subtotal_kes: number;
 }
 
+export interface CustomerPhone {
+  id: string;
+  customer_id: string;
+  phone_number: string;
+  is_primary: boolean;
+}
+
+export interface CustomerLocation {
+  id: string;
+  customer_id: string;
+  estate: string;
+  specific_address?: string | null;
+  is_default: boolean;
+}
+
+export interface Customer {
+  id: string;
+  name: string;
+  created_at: string;
+  phones: CustomerPhone[];
+  locations: CustomerLocation[];
+}
+
 export interface Order {
   id: string;
   order_number: string;
+  receipt_number?: string | null;
   branch_id: string;
   sales_rep_id?: string | null;
   rider_id?: string | null;
+  customer_id?: string | null;
   is_pos_walkin: boolean;
   customer_name: string;
   customer_phone: string;

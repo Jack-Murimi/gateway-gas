@@ -14,6 +14,9 @@ import {
   PaymentStatus,
   PaymentMethod,
   OrderType,
+  Customer,
+  CustomerPhone,
+  CustomerLocation,
 } from '@/types';
 import {
   INITIAL_BRANCHES,
@@ -22,11 +25,15 @@ import {
   INITIAL_INVENTORY,
   INITIAL_ORDERS,
   INITIAL_LEADERBOARD,
+  INITIAL_CUSTOMERS,
 } from '@/lib/mock-data';
 
 interface CreateOrderParams {
   branch_id: string;
   is_pos_walkin: boolean;
+  customer_id?: string | null;
+  receipt_number?: string | null;
+  created_at?: string;
   customer_name: string;
   customer_phone: string;
   delivery_estate?: string;
@@ -54,12 +61,16 @@ interface StoreContextType {
   products: Product[];
   inventory: BranchInventory[];
   orders: Order[];
+  customers: Customer[];
   leaderboard: RiderLeaderboardEntry[];
   // Actions
   signupStaff: (email: string, full_name: string, phone: string, vehicle_plate?: string) => Promise<{ success: boolean; message: string }>;
   approveStaff: (staffId: string, role: UserRole) => void;
   rejectStaff: (staffId: string) => void;
   createOrder: (params: CreateOrderParams) => Promise<Order>;
+  createCustomer: (name: string, phone: string, estate: string, specificAddress?: string) => Customer;
+  addCustomerPhone: (customerId: string, phone: string) => void;
+  addCustomerLocation: (customerId: string, estate: string, specificAddress?: string) => void;
   assignRider: (orderId: string, riderId: string) => void;
   updateDeliveryStatus: (orderId: string, status: DeliveryStatus, comment?: string) => void;
   updateRiderComment: (orderId: string, comment: string) => void;
@@ -77,6 +88,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [products] = useState<Product[]>(INITIAL_PRODUCTS);
   const [inventory, setInventory] = useState<BranchInventory[]>(INITIAL_INVENTORY);
   const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
+  const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Initialize from localStorage or mock defaults
@@ -87,6 +99,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const storedBranches = localStorage.getItem('gwg_branches');
       const storedInventory = localStorage.getItem('gwg_inventory');
       const storedOrders = localStorage.getItem('gwg_orders');
+      const storedCustomers = localStorage.getItem('gwg_customers');
 
       if (storedUser) setCurrentUser(JSON.parse(storedUser));
       else setCurrentUser(INITIAL_STAFF[0]); // Default to admin for fast demo
@@ -95,6 +108,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (storedBranches) setBranches(JSON.parse(storedBranches));
       if (storedInventory) setInventory(JSON.parse(storedInventory));
       if (storedOrders) setOrders(JSON.parse(storedOrders));
+      if (storedCustomers) setCustomers(JSON.parse(storedCustomers));
     } catch {
       setCurrentUser(INITIAL_STAFF[0]);
     }
@@ -112,10 +126,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('gwg_branches', JSON.stringify(branches));
       localStorage.setItem('gwg_inventory', JSON.stringify(inventory));
       localStorage.setItem('gwg_orders', JSON.stringify(orders));
+      localStorage.setItem('gwg_customers', JSON.stringify(customers));
     } catch {
       // quota or private mode fallback
     }
-  }, [currentUser, staffList, branches, inventory, orders, isLoaded]);
+  }, [currentUser, staffList, branches, inventory, orders, customers, isLoaded]);
 
   // Staff signup
   const signupStaff = async (email: string, full_name: string, phone: string, vehicle_plate?: string) => {
@@ -210,9 +225,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const newOrder: Order = {
       id: orderId,
       order_number: orderNumber,
+      receipt_number: params.receipt_number || null,
       branch_id: params.branch_id,
       sales_rep_id: currentUser?.id || null,
       rider_id: null,
+      customer_id: params.customer_id || null,
       is_pos_walkin: params.is_pos_walkin,
       customer_name: params.customer_name,
       customer_phone: params.customer_phone,
@@ -227,7 +244,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       delivery_fee_kes: params.delivery_fee_kes,
       total_kes: total,
       delivered_at: params.is_pos_walkin ? new Date().toISOString() : null,
-      created_at: new Date().toISOString(),
+      created_at: params.created_at || new Date().toISOString(),
       items,
     };
 
@@ -310,6 +327,78 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setBranches((prev) => [...prev, newBranch]);
   };
 
+  // Customers
+  const createCustomer = (name: string, phone: string, estate: string, specificAddress?: string): Customer => {
+    const custId = `cust-${Date.now()}`;
+    const newCust: Customer = {
+      id: custId,
+      name,
+      created_at: new Date().toISOString(),
+      phones: [
+        {
+          id: `cp-${Date.now()}`,
+          customer_id: custId,
+          phone_number: phone,
+          is_primary: true,
+        },
+      ],
+      locations: [
+        {
+          id: `cl-${Date.now()}`,
+          customer_id: custId,
+          estate,
+          specific_address: specificAddress || null,
+          is_default: true,
+        },
+      ],
+    };
+    setCustomers((prev) => [newCust, ...prev]);
+    return newCust;
+  };
+
+  const addCustomerPhone = (customerId: string, phone: string) => {
+    setCustomers((prev) =>
+      prev.map((c) =>
+        c.id === customerId
+          ? {
+              ...c,
+              phones: [
+                ...c.phones,
+                {
+                  id: `cp-${Date.now()}`,
+                  customer_id: customerId,
+                  phone_number: phone,
+                  is_primary: c.phones.length === 0,
+                },
+              ],
+            }
+          : c
+      )
+    );
+  };
+
+  const addCustomerLocation = (customerId: string, estate: string, specificAddress?: string) => {
+    setCustomers((prev) =>
+      prev.map((c) =>
+        c.id === customerId
+          ? {
+              ...c,
+              locations: [
+                ...c.locations,
+                {
+                  id: `cl-${Date.now()}`,
+                  customer_id: customerId,
+                  estate,
+                  specific_address: specificAddress || null,
+                  is_default: c.locations.length === 0,
+                },
+              ],
+            }
+          : c
+      )
+    );
+  };
+
   const logout = () => {
     setCurrentUser(null);
     localStorage.removeItem('gwg_user');
@@ -359,11 +448,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         products,
         inventory,
         orders,
+        customers,
         leaderboard,
         signupStaff,
         approveStaff,
         rejectStaff,
         createOrder,
+        createCustomer,
+        addCustomerPhone,
+        addCustomerLocation,
         assignRider,
         updateDeliveryStatus,
         updateRiderComment,
