@@ -51,7 +51,7 @@ export default function RiderPage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-3xl mx-auto px-4 py-6 pb-24 md:pb-12 space-y-6">
       {/* Mobile Top Header */}
       <div className="bg-slate-900 rounded-2xl p-5 text-white shadow-lg">
         <div className="flex items-center justify-between">
@@ -69,7 +69,7 @@ export default function RiderPage() {
         <div className="mt-4 grid grid-cols-2 gap-2 bg-slate-800 p-1 rounded-xl">
           <button
             onClick={() => setActiveTab('runs')}
-            className={`py-2 text-xs font-bold rounded-lg transition ${
+            className={`min-h-[44px] py-2 text-xs font-bold rounded-lg transition ${
               activeTab === 'runs' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:text-white'
             }`}
           >
@@ -77,7 +77,7 @@ export default function RiderPage() {
           </button>
           <button
             onClick={() => setActiveTab('leaderboard')}
-            className={`py-2 text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5 ${
+            className={`min-h-[44px] py-2 text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5 ${
               activeTab === 'leaderboard' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:text-white'
             }`}
           >
@@ -130,7 +130,7 @@ export default function RiderPage() {
                   <div className="flex items-center gap-2 mt-2">
                     <a
                       href={`tel:${order.customer_phone}`}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs rounded-lg transition border border-emerald-200"
+                      className="inline-flex items-center gap-1.5 min-h-[44px] px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs rounded-xl transition border border-emerald-200"
                     >
                       <Phone className="w-3.5 h-3.5" /> Call Customer ({order.customer_phone})
                     </a>
@@ -160,7 +160,7 @@ export default function RiderPage() {
                   ))}
                 </div>
 
-                {/* Rider Comment Input (Required by answer #3: "the rider can not record payment, but a comment can help") */}
+                {/* Rider Comment Input */}
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-semibold text-slate-600 flex items-center gap-1">
                     <MessageSquare className="w-3 h-3" /> Delivery Note / Comment
@@ -173,12 +173,12 @@ export default function RiderPage() {
                       onChange={(e) =>
                         setCommentInputs({ ...commentInputs, [order.id]: e.target.value })
                       }
-                      className="flex-1 px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      className="flex-1 min-h-[44px] px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
                     />
                     <button
                       type="button"
                       onClick={() => handleSaveComment(order.id)}
-                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-lg transition"
+                      className="min-h-[44px] px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition"
                     >
                       Save Note
                     </button>
@@ -191,7 +191,7 @@ export default function RiderPage() {
                     type="button"
                     disabled={order.delivery_status === 'in_transit'}
                     onClick={() => handleStatusChange(order.id, 'in_transit')}
-                    className={`py-2.5 text-xs font-bold rounded-xl transition ${
+                    className={`min-h-[48px] py-2.5 text-xs font-bold rounded-xl transition ${
                       order.delivery_status === 'in_transit'
                         ? 'bg-blue-50 text-blue-400 border border-blue-200 cursor-not-allowed'
                         : 'bg-blue-600 hover:bg-blue-700 text-white shadow'
@@ -203,7 +203,7 @@ export default function RiderPage() {
                   <button
                     type="button"
                     onClick={() => handleStatusChange(order.id, 'delivered')}
-                    className="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition shadow flex items-center justify-center gap-1"
+                    className="min-h-[48px] py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition shadow flex items-center justify-center gap-1"
                   >
                     <CheckCircle2 className="w-4 h-4" /> Mark Delivered
                   </button>

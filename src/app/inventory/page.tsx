@@ -46,7 +46,9 @@ export default function InventoryPage() {
   const branchItems = inventory.filter((i) => i.branch_id === selectedBranchId);
 
   const filteredProducts = products.filter((p) => {
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.brand.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch =
+      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.brand.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCat = filterCategory === 'all' || p.category === filterCategory;
     return matchesSearch && matchesCat;
   });
@@ -76,30 +78,30 @@ export default function InventoryPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-12 space-y-6">
       {/* Page Title & Actions */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Package className="w-6 h-6 text-orange-600" /> Multi-Branch Inventory & Stock Tally
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <Package className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" /> Branch Stock & Cylinder Tally
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Operator control desk: reconcile full vs empty tare cylinders per distribution hub.
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+            Operator control: monitor full gas vs tare empties per distribution hub.
           </p>
         </div>
 
         {canAddBranch && (
           <button
             onClick={() => setShowBranchModal(true)}
-            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl transition flex items-center gap-2 self-start md:self-auto shadow"
+            className="min-h-[44px] px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition flex items-center gap-2 self-start sm:self-auto shadow"
           >
-            <Plus className="w-4 h-4" /> Add New Branch Hub
+            <Plus className="w-4 h-4" /> Add Branch Hub
           </button>
         )}
       </div>
 
-      {/* Branch Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-200">
+      {/* Branch Horizontal Selector */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
         {branches.map((b) => (
           <button
             key={b.id}
@@ -107,15 +109,19 @@ export default function InventoryPage() {
               setSelectedBranchId(b.id);
               setEditingStock(null);
             }}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${
+            className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap shadow-sm ${
               selectedBranchId === b.id
                 ? 'bg-orange-600 text-white shadow-md'
                 : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
             }`}
           >
-            <Building2 className="w-3.5 h-3.5" />
+            <Building2 className="w-4 h-4" />
             <span>{b.name}</span>
-            <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${selectedBranchId === b.id ? 'bg-orange-700 text-white' : 'bg-slate-100 text-slate-500'}`}>
+            <span
+              className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
+                selectedBranchId === b.id ? 'bg-orange-700 text-white' : 'bg-slate-100 text-slate-500'
+              }`}
+            >
               {b.code}
             </span>
           </button>
@@ -124,26 +130,26 @@ export default function InventoryPage() {
 
       {/* Branch Summary Metrics */}
       {activeBranch && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
             <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-orange-600 font-mono">{activeBranch.code}</span>
-              <h2 className="text-xl font-bold text-slate-900 mt-0.5">{activeBranch.name}</h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Location: {activeBranch.location_estate} • Contact: {activeBranch.contact_phone || 'None'}
-              </p>
+              <span className="text-xs font-bold uppercase tracking-wider text-orange-600 font-mono">
+                {activeBranch.code}
+              </span>
+              <h2 className="text-lg sm:text-xl font-bold text-slate-900 mt-0.5">{activeBranch.name}</h2>
+              <p className="text-xs text-slate-500 mt-0.5">{activeBranch.location_estate}</p>
             </div>
 
-            <div className="flex items-center gap-6">
-              <div className="text-center">
-                <span className="text-xs text-slate-400 block font-medium">Full Cylinders in Hub</span>
-                <span className="text-2xl font-bold text-emerald-600">
+            <div className="grid grid-cols-2 gap-3 sm:flex sm:items-center sm:gap-6 bg-slate-50 sm:bg-transparent p-3 sm:p-0 rounded-xl">
+              <div className="text-center sm:text-right">
+                <span className="text-[11px] text-slate-500 block font-medium">Full Cylinders</span>
+                <span className="text-xl sm:text-2xl font-bold text-emerald-600">
                   {branchItems.reduce((acc, i) => acc + i.full_units, 0)}
                 </span>
               </div>
-              <div className="text-center">
-                <span className="text-xs text-slate-400 block font-medium">Empty Tare Swaps</span>
-                <span className="text-2xl font-bold text-amber-600">
+              <div className="text-center sm:text-right">
+                <span className="text-[11px] text-slate-500 block font-medium">Empty Tare Swaps</span>
+                <span className="text-xl sm:text-2xl font-bold text-amber-600">
                   {branchItems.reduce((acc, i) => acc + i.empty_units, 0)}
                 </span>
               </div>
@@ -151,24 +157,24 @@ export default function InventoryPage() {
           </div>
 
           {/* Search & Filter Toolbar */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="relative w-full sm:w-72">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search cylinder brand or size..."
-                className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                placeholder="Search cylinder or accessory..."
+                className="w-full min-h-[44px] pl-9 pr-3 py-2 text-base md:text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 bg-slate-50/50"
               />
             </div>
 
-            <div className="flex items-center gap-1 self-start sm:self-auto">
+            <div className="flex items-center gap-1.5 self-start sm:self-auto overflow-x-auto w-full sm:w-auto pb-1">
               {(['all', 'cylinder', 'accessory'] as const).map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setFilterCategory(cat)}
-                  className={`px-3 py-1 text-xs font-semibold rounded-lg capitalize transition ${
+                  className={`min-h-[38px] px-3.5 py-1 text-xs font-bold rounded-xl capitalize transition ${
                     filterCategory === cat ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'
                   }`}
                 >
@@ -180,8 +186,115 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {/* Inventory Stock Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      {/* Mobile Card Layout (< 768px) */}
+      <div className="md:hidden space-y-3">
+        {filteredProducts.map((prod) => {
+          const invItem = branchItems.find((i) => i.product_id === prod.id);
+          const fullCount = invItem ? invItem.full_units : 0;
+          const emptyCount = invItem ? invItem.empty_units : 0;
+          const isEditing = editingStock?.productId === prod.id;
+
+          return (
+            <div key={prod.id} className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900">{prod.name}</h3>
+                  <div className="text-xs text-slate-500 mt-0.5">
+                    {prod.brand} • {prod.category} {prod.size_kg ? `(${prod.size_kg}kg)` : ''}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs font-bold text-slate-900">
+                    KES{' '}
+                    {prod.category === 'cylinder'
+                      ? prod.refill_price_kes.toLocaleString()
+                      : prod.accessory_price_kes.toLocaleString()}
+                  </div>
+                  <div className="text-[10px] text-slate-400">Refill Price</div>
+                </div>
+              </div>
+
+              {/* Stock counters */}
+              <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-emerald-700 block">Full Stock</span>
+                  {isEditing ? (
+                    <input
+                      type="number"
+                      min="0"
+                      value={editingStock.full}
+                      onChange={(e) =>
+                        setEditingStock({ ...editingStock, full: parseInt(e.target.value) || 0 })
+                      }
+                      className="w-full min-h-[38px] px-2 py-1 text-sm border border-slate-300 rounded-lg text-center font-bold"
+                    />
+                  ) : (
+                    <span className="text-base font-bold text-slate-800">{fullCount} units</span>
+                  )}
+                </div>
+
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-amber-700 block">Empty Tare</span>
+                  {prod.category === 'cylinder' ? (
+                    isEditing ? (
+                      <input
+                        type="number"
+                        min="0"
+                        value={editingStock.empty}
+                        onChange={(e) =>
+                          setEditingStock({ ...editingStock, empty: parseInt(e.target.value) || 0 })
+                        }
+                        className="w-full min-h-[38px] px-2 py-1 text-sm border border-slate-300 rounded-lg text-center font-bold"
+                      />
+                    ) : (
+                      <span className="text-base font-bold text-slate-800">{emptyCount} empties</span>
+                    )
+                  ) : (
+                    <span className="text-xs text-slate-300 block pt-1.5">—</span>
+                  )}
+                </div>
+              </div>
+
+              {canEditStock && (
+                <div className="pt-1">
+                  {isEditing ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => handleSaveStock(prod.id)}
+                        className="min-h-[40px] bg-emerald-600 text-white font-bold text-xs rounded-xl"
+                      >
+                        Save Count
+                      </button>
+                      <button
+                        onClick={() => setEditingStock(null)}
+                        className="min-h-[40px] bg-slate-100 text-slate-700 font-bold text-xs rounded-xl"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() =>
+                        setEditingStock({
+                          productId: prod.id,
+                          full: fullCount,
+                          empty: emptyCount,
+                        })
+                      }
+                      className="w-full min-h-[40px] bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" /> Adjust Stock Balance
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Desktop Table (>= 768px) */}
+      <div className="hidden md:block bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold">
@@ -191,7 +304,7 @@ export default function InventoryPage() {
                 <th className="py-3 px-6 text-center">Full Gas Stock</th>
                 <th className="py-3 px-6 text-center">Empty Tare Stock</th>
                 <th className="py-3 px-6 text-right">Standard Refill Price</th>
-                {canEditStock && <th className="py-3 px-6 text-right">Operator Stock Tally</th>}
+                {canEditStock && <th className="py-3 px-6 text-right">Operator Tally</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -321,7 +434,7 @@ export default function InventoryPage() {
                   value={newBranchName}
                   onChange={(e) => setNewBranchName(e.target.value)}
                   placeholder="e.g. Lang'ata Hub"
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full min-h-[44px] px-3 py-2 text-base md:text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
               </div>
 
@@ -333,7 +446,7 @@ export default function InventoryPage() {
                   value={newBranchCode}
                   onChange={(e) => setNewBranchCode(e.target.value.toUpperCase())}
                   placeholder="e.g. LNG-05"
-                  className="w-full px-3 py-2 text-xs font-mono uppercase border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full min-h-[44px] px-3 py-2 text-base md:text-sm font-mono uppercase border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
               </div>
 
@@ -345,7 +458,7 @@ export default function InventoryPage() {
                   value={newBranchEstate}
                   onChange={(e) => setNewBranchEstate(e.target.value)}
                   placeholder="e.g. Lang'ata Road, Nairobi"
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full min-h-[44px] px-3 py-2 text-base md:text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
               </div>
 
@@ -356,7 +469,7 @@ export default function InventoryPage() {
                   value={newBranchPhone}
                   onChange={(e) => setNewBranchPhone(e.target.value)}
                   placeholder="+254..."
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full min-h-[44px] px-3 py-2 text-base md:text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
               </div>
 
@@ -364,13 +477,13 @@ export default function InventoryPage() {
                 <button
                   type="button"
                   onClick={() => setShowBranchModal(false)}
-                  className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition"
+                  className="min-h-[44px] px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold text-xs rounded-lg transition"
+                  className="min-h-[44px] px-5 py-2 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl transition shadow"
                 >
                   Save Branch
                 </button>

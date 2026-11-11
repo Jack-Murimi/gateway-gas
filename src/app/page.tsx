@@ -103,7 +103,7 @@ export default function HomePage() {
     const myPending = myDeliveries.filter((o) => o.delivery_status !== 'delivered' && o.delivery_status !== 'cancelled');
 
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-12 space-y-6">
         <div className="bg-gradient-to-r from-amber-500 to-orange-600 rounded-2xl p-6 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <span className="text-xs font-bold uppercase tracking-wider text-amber-100">Rider Console</span>
@@ -190,7 +190,7 @@ export default function HomePage() {
 
   // Admin, Director, Operator, Sales Rep Dashboard
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-12 space-y-6">
       {/* Welcome Banner */}
       <div className="bg-slate-900 rounded-2xl p-6 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -320,17 +320,60 @@ export default function HomePage() {
       </div>
 
       {/* Recent Orders List */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+          <h2 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
             <ShoppingCart className="w-5 h-5 text-orange-600" /> Recent Sales & Deliveries
           </h2>
           <Link href="/sales" className="text-xs font-semibold text-orange-600 hover:underline">
-            View All Orders
+            View POS
           </Link>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Mobile Cards (< 768px) */}
+        <div className="md:hidden divide-y divide-slate-100">
+          {orders.slice(0, 5).map((order) => {
+            const branch = branches.find((b) => b.id === order.branch_id);
+            return (
+              <div key={order.id} className="py-3 space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-mono font-bold text-orange-600">{order.order_number}</span>
+                  <span className="font-bold text-slate-900">KES {order.total_kes.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-slate-600">
+                  <span className="font-medium text-slate-800">{order.customer_name}</span>
+                  <span className="text-[11px] text-slate-400">{branch?.name}</span>
+                </div>
+                <div className="flex items-center gap-1.5 pt-0.5">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-100 text-slate-700">
+                    {order.is_pos_walkin ? 'Walk-In' : 'Delivery'}
+                  </span>
+                  <span
+                    className={`px-2 py-0.5 rounded font-bold uppercase text-[10px] ${
+                      order.delivery_status === 'delivered'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : order.delivery_status === 'in_transit'
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-amber-100 text-amber-800'
+                    }`}
+                  >
+                    {order.delivery_status.replace('_', ' ')}
+                  </span>
+                  <span
+                    className={`px-2 py-0.5 rounded font-bold uppercase text-[10px] ${
+                      order.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                    }`}
+                  >
+                    {order.payment_status}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Desktop Table (>= 768px) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold">
               <tr>
