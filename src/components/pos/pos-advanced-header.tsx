@@ -114,7 +114,13 @@ export function PosAdvancedHeader({
                 type="date"
                 value={receiptDate}
                 onChange={(e) => onChangeDate(e.target.value)}
-                onClick={(e) => (e.target as HTMLInputElement).showPicker?.()}
+                onClick={(e) => {
+                  try {
+                    (e.target as HTMLInputElement).showPicker?.();
+                  } catch {
+                    // Ignore if unsupported or already showing
+                  }
+                }}
                 className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
                 aria-label="Sale date"
               />
@@ -215,7 +221,14 @@ export function PosAdvancedHeader({
                 type="date"
                 value={receiptDate}
                 onChange={(e) => onChangeDate(e.target.value)}
-                onClick={(e) => canEditDate && (e.target as HTMLInputElement).showPicker?.()}
+                onClick={(e) => {
+                  if (!canEditDate) return;
+                  try {
+                    (e.target as HTMLInputElement).showPicker?.();
+                  } catch {
+                    // Ignore if unsupported or already showing
+                  }
+                }}
                 disabled={!canEditDate}
                 aria-describedby={canEditDate ? undefined : `${dateId}-hint`}
                 className={`${fieldClass} ${canEditDate ? 'cursor-pointer hover:border-orange-500' : ''}`}

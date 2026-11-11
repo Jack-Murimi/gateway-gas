@@ -138,7 +138,13 @@ export default function SalesPage() {
         is_pos_walkin: isPosWalkin,
         customer_id: selectedCustomer?.id || null,
         receipt_number: receiptNumber.trim(),
-        created_at: new Date(receiptDate).toISOString(),
+        created_at: (() => {
+          const now = new Date();
+          const [y, m, d] = receiptDate.split('-').map(Number);
+          return y && m && d
+            ? new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds()).toISOString()
+            : now.toISOString();
+        })(),
         customer_name: customerName,
         customer_phone: customerPhone,
         delivery_estate: isPosWalkin ? undefined : deliveryEstate,
