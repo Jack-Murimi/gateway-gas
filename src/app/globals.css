@@ -18,3 +18,8 @@ body {
 * {
   box-sizing: border-box;
 }
+
+/* Hide Next.js dev watermark / indicator */
+nextjs-portal {
+  display: none !important;
+}
