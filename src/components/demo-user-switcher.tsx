@@ -22,6 +22,8 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 
+import { useToast } from '@/components/ui/toast';
+
 const roleMeta: Record<string, { label: string; icon: React.ComponentType<{ className?: string }>; color: string }> = {
   admin: { label: 'Admin', icon: ShieldCheck, color: 'bg-purple-100 text-purple-800 border-purple-200' },
   director: { label: 'Director', icon: Briefcase, color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
@@ -36,10 +38,11 @@ export function DemoUserSwitcher() {
   const router = useRouter();
   const pathname = usePathname();
   const { currentUser, setCurrentUser, staffList, resetDemoData } = useStore();
+  const { showSuccess } = useToast();
 
   const [isOpen, setIsOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [resetSuccess, setResetSuccess] = useState(false);
+  const [showConfirmReset, setShowConfirmReset] = useState(false);
 
   // Compile-time tree-shake: dead-code eliminated when NEXT_PUBLIC_DEMO_MODE !== 'true'
   if (!IS_DEMO_MODE) {
@@ -54,6 +57,7 @@ export function DemoUserSwitcher() {
       setDemoSessionCookies(user.id, user.role, user.approval_status);
     }
     setIsOpen(false);
+    showSuccess(`Switched active user to ${user.full_name} (${user.role.replace('_', ' ')})`);
 
     // Redirect to appropriate landing by role if current page is restricted
     if (user.approval_status !== 'approved') {
@@ -70,32 +74,30 @@ export function DemoUserSwitcher() {
   };
 
   const handleResetData = () => {
-    if (window.confirm('Reset all demo orders, stock, and staff back to original seed data?')) {
-      resetDemoData();
-      setResetSuccess(true);
-      setTimeout(() => setResetSuccess(false), 2500);
-      setIsOpen(false);
-    }
+    resetDemoData();
+    showSuccess('Demo data reset to original seed state.');
+    setShowConfirmReset(false);
+    setIsOpen(false);
   };
 
   return (
     <>
       {/* 1. VISIBLE DEMO MODE RIBBON (Never mistaken for production) */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-amber-400 text-amber-950 px-3 py-1 text-[11px] font-black uppercase tracking-wider flex items-center justify-between shadow-sm select-none pointer-events-auto">
+      <div className="relative z-40 bg-amber-400 text-amber-950 px-3 py-1.5 text-xs font-black uppercase tracking-wider flex items-center justify-between shadow-sm select-none">
         <div className="flex items-center gap-1.5 mx-auto sm:mx-0">
-          <AlertTriangle className="w-3.5 h-3.5 fill-amber-950 text-amber-400 shrink-0" />
+          <AlertTriangle className="w-4 h-4 fill-amber-950 text-amber-400 shrink-0" />
           <span>DEMO MODE ACTIVE</span>
-          <span className="hidden sm:inline font-medium lowercase text-amber-900">• mock session & sandbox data</span>
+          <span className="hidden sm:inline font-bold lowercase text-amber-900">• sandbox mock data</span>
         </div>
         <div className="hidden sm:flex items-center gap-2">
-          <span className="text-[10px] font-semibold text-amber-900">
-            Current: {currentUser ? `${currentUser.full_name} (${currentUser.role})` : 'Not signed in'}
+          <span className="text-xs font-bold text-amber-950">
+            Active: {currentUser ? `${currentUser.full_name} (${currentUser.role})` : 'Not signed in'}
           </span>
           <button
             onClick={() => setIsOpen(true)}
-            className="px-2 py-0.5 rounded bg-amber-950 text-amber-200 text-[10px] font-bold hover:bg-black transition"
+            className="px-2.5 py-0.5 rounded-lg bg-amber-950 text-amber-200 text-xs font-black hover:bg-black transition"
           >
-            Switch
+            Switch User
           </button>
         </div>
       </div>
@@ -209,21 +211,39 @@ export function DemoUserSwitcher() {
             </div>
 
             {/* Actions: Reset Data Button */}
-            <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={handleResetData}
-                className="w-full py-2 px-3 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition flex items-center justify-center gap-1.5"
-              >
-                <RefreshCw className="w-3.5 h-3.5" /> Reset Demo Data
-              </button>
+            <div className="pt-3 border-t-2 border-slate-100">
+              {showConfirmReset ? (
+                <div className="p-3 bg-rose-50 border-2 border-rose-300 rounded-2xl space-y-2">
+                  <p className="text-xs font-bold text-rose-900">
+                    Reset all demo orders, stock counts, and staff back to seed state?
+                  </p>
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmReset(false)}
+                      className="px-3 py-1.5 text-xs font-bold bg-white text-slate-700 border border-slate-300 rounded-xl"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResetData}
+                      className="px-3 py-1.5 text-xs font-black bg-rose-600 text-white rounded-xl shadow-sm hover:bg-rose-700"
+                    >
+                      Yes, Reset
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmReset(true)}
+                  className="w-full min-h-[44px] py-2 px-3 rounded-2xl border-2 border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-black transition flex items-center justify-center gap-1.5"
+                >
+                  <RefreshCw className="w-4 h-4" /> Reset Demo Mock Data
+                </button>
+              )}
             </div>
-
-            {resetSuccess && (
-              <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs text-center font-semibold">
-                Demo mock data reset to original seed.
-              </div>
-            )}
           </div>
         </div>
       )}

@@ -7,10 +7,12 @@ import { useStore } from '@/context/store-context';
 import { createClient } from '@/lib/supabase/client';
 import { IS_DEMO_MODE, setDemoSessionCookies } from '@/lib/demo-mode';
 import { StaffProfile } from '@/types';
+import { normalizeKenyanPhone } from '@/lib/formatters';
 import {
   Flame,
   Lock,
   Mail,
+  Phone,
   AlertCircle,
   ArrowRight,
   ShieldCheck,
@@ -22,6 +24,9 @@ import {
   XCircle,
   Zap,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 
 function LoginContent() {
   const router = useRouter();
@@ -29,7 +34,7 @@ function LoginContent() {
   const redirectTarget = searchParams.get('redirect');
 
   const { setCurrentUser, staffList } = useStore();
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState(''); // Email or Kenyan phone
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -61,31 +66,47 @@ function LoginContent() {
     navigateByRole(user);
   };
 
-  // Real Supabase Auth Production Login
+  // Real Supabase Auth Login (supports email or phone lookup)
   const handleRealSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!email || !password) {
-      setError('Please provide your work email and password.');
+    const trimmed = identifier.trim();
+    if (!trimmed || !password) {
+      setError('Please provide your work email/phone and password.');
       return;
     }
 
     setIsSubmitting(true);
     try {
       const supabase = createClient();
+      let emailToAuth = trimmed;
+
+      // If user typed a phone number, resolve their work email first
+      if (/^[0-9+ ]+$/.test(trimmed)) {
+        const cleanPhone = normalizeKenyanPhone(trimmed);
+        const { data: matchedProfile } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('phone', cleanPhone)
+          .single();
+
+        if (matchedProfile?.email) {
+          emailToAuth = matchedProfile.email;
+        }
+      }
+
       const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
+        email: emailToAuth,
         password,
       });
 
       if (authError) {
-        setError(authError.message || 'Invalid email or password.');
+        setError(authError.message || 'Invalid credentials. Please verify your email and password.');
         return;
       }
 
       if (data.user) {
-        // Fetch correlating staff profile
         const { data: profile, error: profError } = await supabase
           .from('profiles')
           .select('*')
@@ -93,7 +114,7 @@ function LoginContent() {
           .single();
 
         if (profError || !profile) {
-          setError('Profile record not found. Contact administrator.');
+          setError('Staff profile record not found. Please contact administration.');
           return;
         }
 
@@ -117,120 +138,102 @@ function LoginContent() {
         navigateByRole(staffUser);
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Login failed. Please retry.';
-      setError(message);
+      const msg = err instanceof Error ? err.message : 'Sign in failed. Please try again.';
+      setError(msg);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Test account definitions for demo mode
   const testAccountConfigs = [
-    { roleKey: 'admin', label: 'Admin', icon: ShieldCheck, color: 'border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-900' },
-    { roleKey: 'director', label: 'Director', icon: Briefcase, color: 'border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-900' },
-    { roleKey: 'operator', label: 'Operator', icon: Package, color: 'border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-900' },
-    { roleKey: 'sales_rep', label: 'Sales Rep', icon: ShoppingCart, color: 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-900' },
-    { roleKey: 'rider', label: 'Rider', icon: Bike, color: 'border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900' },
-    { roleKey: 'pending', label: 'Pending', icon: Clock, color: 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-zinc-900', status: 'pending' },
-    { roleKey: 'rejected', label: 'Rejected', icon: XCircle, color: 'border-red-200 bg-red-50 hover:bg-red-100 text-red-900', status: 'rejected' },
+    { roleKey: 'admin', label: 'Admin', icon: ShieldCheck, color: 'bg-purple-100 text-purple-950 border-purple-300' },
+    { roleKey: 'director', label: 'Director', icon: Briefcase, color: 'bg-indigo-100 text-indigo-950 border-indigo-300' },
+    { roleKey: 'operator', label: 'Operator', icon: Package, color: 'bg-blue-100 text-blue-950 border-blue-300' },
+    { roleKey: 'sales_rep', label: 'Sales Rep', icon: ShoppingCart, color: 'bg-emerald-100 text-emerald-950 border-emerald-300' },
+    { roleKey: 'rider', label: 'Rider', icon: Bike, color: 'bg-amber-100 text-amber-950 border-amber-300' },
+    { roleKey: 'pending', label: 'Pending', icon: Clock, color: 'bg-zinc-100 text-zinc-950 border-zinc-300', status: 'pending' },
+    { roleKey: 'rejected', label: 'Rejected', icon: XCircle, color: 'bg-red-100 text-red-950 border-red-300', status: 'rejected' },
   ];
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center px-4 py-8">
-      <div className="max-w-md w-full space-y-5">
-        {/* Card */}
-        <div className="bg-white rounded-3xl shadow-xl border border-slate-200 p-6 sm:p-8 space-y-6">
+      <div className="max-w-md w-full space-y-6">
+        {/* Brand Card */}
+        <div className="bg-white rounded-3xl shadow-xl border-2 border-slate-200 p-6 sm:p-8 space-y-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-xl bg-orange-600 flex items-center justify-center text-white shadow-md">
-                <Flame className="w-5 h-5" />
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-orange-600 flex items-center justify-center text-white shadow-md">
+                <Flame className="w-6 h-6" />
               </div>
               <div>
-                <span className="font-extrabold text-base tracking-tight text-slate-900 block leading-tight">
+                <span className="font-black text-xl tracking-tight text-slate-900 block leading-tight">
                   GATEWAY GAS
                 </span>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600 block">
-                  Staff Portal
+                <span className="text-xs font-bold uppercase tracking-wider text-orange-600 block">
+                  Operations Portal
                 </span>
               </div>
             </div>
-            {IS_DEMO_MODE && (
-              <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-amber-100 text-amber-800 border border-amber-300">
-                Demo Active
-              </span>
-            )}
+            {IS_DEMO_MODE && <Badge variant="warning">Demo Active</Badge>}
           </div>
 
           <div>
-            <h1 className="text-xl font-bold text-slate-900">Sign In to Your Station</h1>
-            <p className="text-xs text-slate-500 mt-1">
-              Internal-use only. Access is protected by enterprise role permissions.
+            <h1 className="text-2xl font-black text-slate-900">Sign In</h1>
+            <p className="text-sm font-medium text-slate-500 mt-1">
+              Internal staff credentials. Access managed by branch permissions.
             </p>
           </div>
 
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
+            <div className="p-4 bg-red-50 border-2 border-red-300 rounded-2xl text-sm font-bold text-red-700 flex items-center gap-2.5">
+              <AlertCircle className="w-5 h-5 shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
           {/* Real Credentials Form */}
-          <form onSubmit={handleRealSignIn} className="space-y-3.5">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Work Email</label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@gatewaygas.co.ke"
-                  className="w-full min-h-[42px] pl-9 pr-3 text-xs border border-slate-300 rounded-xl focus:ring-1 focus:ring-orange-500 focus:outline-none"
-                />
-              </div>
+          <form onSubmit={handleRealSignIn} className="space-y-4">
+            <Input
+              label="Work Email or Phone"
+              required
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder="e.g. name@gatewaygas.co.ke or 0712345678"
+              leftIcon={<Mail className="w-5 h-5" />}
+            />
+
+            <Input
+              label="Password"
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              leftIcon={<Lock className="w-5 h-5" />}
+            />
+
+            <div className="flex items-center justify-between text-xs font-bold">
+              <span className="text-slate-500">Forgot password? Contact Station Admin</span>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Password</label>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full min-h-[42px] pl-9 pr-3 text-xs border border-slate-300 rounded-xl focus:ring-1 focus:ring-orange-500 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full min-h-[44px] py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl shadow transition disabled:opacity-40 flex items-center justify-center gap-2"
-            >
-              {isSubmitting ? 'Authenticating...' : 'Sign In with Password'}{' '}
-              <ArrowRight className="w-4 h-4" />
-            </button>
+            <Button type="submit" isLoading={isSubmitting} size="lg" className="w-full">
+              Sign In to Station <ArrowRight className="w-5 h-5 ml-2" />
+            </Button>
           </form>
 
           {/* DEMO MODE: Test Accounts Panel (Tree-shaken in production) */}
           {IS_DEMO_MODE && (
-            <div className="pt-4 border-t border-slate-100 space-y-2.5">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900 uppercase tracking-wider">
-                <Zap className="w-3.5 h-3.5 text-amber-600" /> Test accounts (1-Tap Instant Sign-In)
+            <div className="pt-5 border-t-2 border-slate-100 space-y-3">
+              <div className="flex items-center gap-2 text-xs font-black text-amber-900 uppercase tracking-wider">
+                <Zap className="w-4 h-4 text-amber-600" /> 1-Tap QA Test Accounts
               </div>
-              <p className="text-[11px] text-slate-500">
-                App is in testing mode. Tap any role to sign in instantly with zero typing:
+              <p className="text-xs text-slate-600">
+                Testing mode active. Tap any role to sign in instantly with no typing:
               </p>
 
               <div className="grid grid-cols-2 gap-2 pt-1">
                 {testAccountConfigs.map((cfg) => {
                   const Icon = cfg.icon;
-                  // Match user in staffList
                   const targetUser = staffList.find((u) => {
                     if (cfg.status === 'rejected') return u.approval_status === 'rejected';
                     if (cfg.status === 'pending') return u.approval_status === 'pending';
@@ -244,12 +247,12 @@ function LoginContent() {
                       key={cfg.label}
                       type="button"
                       onClick={() => handleDemoSignIn(targetUser)}
-                      className={`p-2 rounded-xl border text-left transition flex items-center gap-2 text-xs font-semibold ${cfg.color}`}
+                      className={`min-h-[48px] p-2.5 rounded-2xl border-2 text-left transition flex items-center gap-2.5 font-bold ${cfg.color} active:scale-95`}
                     >
-                      <Icon className="w-4 h-4 shrink-0" />
+                      <Icon className="w-5 h-5 shrink-0" />
                       <div className="min-w-0 flex-1 truncate">
-                        <div className="font-bold text-[11px] leading-tight">{cfg.label}</div>
-                        <div className="text-[9px] opacity-75 truncate">{targetUser.full_name.split(' ')[0]}</div>
+                        <div className="text-xs font-black leading-tight">{cfg.label}</div>
+                        <div className="text-[11px] opacity-80 truncate">{targetUser.full_name.split(' ')[0]}</div>
                       </div>
                     </button>
                   );
@@ -258,9 +261,9 @@ function LoginContent() {
             </div>
           )}
 
-          <div className="pt-3 border-t border-slate-100 text-center">
-            <Link href="/signup" className="text-xs text-orange-600 hover:underline font-bold">
-              New staff member? Register account →
+          <div className="pt-3 border-t-2 border-slate-100 text-center">
+            <Link href="/signup" className="text-sm font-bold text-orange-600 hover:underline">
+              New staff employee? Request station access →
             </Link>
           </div>
         </div>
@@ -271,9 +274,8 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-[85vh] flex items-center justify-center text-xs text-slate-400">Loading portal...</div>}>
+    <Suspense fallback={<div className="min-h-[85vh] flex items-center justify-center text-sm font-bold text-slate-500">Loading station portal...</div>}>
       <LoginContent />
     </Suspense>
   );
 }
-

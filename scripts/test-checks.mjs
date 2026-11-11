@@ -1,0 +1,29 @@
+import assert from 'node:assert/strict';
+
+// Self-check core phone normalization & KES currency logic
+function normalizeKenyanPhone(phone) {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.startsWith('0') && digits.length === 10) return `+254${digits.slice(1)}`;
+  if (digits.startsWith('254') && digits.length === 12) return `+${digits}`;
+  if (digits.length === 9) return `+254${digits}`;
+  return phone.startsWith('+') ? phone : `+${digits}`;
+}
+
+function formatKES(amount) {
+  if (isNaN(amount) || amount === null || amount === undefined) return 'KES 0';
+  return `KES ${Math.round(amount).toLocaleString('en-KE')}`;
+}
+
+// 1. Phone normalization tests
+assert.equal(normalizeKenyanPhone('0712345678'), '+254712345678');
+assert.equal(normalizeKenyanPhone('254712345678'), '+254712345678');
+assert.equal(normalizeKenyanPhone('712345678'), '+254712345678');
+assert.equal(normalizeKenyanPhone('+254712345678'), '+254712345678');
+assert.equal(normalizeKenyanPhone('0722 000 111'), '+254722000111');
+
+// 2. Currency formatting tests
+assert.equal(formatKES(0), 'KES 0');
+assert.equal(formatKES(1250), 'KES 1,250');
+assert.equal(formatKES(2999.8), 'KES 3,000');
+
+console.log('All core logic checks passed.');

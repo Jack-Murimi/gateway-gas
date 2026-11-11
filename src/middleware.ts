@@ -18,12 +18,12 @@ export function middleware(request: NextRequest) {
   const status = request.cookies.get('gwg_status')?.value;
   const userId = request.cookies.get('gwg_user_id')?.value;
 
-  const isPublicRoute = pathname === '/login' || pathname === '/signup';
+  const isAuthRoute = pathname === '/login' || pathname === '/signup';
   const isAuthenticated = Boolean(userId && role);
 
-  // 3. Unauthenticated -> redirect to /login
+  // 3. Unauthenticated -> allow / and auth pages, redirect rest to /login
   if (!isAuthenticated) {
-    if (isPublicRoute) {
+    if (pathname === '/' || isAuthRoute) {
       return NextResponse.next();
     }
     const loginUrl = new URL('/login', request.url);
@@ -39,8 +39,8 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/pending', request.url));
   }
 
-  // 5. Approved user accessing /login, /signup, or /pending -> redirect to landing
-  if (isPublicRoute || pathname === '/pending') {
+  // 5. Approved user accessing /login, /signup, or /pending -> redirect to role home
+  if (isAuthRoute || pathname === '/pending') {
     if (role === 'rider') return NextResponse.redirect(new URL('/rider', request.url));
     if (role === 'sales_rep') return NextResponse.redirect(new URL('/sales', request.url));
     if (role === 'operator') return NextResponse.redirect(new URL('/operations', request.url));

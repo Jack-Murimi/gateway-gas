@@ -1,0 +1,66 @@
+export type Locale = 'en' | 'sw';
+
+export const translations = {
+  en: {
+    portalTitle: 'Gateway Gas',
+    portalSubtitle: 'Nairobi Multi-Branch LPG',
+    navOverview: 'Overview',
+    navPOS: 'POS Sale',
+    navStock: 'Stock',
+    navDispatch: 'Dispatch',
+    navDeliveries: 'My Deliveries',
+    navStaff: 'Staff',
+    // POS Flow
+    stepCustomer: '1. Customer',
+    stepItems: '2. Cylinders / Items',
+    stepPay: '3. Payment',
+    walkInCustomer: 'Walk-in Counter Customer',
+    freeDelivery: 'Free Doorstep Delivery',
+    returnedBrand: 'Returned Empty Tare',
+    soldBrand: 'Dispensed Filled Brand',
+    completeSale: 'Complete Sale',
+    totalPayable: 'Total Payable',
+    // Rider
+    startTrip: 'Start Trip',
+    markDelivered: 'Mark Delivered',
+    callCustomer: 'Call Customer',
+    navigateMap: 'Google Maps',
+    // Statuses
+    statusPending: 'Pending',
+    statusAssigned: 'Assigned',
+    statusInTransit: 'On the Way',
+    statusDelivered: 'Delivered',
+    statusCancelled: 'Cancelled',
+  },
+  sw: {
+    portalTitle: 'Gateway Gas',
+    portalSubtitle: 'Mtandao wa Mitungi Nairobi',
+    navOverview: 'Muhtasari',
+    navPOS: 'Kuuza (POS)',
+    navStock: 'Stoo / Akiba',
+    navDispatch: 'Ugawaji',
+    navDeliveries: 'Safari Zangu',
+    navStaff: 'Wafanyikazi',
+    // POS Flow
+    stepCustomer: '1. Mteja',
+    stepItems: '2. Mitungi / Bidhaa',
+    stepPay: '3. Malipo',
+    walkInCustomer: 'Mteja wa Dukani',
+    freeDelivery: 'Uwasilishaji Bure Mlangoni',
+    returnedBrand: 'Mtungi Uliorudishwa (Tupu)',
+    soldBrand: 'Mtungi Mpya / Uliojazwa',
+    completeSale: 'Kamilisha Mauzo',
+    totalPayable: 'Jumla ya Kulipa',
+    // Rider
+    startTrip: 'Anza Safari',
+    markDelivered: 'Nimewasilisha',
+    callCustomer: 'Pigia Mteja Simu',
+    navigateMap: 'Ramani (Google Maps)',
+    // Statuses
+    statusPending: 'Inasubiri',
+    statusAssigned: 'Imepangiwa Rider',
+    statusInTransit: 'Njiani',
+    statusDelivered: 'Imewasilishwa',
+    statusCancelled: 'Imeahirishwa',
+  },
+};

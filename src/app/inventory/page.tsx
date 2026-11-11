@@ -6,493 +6,384 @@ import {
   Package,
   Building2,
   Plus,
+  Minus,
   RefreshCw,
   Search,
-  CheckCircle,
+  CheckCircle2,
   AlertTriangle,
-  ArrowUpDown,
+  ArrowRightLeft,
+  X,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/components/ui/toast';
+import { formatKES } from '@/lib/formatters';
 
 export default function InventoryPage() {
   const { currentUser, branches, products, inventory, updateBranchStock, createBranch } = useStore();
+  const { showSuccess, showError } = useToast();
 
   const [selectedBranchId, setSelectedBranchId] = useState<string>(branches[0]?.id || '');
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterBrand, setFilterBrand] = useState<string>('all');
   const [filterCategory, setFilterCategory] = useState<'all' | 'cylinder' | 'water' | 'accessory'>('all');
 
-  // New Branch modal state
-  const [showBranchModal, setShowBranchModal] = useState(false);
-  const [newBranchName, setNewBranchName] = useState('');
-  const [newBranchCode, setNewBranchCode] = useState('');
-  const [newBranchEstate, setNewBranchEstate] = useState('');
-  const [newBranchPhone, setNewBranchPhone] = useState('');
-
-  // Stock edit state
-  const [editingStock, setEditingStock] = useState<{ productId: string; full: number; empty: number } | null>(null);
+  // Inter-branch transfer modal
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferTargetBranchId, setTransferTargetBranchId] = useState<string>(branches[1]?.id || '');
+  const [transferProductId, setTransferProductId] = useState<string>(products[0]?.id || '');
+  const [transferUnits, setTransferUnits] = useState<number>(5);
+  const [transferType, setTransferType] = useState<'full' | 'empty'>('full');
 
   if (!currentUser || currentUser.approval_status !== 'approved') {
     return (
       <div className="max-w-4xl mx-auto px-4 py-16 text-center">
-        <p className="text-sm text-slate-500">Please log in with an approved staff account.</p>
+        <p className="text-sm font-bold text-slate-500">Please sign in with an approved station staff profile.</p>
       </div>
     );
   }
 
   const activeBranch = branches.find((b) => b.id === selectedBranchId) || branches[0];
   const canEditStock = ['admin', 'director', 'operator'].includes(currentUser.role);
-  const canAddBranch = currentUser.role === 'admin';
 
   // Branch inventory rows
   const branchItems = inventory.filter((i) => i.branch_id === selectedBranchId);
+
+  // Extract unique brands for filter
+  const brandsList = Array.from(new Set(products.map((p) => p.brand)));
 
   const filteredProducts = products.filter((p) => {
     const matchesSearch =
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.brand.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCat = filterCategory === 'all' || p.category === filterCategory;
-    return matchesSearch && matchesCat;
+    const matchesBrand = filterBrand === 'all' || p.brand.toLowerCase() === filterBrand.toLowerCase();
+    return matchesSearch && matchesCat && matchesBrand;
   });
 
-  const handleSaveStock = (productId: string) => {
-    if (!editingStock) return;
-    const existing = branchItems.find((i) => i.product_id === productId);
-    const currentFull = existing ? existing.full_units : 0;
-    const currentEmpty = existing ? existing.empty_units : 0;
-
-    const fullDelta = editingStock.full - currentFull;
-    const emptyDelta = editingStock.empty - currentEmpty;
-
+  // Quick inline +/- adjust
+  const handleQuickAdjust = (productId: string, isFull: boolean, delta: number) => {
+    if (!canEditStock) {
+      showError('Stock adjustments require Operator or Admin credentials.');
+      return;
+    }
+    const fullDelta = isFull ? delta : 0;
+    const emptyDelta = !isFull ? delta : 0;
     updateBranchStock(selectedBranchId, productId, fullDelta, emptyDelta);
-    setEditingStock(null);
+    showSuccess(`Updated ${isFull ? 'full' : 'empty'} count by ${delta > 0 ? `+${delta}` : delta}`);
   };
 
-  const handleCreateBranch = (e: React.FormEvent) => {
+  // Inter-branch stock transfer
+  const handleTransfer = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newBranchName || !newBranchCode || !newBranchEstate) return;
-    createBranch(newBranchName, newBranchCode, newBranchEstate, newBranchPhone);
-    setShowBranchModal(false);
-    setNewBranchName('');
-    setNewBranchCode('');
-    setNewBranchEstate('');
-    setNewBranchPhone('');
+    if (selectedBranchId === transferTargetBranchId) {
+      showError('Source and destination branches must be different.');
+      return;
+    }
+
+    const sourceItem = branchItems.find((i) => i.product_id === transferProductId);
+    const available = transferType === 'full' ? sourceItem?.full_units || 0 : sourceItem?.empty_units || 0;
+
+    if (transferUnits <= 0 || transferUnits > available) {
+      showError(`Cannot transfer ${transferUnits} units. Only ${available} available at ${activeBranch.name}.`);
+      return;
+    }
+
+    // Deduct from source branch
+    updateBranchStock(
+      selectedBranchId,
+      transferProductId,
+      transferType === 'full' ? -transferUnits : 0,
+      transferType === 'empty' ? -transferUnits : 0
+    );
+
+    // Add to target branch
+    updateBranchStock(
+      transferTargetBranchId,
+      transferProductId,
+      transferType === 'full' ? transferUnits : 0,
+      transferType === 'empty' ? transferUnits : 0
+    );
+
+    const targetBranch = branches.find((b) => b.id === transferTargetBranchId);
+    showSuccess(`Transferred ${transferUnits} units to ${targetBranch?.name || 'target hub'}`);
+    setShowTransferModal(false);
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-12 space-y-6">
-      {/* Page Title & Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-12 space-y-6 text-left">
+      {/* Title & Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Package className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" /> Branch Stock & Cylinder Tally
+          <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2">
+            <Package className="w-6 h-6 text-orange-600" /> Multi-Branch Inventory Balance
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Operator control: monitor full gas vs tare empties per distribution hub.
+            Real-time full cylinders, empty tares, and inter-hub transfers across Nairobi.
           </p>
         </div>
 
-        {canAddBranch && (
-          <button
-            onClick={() => setShowBranchModal(true)}
-            className="min-h-[44px] px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition flex items-center gap-2 self-start sm:self-auto shadow"
+        {canEditStock && (
+          <Button
+            size="md"
+            variant="outline"
+            onClick={() => setShowTransferModal(true)}
+            className="flex items-center gap-2 text-sm font-black"
           >
-            <Plus className="w-4 h-4" /> Add Branch Hub
-          </button>
+            <ArrowRightLeft className="w-4 h-4 text-orange-600" />
+            <span>Inter-Branch Stock Transfer</span>
+          </Button>
         )}
       </div>
 
-      {/* Branch Horizontal Selector */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-        {branches.map((b) => (
-          <button
-            key={b.id}
-            onClick={() => {
-              setSelectedBranchId(b.id);
-              setEditingStock(null);
-            }}
-            className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap shadow-sm ${
-              selectedBranchId === b.id
-                ? 'bg-orange-600 text-white shadow-md'
-                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            <Building2 className="w-4 h-4" />
-            <span>{b.name}</span>
-            <span
-              className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
-                selectedBranchId === b.id ? 'bg-orange-700 text-white' : 'bg-slate-100 text-slate-500'
-              }`}
+      {/* Branch & Brand Filter Strip */}
+      <div className="bg-white p-4 rounded-3xl border-2 border-slate-200 shadow-sm space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Branch Select */}
+          <div>
+            <label className="block text-xs font-black uppercase text-slate-600 mb-1">Station Hub</label>
+            <select
+              value={selectedBranchId}
+              onChange={(e) => setSelectedBranchId(e.target.value)}
+              className="w-full min-h-[48px] text-sm font-black px-3.5 bg-slate-50 border-2 border-slate-300 rounded-xl focus:border-orange-500 focus:outline-none"
             >
-              {b.code}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {/* Branch Summary Metrics */}
-      {activeBranch && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-sm space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-            <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-orange-600 font-mono">
-                {activeBranch.code}
-              </span>
-              <h2 className="text-lg sm:text-xl font-bold text-slate-900 mt-0.5">{activeBranch.name}</h2>
-              <p className="text-xs text-slate-500 mt-0.5">{activeBranch.location_estate}</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 sm:flex sm:items-center sm:gap-6 bg-slate-50 sm:bg-transparent p-3 sm:p-0 rounded-xl">
-              <div className="text-center sm:text-right">
-                <span className="text-[11px] text-slate-500 block font-medium">Full Cylinders</span>
-                <span className="text-xl sm:text-2xl font-bold text-emerald-600">
-                  {branchItems.reduce((acc, i) => acc + i.full_units, 0)}
-                </span>
-              </div>
-              <div className="text-center sm:text-right">
-                <span className="text-[11px] text-slate-500 block font-medium">Empty Tare Swaps</span>
-                <span className="text-xl sm:text-2xl font-bold text-amber-600">
-                  {branchItems.reduce((acc, i) => acc + i.empty_units, 0)}
-                </span>
-              </div>
-            </div>
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name} ({b.code}) — {b.location_estate}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* Search & Filter Toolbar */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="relative w-full sm:w-72">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search cylinder or accessory..."
-                className="w-full min-h-[44px] pl-9 pr-3 py-2 text-base md:text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 bg-slate-50/50"
-              />
-            </div>
+          {/* Category Filter */}
+          <div>
+            <label className="block text-xs font-black uppercase text-slate-600 mb-1">Category</label>
+            <select
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value as any)}
+              className="w-full min-h-[48px] text-sm font-bold px-3.5 bg-slate-50 border-2 border-slate-300 rounded-xl focus:border-orange-500 focus:outline-none"
+            >
+              <option value="all">All Products</option>
+              <option value="cylinder">Gas Cylinders</option>
+              <option value="water">Drinking Water</option>
+              <option value="accessory">Accessories</option>
+            </select>
+          </div>
 
-            <div className="flex items-center gap-1.5 self-start sm:self-auto overflow-x-auto w-full sm:w-auto pb-1">
-              {(['all', 'cylinder', 'water', 'accessory'] as const).map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setFilterCategory(cat)}
-                  className={`min-h-[38px] px-3.5 py-1 text-xs font-bold rounded-xl capitalize transition whitespace-nowrap ${
-                    filterCategory === cat ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  {cat === 'all' ? 'All' : cat === 'cylinder' ? 'Gas' : cat === 'water' ? 'Water' : 'Accessories'}
-                </button>
+          {/* Brand Filter */}
+          <div>
+            <label className="block text-xs font-black uppercase text-slate-600 mb-1">Brand</label>
+            <select
+              value={filterBrand}
+              onChange={(e) => setFilterBrand(e.target.value)}
+              className="w-full min-h-[48px] text-sm font-bold px-3.5 bg-slate-50 border-2 border-slate-300 rounded-xl focus:border-orange-500 focus:outline-none"
+            >
+              <option value="all">All Brands</option>
+              {brandsList.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
               ))}
-            </div>
+            </select>
           </div>
         </div>
-      )}
 
-      {/* Mobile Card Layout (< 768px) */}
-      <div className="md:hidden space-y-3">
-        {filteredProducts.map((prod) => {
-          const invItem = branchItems.find((i) => i.product_id === prod.id);
-          const fullCount = invItem ? invItem.full_units : 0;
-          const emptyCount = invItem ? invItem.empty_units : 0;
-          const isEditing = editingStock?.productId === prod.id;
-          const isExchangeItem = prod.category === 'cylinder' || (prod.category === 'water' && prod.refill_price_kes > 0);
+        {/* Live Search Bar */}
+        <div className="relative">
+          <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search specific size or SKU (e.g. 13kg Pro Gas, 6kg Total)..."
+            className="w-full min-h-[48px] pl-11 pr-4 text-base bg-white border-2 border-slate-300 rounded-2xl font-medium focus:border-orange-500 focus:outline-none"
+          />
+        </div>
+      </div>
+
+      {/* Stock Cards Grid (Mobile-friendly, big tap targets) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filteredProducts.map((p) => {
+          const invRow = branchItems.find((i) => i.product_id === p.id);
+          const fullCount = invRow?.full_units || 0;
+          const emptyCount = invRow?.empty_units || 0;
+          const isLowStock = p.category === 'cylinder' && fullCount <= 5;
 
           return (
-            <div key={prod.id} className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3">
-              <div className="flex items-start justify-between gap-2">
+            <div
+              key={p.id}
+              className={`p-5 rounded-3xl border-2 bg-white transition shadow-sm space-y-4 ${
+                isLowStock ? 'border-rose-400 ring-2 ring-rose-100' : 'border-slate-200'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-3">
                 <div>
-                  <h3 className="font-bold text-sm text-slate-900">{prod.name}</h3>
-                  <div className="text-xs text-slate-500 mt-0.5">
-                    {prod.brand} • {prod.category === 'water' ? 'Water' : prod.category === 'cylinder' ? 'Gas' : 'Accessory'} {prod.size_kg ? `(${prod.size_kg}${prod.category === 'water' ? 'L' : 'kg'})` : ''}
-                  </div>
+                  <h3 className="text-base font-black text-slate-900 leading-tight">{p.name}</h3>
+                  <div className="text-xs font-bold text-slate-500 mt-0.5">{p.brand}</div>
                 </div>
-                <div className="text-right">
-                  <div className="text-xs font-bold text-slate-900">
-                    KES{' '}
-                    {prod.refill_price_kes > 0
-                      ? prod.refill_price_kes.toLocaleString()
-                      : prod.accessory_price_kes.toLocaleString()}
-                  </div>
-                  <div className="text-[10px] text-slate-400">
-                    {prod.refill_price_kes > 0 ? 'Refill Price' : 'Unit Price'}
-                  </div>
-                </div>
+
+                {isLowStock ? (
+                  <Badge variant="danger" icon={<AlertTriangle className="w-3.5 h-3.5" />}>
+                    Low Stock
+                  </Badge>
+                ) : (
+                  <Badge variant="success">In Stock</Badge>
+                )}
               </div>
 
-              {/* Stock counters */}
-              <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-emerald-700 block">Full Stock</span>
-                  {isEditing ? (
-                    <input
-                      type="number"
-                      min="0"
-                      value={editingStock.full}
-                      onChange={(e) =>
-                        setEditingStock({ ...editingStock, full: parseInt(e.target.value) || 0 })
-                      }
-                      className="w-full min-h-[38px] px-2 py-1 text-sm border border-slate-300 rounded-lg text-center font-bold"
-                    />
-                  ) : (
-                    <span className="text-base font-bold text-slate-800">{fullCount} units</span>
-                  )}
-                </div>
-
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-amber-700 block">
-                    {prod.category === 'water' ? 'Empty Bottles' : 'Empty Tare'}
+              {/* Counts & Quick Steppers */}
+              <div className="grid grid-cols-2 gap-3 text-center">
+                {/* Full Units */}
+                <div className="bg-emerald-50/70 p-3 rounded-2xl border-2 border-emerald-200 space-y-1.5">
+                  <span className="text-[11px] font-black uppercase text-emerald-800 tracking-wider">
+                    Filled Units
                   </span>
-                  {isExchangeItem ? (
-                    isEditing ? (
-                      <input
-                        type="number"
-                        min="0"
-                        value={editingStock.empty}
-                        onChange={(e) =>
-                          setEditingStock({ ...editingStock, empty: parseInt(e.target.value) || 0 })
-                        }
-                        className="w-full min-h-[38px] px-2 py-1 text-sm border border-slate-300 rounded-lg text-center font-bold"
-                      />
-                    ) : (
-                      <span className="text-base font-bold text-slate-800">{emptyCount} empties</span>
-                    )
-                  ) : (
-                    <span className="text-xs text-slate-300 block pt-1.5">— (Disposable)</span>
-                  )}
-                </div>
-              </div>
+                  <div className="text-2xl font-black text-emerald-950">{fullCount}</div>
 
-              {canEditStock && (
-                <div className="pt-1">
-                  {isEditing ? (
-                    <div className="grid grid-cols-2 gap-2">
+                  {canEditStock && (
+                    <div className="flex justify-center gap-1 pt-1">
                       <button
-                        onClick={() => handleSaveStock(prod.id)}
-                        className="min-h-[40px] bg-emerald-600 text-white font-bold text-xs rounded-xl"
+                        type="button"
+                        onClick={() => handleQuickAdjust(p.id, true, -1)}
+                        className="w-8 h-8 rounded-lg bg-white border border-emerald-300 text-emerald-900 flex items-center justify-center font-black active:scale-95"
                       >
-                        Save Count
+                        <Minus className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => setEditingStock(null)}
-                        className="min-h-[40px] bg-slate-100 text-slate-700 font-bold text-xs rounded-xl"
+                        type="button"
+                        onClick={() => handleQuickAdjust(p.id, true, 1)}
+                        className="w-8 h-8 rounded-lg bg-white border border-emerald-300 text-emerald-900 flex items-center justify-center font-black active:scale-95"
                       >
-                        Cancel
+                        <Plus className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                  ) : (
-                    <button
-                      onClick={() =>
-                        setEditingStock({
-                          productId: prod.id,
-                          full: fullCount,
-                          empty: emptyCount,
-                        })
-                      }
-                      className="w-full min-h-[40px] bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" /> Adjust Stock Balance
-                    </button>
                   )}
                 </div>
-              )}
+
+                {/* Empty Tares */}
+                <div className="bg-slate-100 p-3 rounded-2xl border-2 border-slate-300 space-y-1.5">
+                  <span className="text-[11px] font-black uppercase text-slate-700 tracking-wider">
+                    Empty Tares
+                  </span>
+                  <div className="text-2xl font-black text-slate-900">{emptyCount}</div>
+
+                  {canEditStock && (
+                    <div className="flex justify-center gap-1 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleQuickAdjust(p.id, false, -1)}
+                        className="w-8 h-8 rounded-lg bg-white border border-slate-300 text-slate-800 flex items-center justify-center font-black active:scale-95"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleQuickAdjust(p.id, false, 1)}
+                        className="w-8 h-8 rounded-lg bg-white border border-slate-300 text-slate-800 flex items-center justify-center font-black active:scale-95"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Pricing Spec */}
+              <div className="pt-1 text-xs font-bold text-slate-500 flex justify-between">
+                <span>Refill: {formatKES(p.refill_price_kes)}</span>
+                <span>Complete: {formatKES(p.complete_price_kes)}</span>
+              </div>
             </div>
           );
         })}
       </div>
 
-      {/* Desktop Table (>= 768px) */}
-      <div className="hidden md:block bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold">
-              <tr>
-                <th className="py-3 px-6">Product / Brand</th>
-                <th className="py-3 px-6">Category & Size</th>
-                <th className="py-3 px-6 text-center">Full Gas Stock</th>
-                <th className="py-3 px-6 text-center">Empty Tare Stock</th>
-                <th className="py-3 px-6 text-right">Standard Refill Price</th>
-                {canEditStock && <th className="py-3 px-6 text-right">Operator Tally</th>}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredProducts.map((prod) => {
-                const invItem = branchItems.find((i) => i.product_id === prod.id);
-                const fullCount = invItem ? invItem.full_units : 0;
-                const emptyCount = invItem ? invItem.empty_units : 0;
-                const isEditing = editingStock?.productId === prod.id;
-                const isExchangeItem = prod.category === 'cylinder' || (prod.category === 'water' && prod.refill_price_kes > 0);
+      {/* Inter-Branch Transfer Sheet / Modal */}
+      {showTransferModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowTransferModal(false)} />
+          <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl border-2 border-slate-300 p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                <ArrowRightLeft className="w-5 h-5 text-orange-600" /> Inter-Branch Stock Transfer
+              </h3>
+              <button onClick={() => setShowTransferModal(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
-                return (
-                  <tr key={prod.id} className="hover:bg-slate-50">
-                    <td className="py-3.5 px-6">
-                      <div className="font-bold text-slate-900">{prod.name}</div>
-                      <div className="text-xs text-slate-500 font-medium">{prod.brand}</div>
-                    </td>
-
-                    <td className="py-3.5 px-6">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-100 text-slate-700">
-                        {prod.category === 'water' ? 'Water' : prod.category === 'cylinder' ? 'Gas' : 'Accessory'} {prod.size_kg ? `• ${prod.size_kg}${prod.category === 'water' ? 'L' : 'kg'}` : ''}
-                      </span>
-                    </td>
-
-                    <td className="py-3.5 px-6 text-center">
-                      {isEditing ? (
-                        <input
-                          type="number"
-                          min="0"
-                          value={editingStock.full}
-                          onChange={(e) =>
-                            setEditingStock({ ...editingStock, full: parseInt(e.target.value) || 0 })
-                          }
-                          className="w-16 px-2 py-1 text-xs border border-slate-300 rounded text-center font-bold text-emerald-700"
-                        />
-                      ) : (
-                        <span
-                          className={`font-bold text-sm ${
-                            fullCount === 0 ? 'text-red-500' : fullCount < 5 ? 'text-amber-600' : 'text-emerald-700'
-                          }`}
-                        >
-                          {fullCount} units
-                        </span>
-                      )}
-                    </td>
-
-                    <td className="py-3.5 px-6 text-center">
-                      {isExchangeItem ? (
-                        isEditing ? (
-                          <input
-                            type="number"
-                            min="0"
-                            value={editingStock.empty}
-                            onChange={(e) =>
-                              setEditingStock({ ...editingStock, empty: parseInt(e.target.value) || 0 })
-                            }
-                            className="w-16 px-2 py-1 text-xs border border-slate-300 rounded text-center font-bold text-amber-700"
-                          />
-                        ) : (
-                          <span className="font-bold text-sm text-amber-700">{emptyCount} empties</span>
-                        )
-                      ) : (
-                        <span className="text-xs text-slate-300">—</span>
-                      )}
-                    </td>
-
-                    <td className="py-3.5 px-6 text-right font-medium text-slate-700 text-xs">
-                      {prod.refill_price_kes > 0
-                        ? `KES ${prod.refill_price_kes.toLocaleString()}`
-                        : `KES ${prod.accessory_price_kes.toLocaleString()}`}
-                    </td>
-
-                    {canEditStock && (
-                      <td className="py-3.5 px-6 text-right">
-                        {isEditing ? (
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={() => handleSaveStock(prod.id)}
-                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded"
-                            >
-                              Save
-                            </button>
-                            <button
-                              onClick={() => setEditingStock(null)}
-                              className="px-2 py-1 text-xs text-slate-500 hover:text-slate-800"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() =>
-                              setEditingStock({
-                                productId: prod.id,
-                                full: fullCount,
-                                empty: emptyCount,
-                              })
-                            }
-                            className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded transition flex items-center gap-1 ml-auto"
-                          >
-                            <RefreshCw className="w-3 h-3" /> Adjust
-                          </button>
-                        )}
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Add Branch Modal */}
-      {showBranchModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-900 mb-1">Add New Distribution Branch</h3>
-            <p className="text-xs text-slate-500 mb-4">
-              Expand Gateway Gas network to a new Nairobi estate or station.
-            </p>
-
-            <form onSubmit={handleCreateBranch} className="space-y-4">
+            <form onSubmit={handleTransfer} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Branch Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={newBranchName}
-                  onChange={(e) => setNewBranchName(e.target.value)}
-                  placeholder="e.g. Lang'ata Hub"
-                  className="w-full min-h-[44px] px-3 py-2 text-base md:text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
+                <label className="block text-xs font-bold text-slate-700 mb-1">Source Station (From)</label>
+                <div className="p-3 bg-slate-100 rounded-xl font-black text-sm text-slate-900">
+                  {activeBranch.name} ({activeBranch.code})
+                </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Branch Code (Unique) *</label>
-                <input
-                  type="text"
-                  required
-                  value={newBranchCode}
-                  onChange={(e) => setNewBranchCode(e.target.value.toUpperCase())}
-                  placeholder="e.g. LNG-05"
-                  className="w-full min-h-[44px] px-3 py-2 text-base md:text-sm font-mono uppercase border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Estate / Location *</label>
-                <input
-                  type="text"
-                  required
-                  value={newBranchEstate}
-                  onChange={(e) => setNewBranchEstate(e.target.value)}
-                  placeholder="e.g. Lang'ata Road, Nairobi"
-                  className="w-full min-h-[44px] px-3 py-2 text-base md:text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Contact Phone</label>
-                <input
-                  type="text"
-                  value={newBranchPhone}
-                  onChange={(e) => setNewBranchPhone(e.target.value)}
-                  placeholder="+254..."
-                  className="w-full min-h-[44px] px-3 py-2 text-base md:text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowBranchModal(false)}
-                  className="min-h-[44px] px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition"
+                <label className="block text-xs font-bold text-slate-700 mb-1">Destination Station (To)</label>
+                <select
+                  value={transferTargetBranchId}
+                  onChange={(e) => setTransferTargetBranchId(e.target.value)}
+                  className="w-full min-h-[48px] text-sm font-black px-3.5 bg-white border-2 border-slate-300 rounded-xl"
                 >
+                  {branches
+                    .filter((b) => b.id !== selectedBranchId)
+                    .map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} ({b.code})
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Cylinder Product</label>
+                <select
+                  value={transferProductId}
+                  onChange={(e) => setTransferProductId(e.target.value)}
+                  className="w-full min-h-[48px] text-sm font-bold px-3.5 bg-white border-2 border-slate-300 rounded-xl"
+                >
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Unit Type</label>
+                  <select
+                    value={transferType}
+                    onChange={(e) => setTransferType(e.target.value as 'full' | 'empty')}
+                    className="w-full min-h-[48px] text-sm font-bold px-3.5 bg-white border-2 border-slate-300 rounded-xl"
+                  >
+                    <option value="full">Filled Cylinders</option>
+                    <option value="empty">Empty Tares</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Quantity</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={transferUnits}
+                    onChange={(e) => setTransferUnits(parseInt(e.target.value) || 1)}
+                    className="w-full min-h-[48px] text-base font-black px-3.5 bg-white border-2 border-slate-300 rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <Button type="button" variant="ghost" onClick={() => setShowTransferModal(false)}>
                   Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="min-h-[44px] px-5 py-2 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl transition shadow"
-                >
-                  Save Branch
-                </button>
+                </Button>
+                <Button type="submit" variant="primary">
+                  Confirm Transfer
+                </Button>
               </div>
             </form>
           </div>
