@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { formatKES } from '@/lib/formatters';
+import { formatKES, hasEmptyState } from '@/lib/formatters';
 
 export interface PosCartItem {
   id: string;
@@ -69,10 +69,12 @@ export function PosItemsStep({
 
   const handleSelectProduct = (p: Product) => {
     setActiveProduct(p);
-    if (p.category === 'accessory') {
+    const returnable = hasEmptyState(p);
+    if (!returnable) {
       setItemType('accessory');
+      setIncomingTareBrand('');
     } else if (p.category === 'water') {
-      setItemType(p.refill_price_kes > 0 ? 'refill' : 'accessory');
+      setItemType('refill');
       setIncomingTareBrand(p.brand === 'Keringet' ? 'Keringet' : 'Aquamist');
     } else {
       setItemType('refill');
@@ -86,10 +88,10 @@ export function PosItemsStep({
     let price = 0;
     if (itemType === 'refill') price = activeProduct.refill_price_kes;
     else if (itemType === 'complete') price = activeProduct.complete_price_kes;
-    else price = activeProduct.accessory_price_kes;
+    else price = activeProduct.accessory_price_kes || activeProduct.complete_price_kes;
 
-    const isExchange = activeProduct.category === 'cylinder' || (activeProduct.category === 'water' && activeProduct.refill_price_kes > 0);
-    const inc = itemType === 'refill' && isExchange ? incomingTareBrand : '';
+    const returnable = hasEmptyState(activeProduct);
+    const inc = itemType === 'refill' && returnable ? incomingTareBrand : '';
 
     const newItem: PosCartItem = {
       id: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
@@ -159,7 +161,11 @@ export function PosItemsStep({
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 max-h-64 overflow-y-auto pr-1">
         {filteredProducts.map((p) => {
           const isSelected = activeProduct?.id === p.id;
-          const displayPrice = p.refill_price_kes > 0 ? p.refill_price_kes : p.accessory_price_kes;
+          const returnable = hasEmptyState(p);
+          const isDisposableWater = p.category === 'water' && !returnable;
+          const displayPrice = returnable
+            ? p.refill_price_kes
+            : (p.accessory_price_kes || p.complete_price_kes);
 
           return (
             <button
@@ -174,7 +180,14 @@ export function PosItemsStep({
             >
               <div>
                 <div className="text-xs font-black text-slate-900 leading-tight truncate">{p.name}</div>
-                <div className="text-[11px] font-bold text-slate-500 mt-0.5">{p.brand}</div>
+                <div className="text-[11px] font-bold text-slate-500 mt-0.5 flex items-center justify-between gap-1">
+                  <span className="truncate">{p.brand}</span>
+                  {isDisposableWater && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-850 font-black uppercase shrink-0">
+                      Disposable
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="mt-2 text-xs font-black text-orange-600">
                 {formatKES(displayPrice)}
@@ -195,7 +208,7 @@ export function PosItemsStep({
 
             {/* Sale Type Selector */}
             <div className="flex gap-1 bg-white p-1 rounded-xl border border-slate-200">
-              {activeProduct.category !== 'accessory' && (
+              {hasEmptyState(activeProduct) ? (
                 <>
                   <button
                     type="button"
@@ -216,15 +229,16 @@ export function PosItemsStep({
                     Complete (New)
                   </button>
                 </>
-              )}
-              {activeProduct.category === 'accessory' && (
-                <span className="px-3 py-1 text-xs font-black text-slate-800">Direct Purchase</span>
+              ) : (
+                <span className="px-3 py-1 text-xs font-black text-slate-800">
+                  {activeProduct.category === 'water' ? 'Disposable Bottle (Direct Sale)' : 'Direct Purchase'}
+                </span>
               )}
             </div>
           </div>
 
-          {/* Visual Brand Exchange: Returned Tare -> Dispensed Brand */}
-          {itemType === 'refill' && (
+          {/* Visual Brand Exchange: Returned Tare -> Dispensed Brand (Only if product has empty state) */}
+          {itemType === 'refill' && hasEmptyState(activeProduct) && (
             <div className="bg-white p-3.5 rounded-2xl border-2 border-orange-200 space-y-2">
               <div className="text-xs font-black text-slate-700 uppercase flex items-center gap-1.5">
                 <Repeat className="w-4 h-4 text-orange-600" />

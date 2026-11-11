@@ -146,17 +146,25 @@ export const INITIAL_INVENTORY: BranchInventory[] = [
   { id: 'inv-6', branch_id: 'b1111111-1111-1111-1111-111111111111', product_id: 'c8', full_units: 20, empty_units: 4 },
   { id: 'inv-7', branch_id: 'b1111111-1111-1111-1111-111111111111', product_id: 'a1', full_units: 40, empty_units: 0 },
   { id: 'inv-8', branch_id: 'b1111111-1111-1111-1111-111111111111', product_id: 'a2', full_units: 50, empty_units: 0 },
+  { id: 'inv-w1', branch_id: 'b1111111-1111-1111-1111-111111111111', product_id: 'w1', full_units: 25, empty_units: 10 },
+  { id: 'inv-w3', branch_id: 'b1111111-1111-1111-1111-111111111111', product_id: 'w3', full_units: 60, empty_units: 0 },
+  { id: 'inv-w4', branch_id: 'b1111111-1111-1111-1111-111111111111', product_id: 'w4', full_units: 45, empty_units: 0 },
+  { id: 'inv-w5', branch_id: 'b1111111-1111-1111-1111-111111111111', product_id: 'w5', full_units: 30, empty_units: 0 },
+  { id: 'inv-w6', branch_id: 'b1111111-1111-1111-1111-111111111111', product_id: 'w6', full_units: 35, empty_units: 0 },
   // Lavington
   { id: 'inv-9', branch_id: 'b2222222-2222-2222-2222-222222222222', product_id: 'c1', full_units: 28, empty_units: 10 },
   { id: 'inv-10', branch_id: 'b2222222-2222-2222-2222-222222222222', product_id: 'c2', full_units: 30, empty_units: 15 },
   { id: 'inv-11', branch_id: 'b2222222-2222-2222-2222-222222222222', product_id: 'c4', full_units: 12, empty_units: 4 },
   { id: 'inv-12', branch_id: 'b2222222-2222-2222-2222-222222222222', product_id: 'c8', full_units: 16, empty_units: 7 },
+  { id: 'inv-w6-lav', branch_id: 'b2222222-2222-2222-2222-222222222222', product_id: 'w6', full_units: 20, empty_units: 0 },
   // Jamhuri
   { id: 'inv-13', branch_id: 'b3333333-3333-3333-3333-333333333333', product_id: 'c1', full_units: 42, empty_units: 18 },
   { id: 'inv-14', branch_id: 'b3333333-3333-3333-3333-333333333333', product_id: 'c2', full_units: 22, empty_units: 11 },
+  { id: 'inv-w6-jmh', branch_id: 'b3333333-3333-3333-3333-333333333333', product_id: 'w6', full_units: 25, empty_units: 0 },
   // Kileleshwa
   { id: 'inv-15', branch_id: 'b4444444-4444-4444-4444-444444444444', product_id: 'c1', full_units: 20, empty_units: 8 },
   { id: 'inv-16', branch_id: 'b4444444-4444-4444-4444-444444444444', product_id: 'c2', full_units: 19, empty_units: 5 },
+  { id: 'inv-w6-klh', branch_id: 'b4444444-4444-4444-4444-444444444444', product_id: 'w6', full_units: 18, empty_units: 0 },
 ];
 
 export const INITIAL_ORDERS: Order[] = [

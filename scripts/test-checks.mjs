@@ -34,4 +34,20 @@ assert.equal(calculateCashVariance(12500, 12500), 0);
 assert.equal(calculateCashVariance(13000, 12500), 500); // Surplus
 assert.equal(calculateCashVariance(12000, 12500), -500); // Shortage
 
+// 4. Returnable vs disposable empty state logic
+function hasEmptyState(product) {
+  if (product.category === 'cylinder') return true;
+  if (product.category === 'water') {
+    return (product.refill_price_kes || 0) > 0 && product.brand?.toLowerCase() !== 'japeli';
+  }
+  return false;
+}
+
+assert.equal(hasEmptyState({ category: 'cylinder', brand: 'Afrigas', refill_price_kes: 1450 }), true);
+assert.equal(hasEmptyState({ category: 'water', brand: 'Keringet', refill_price_kes: 650 }), true);
+assert.equal(hasEmptyState({ category: 'water', brand: 'Aquamist', refill_price_kes: 600 }), true);
+assert.equal(hasEmptyState({ category: 'water', brand: 'Japeli', refill_price_kes: 0 }), false);
+assert.equal(hasEmptyState({ category: 'water', brand: 'Japeli', refill_price_kes: 550 }), false);
+assert.equal(hasEmptyState({ category: 'accessory', brand: 'Kabason', refill_price_kes: 0 }), false);
+
 console.log('All core logic checks passed.');

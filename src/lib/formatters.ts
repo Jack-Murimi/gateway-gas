@@ -58,3 +58,20 @@ export function formatRelativeMinutes(minutes: number): string {
   const rem = minutes % 60;
   return rem > 0 ? `${hrs}h ${rem}m` : `${hrs}h`;
 }
+
+/**
+ * Determines whether a product tracks returnable empty container shells.
+ * Gas cylinders and 20L returnable bottles (Keringet/Aquamist) track empty tares.
+ * Japeli water is disposable; accessories are direct purchase items (no empty state).
+ */
+export function hasEmptyState(product: {
+  category: string;
+  refill_price_kes?: number | null;
+  brand?: string | null;
+}): boolean {
+  if (product.category === 'cylinder') return true;
+  if (product.category === 'water') {
+    return (product.refill_price_kes || 0) > 0 && product.brand?.toLowerCase() !== 'japeli';
+  }
+  return false;
+}

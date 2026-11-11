@@ -17,7 +17,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/toast';
-import { formatKES } from '@/lib/formatters';
+import { formatKES, hasEmptyState } from '@/lib/formatters';
 
 export default function InventoryPage() {
   const { currentUser, branches, products, inventory, updateBranchStock, createBranch } = useStore();
@@ -207,6 +207,7 @@ export default function InventoryPage() {
           const invRow = branchItems.find((i) => i.product_id === p.id);
           const fullCount = invRow?.full_units || 0;
           const emptyCount = invRow?.empty_units || 0;
+          const returnable = hasEmptyState(p);
           const isLowStock = p.category === 'cylinder' && fullCount <= 5;
 
           return (
@@ -232,67 +233,112 @@ export default function InventoryPage() {
               </div>
 
               {/* Counts & Quick Steppers */}
-              <div className="grid grid-cols-2 gap-3 text-center">
-                {/* Full Units */}
-                <div className="bg-emerald-50/70 p-3 rounded-2xl border-2 border-emerald-200 space-y-1.5">
-                  <span className="text-[11px] font-black uppercase text-emerald-800 tracking-wider">
-                    Filled Units
-                  </span>
-                  <div className="text-2xl font-black text-emerald-950">{fullCount}</div>
+              {returnable ? (
+                <div className="grid grid-cols-2 gap-3 text-center">
+                  {/* Full Units */}
+                  <div className="bg-emerald-50/70 p-3 rounded-2xl border-2 border-emerald-200 space-y-1.5">
+                    <span className="text-[11px] font-black uppercase text-emerald-800 tracking-wider">
+                      Filled Units
+                    </span>
+                    <div className="text-2xl font-black text-emerald-950">{fullCount}</div>
 
-                  {canEditStock && (
-                    <div className="flex justify-center gap-1 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => handleQuickAdjust(p.id, true, -1)}
-                        className="w-8 h-8 rounded-lg bg-white border border-emerald-300 text-emerald-900 flex items-center justify-center font-black active:scale-95"
-                      >
-                        <Minus className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleQuickAdjust(p.id, true, 1)}
-                        className="w-8 h-8 rounded-lg bg-white border border-emerald-300 text-emerald-900 flex items-center justify-center font-black active:scale-95"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
+                    {canEditStock && (
+                      <div className="flex justify-center gap-1 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => handleQuickAdjust(p.id, true, -1)}
+                          className="w-8 h-8 rounded-lg bg-white border border-emerald-300 text-emerald-900 flex items-center justify-center font-black active:scale-95"
+                        >
+                          <Minus className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleQuickAdjust(p.id, true, 1)}
+                          className="w-8 h-8 rounded-lg bg-white border border-emerald-300 text-emerald-900 flex items-center justify-center font-black active:scale-95"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Empty Tares */}
+                  <div className="bg-slate-100 p-3 rounded-2xl border-2 border-slate-300 space-y-1.5">
+                    <span className="text-[11px] font-black uppercase text-slate-700 tracking-wider">
+                      Empty Tares
+                    </span>
+                    <div className="text-2xl font-black text-slate-900">{emptyCount}</div>
+
+                    {canEditStock && (
+                      <div className="flex justify-center gap-1 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => handleQuickAdjust(p.id, false, -1)}
+                          className="w-8 h-8 rounded-lg bg-white border border-slate-300 text-slate-800 flex items-center justify-center font-black active:scale-95"
+                        >
+                          <Minus className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleQuickAdjust(p.id, false, 1)}
+                          className="w-8 h-8 rounded-lg bg-white border border-slate-300 text-slate-800 flex items-center justify-center font-black active:scale-95"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-
-                {/* Empty Tares */}
-                <div className="bg-slate-100 p-3 rounded-2xl border-2 border-slate-300 space-y-1.5">
-                  <span className="text-[11px] font-black uppercase text-slate-700 tracking-wider">
-                    Empty Tares
-                  </span>
-                  <div className="text-2xl font-black text-slate-900">{emptyCount}</div>
-
-                  {canEditStock && (
-                    <div className="flex justify-center gap-1 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => handleQuickAdjust(p.id, false, -1)}
-                        className="w-8 h-8 rounded-lg bg-white border border-slate-300 text-slate-800 flex items-center justify-center font-black active:scale-95"
-                      >
-                        <Minus className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleQuickAdjust(p.id, false, 1)}
-                        className="w-8 h-8 rounded-lg bg-white border border-slate-300 text-slate-800 flex items-center justify-center font-black active:scale-95"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
+              ) : (
+                /* Disposable / Direct products have NO empty tares */
+                <div className="text-center">
+                  <div className="bg-emerald-50/70 p-3 rounded-2xl border-2 border-emerald-200 space-y-1.5">
+                    <div className="flex items-center justify-between px-1">
+                      <span className="text-[11px] font-black uppercase text-emerald-800 tracking-wider">
+                        Available Stock
+                      </span>
+                      <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-sky-100 text-sky-850 uppercase">
+                        {p.category === 'water' ? 'Disposable Water (No Tare)' : 'Direct Sale'}
+                      </span>
                     </div>
-                  )}
+                    <div className="text-2xl font-black text-emerald-950">{fullCount}</div>
+
+                    {canEditStock && (
+                      <div className="flex justify-center gap-1 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => handleQuickAdjust(p.id, true, -1)}
+                          className="w-8 h-8 rounded-lg bg-white border border-emerald-300 text-emerald-900 flex items-center justify-center font-black active:scale-95"
+                        >
+                          <Minus className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleQuickAdjust(p.id, true, 1)}
+                          className="w-8 h-8 rounded-lg bg-white border border-emerald-300 text-emerald-900 flex items-center justify-center font-black active:scale-95"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Pricing Spec */}
-              <div className="pt-1 text-xs font-bold text-slate-500 flex justify-between">
-                <span>Refill: {formatKES(p.refill_price_kes)}</span>
-                <span>Complete: {formatKES(p.complete_price_kes)}</span>
-              </div>
+              {returnable ? (
+                <div className="pt-1 text-xs font-bold text-slate-500 flex justify-between">
+                  <span>Refill: {formatKES(p.refill_price_kes)}</span>
+                  <span>Complete: {formatKES(p.complete_price_kes)}</span>
+                </div>
+              ) : (
+                <div className="pt-1 text-xs font-bold text-slate-500 flex justify-between">
+                  <span>Price: {formatKES(p.accessory_price_kes || p.complete_price_kes)}</span>
+                  <span className="text-slate-400">
+                    {p.category === 'water' ? 'Disposable Bottle' : 'Accessory'}
+                  </span>
+                </div>
+              )}
             </div>
           );
         })}
@@ -338,10 +384,17 @@ export default function InventoryPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Cylinder Product</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Product</label>
                 <select
                   value={transferProductId}
-                  onChange={(e) => setTransferProductId(e.target.value)}
+                  onChange={(e) => {
+                    const newId = e.target.value;
+                    setTransferProductId(newId);
+                    const prod = products.find((p) => p.id === newId);
+                    if (prod && !hasEmptyState(prod)) {
+                      setTransferType('full');
+                    }
+                  }}
                   className="w-full min-h-[48px] text-sm font-bold px-3.5 bg-white border-2 border-slate-300 rounded-xl"
                 >
                   {products.map((p) => (
@@ -355,14 +408,23 @@ export default function InventoryPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Unit Type</label>
-                  <select
-                    value={transferType}
-                    onChange={(e) => setTransferType(e.target.value as 'full' | 'empty')}
-                    className="w-full min-h-[48px] text-sm font-bold px-3.5 bg-white border-2 border-slate-300 rounded-xl"
-                  >
-                    <option value="full">Filled Cylinders</option>
-                    <option value="empty">Empty Tares</option>
-                  </select>
+                  {(() => {
+                    const selectedProd = products.find((p) => p.id === transferProductId);
+                    const returnable = selectedProd ? hasEmptyState(selectedProd) : true;
+                    return (
+                      <select
+                        value={transferType}
+                        onChange={(e) => setTransferType(e.target.value as 'full' | 'empty')}
+                        disabled={!returnable}
+                        className="w-full min-h-[48px] text-sm font-bold px-3.5 bg-white border-2 border-slate-300 rounded-xl disabled:bg-slate-100 disabled:text-slate-500"
+                      >
+                        <option value="full">
+                          {returnable ? 'Filled Units' : 'Full Stock (Disposable)'}
+                        </option>
+                        {returnable && <option value="empty">Empty Tares</option>}
+                      </select>
+                    );
+                  })()}
                 </div>
 
                 <div>
