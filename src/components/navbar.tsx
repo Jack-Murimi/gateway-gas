@@ -119,8 +119,7 @@ function RoleAvatar({
 }
 
 export function Navbar() {
-  const { currentUser, setCurrentUser, staffList, logout } = useStore();
-  const [showRoleSwitcher, setShowRoleSwitcher] = useState(false);
+  const { currentUser, logout } = useStore();
   const [showMoreDrawer, setShowMoreDrawer] = useState(false);
   const pathname = usePathname();
 
@@ -201,86 +200,29 @@ export function Navbar() {
               </nav>
             </div>
 
-            {/* Right: Switcher & Logout */}
+            {/* Right: User Profile & Logout */}
             <div className="flex items-center gap-1.5 sm:gap-2">
-              <div className="relative">
-                <button
-                  onClick={() => setShowRoleSwitcher(!showRoleSwitcher)}
-                  className="min-h-[40px] flex items-center gap-1.5 sm:gap-2 p-1 sm:px-2.5 sm:py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition"
-                  aria-label="User profile and role menu"
-                >
-                  <RoleAvatar
-                    role={currentUser.role}
-                    name={currentUser.full_name}
-                    avatarUrl={currentUser.avatar_url}
-                    size="md"
-                  />
+              <div className="flex items-center gap-1.5 sm:gap-2 p-1 sm:px-2.5 sm:py-1.5 bg-slate-50 border border-slate-200 rounded-xl">
+                <RoleAvatar
+                  role={currentUser.role}
+                  name={currentUser.full_name}
+                  avatarUrl={currentUser.avatar_url}
+                  size="md"
+                />
 
-                  {/* Desktop text details: hidden on small screen to eliminate text truncation */}
-                  <div className="hidden sm:block text-left">
-                    <div className="font-bold text-xs text-slate-800 leading-tight">
-                      {currentUser.full_name}
-                    </div>
-                    <span
-                      className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-extrabold border uppercase mt-0.5 ${
-                        roleColors[currentUser.role] || 'bg-slate-100'
-                      }`}
-                    >
-                      {currentUser.role.replace('_', ' ')}
-                    </span>
+                {/* Desktop text details: hidden on small screen to eliminate text truncation */}
+                <div className="hidden sm:block text-left">
+                  <div className="font-bold text-xs text-slate-800 leading-tight">
+                    {currentUser.full_name}
                   </div>
-
-                  <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
-                </button>
-
-                {showRoleSwitcher && (
-                  <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 py-2 z-50">
-                    <div className="px-3 py-1.5 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                      Switch Role Simulation:
-                    </div>
-                    <div className="max-h-64 overflow-y-auto">
-                      {staffList.map((staff) => (
-                        <button
-                          key={staff.id}
-                          onClick={() => {
-                            setCurrentUser(staff);
-                            setShowRoleSwitcher(false);
-                          }}
-                          className={`w-full text-left px-3 py-2 flex items-center gap-2.5 hover:bg-slate-50 transition text-xs ${
-                            currentUser.id === staff.id ? 'bg-orange-50 font-bold' : ''
-                          }`}
-                        >
-                          <RoleAvatar
-                            role={staff.role}
-                            name={staff.full_name}
-                            avatarUrl={staff.avatar_url}
-                            size="sm"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-slate-800 truncate font-semibold">{staff.full_name}</div>
-                            <div className="text-[10px] text-slate-400 truncate">{staff.email}</div>
-                          </div>
-                          <span
-                            className={`px-1.5 py-0.5 rounded text-[9px] font-bold border uppercase shrink-0 ${
-                              roleColors[staff.role]
-                            }`}
-                          >
-                            {staff.role.replace('_', ' ')}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                    <div className="p-2 border-t border-slate-100 bg-slate-50 rounded-b-2xl">
-                      <Link
-                        href="/signup"
-                        onClick={() => setShowRoleSwitcher(false)}
-                        className="block text-center text-xs text-orange-600 font-bold hover:underline"
-                      >
-                        + Test New Staff Signup
-                      </Link>
-                    </div>
-                  </div>
-                )}
+                  <span
+                    className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-extrabold border uppercase mt-0.5 ${
+                      roleColors[currentUser.role] || 'bg-slate-100'
+                    }`}
+                  >
+                    {currentUser.role.replace('_', ' ')}
+                  </span>
+                </div>
               </div>
 
               <button

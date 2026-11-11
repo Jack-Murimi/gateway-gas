@@ -27,6 +27,8 @@ import {
   INITIAL_LEADERBOARD,
   INITIAL_CUSTOMERS,
 } from '@/lib/mock-data';
+import { createClient } from '@/lib/supabase/client';
+import { setDemoSessionCookies, clearDemoSessionCookies } from '@/lib/demo-mode';
 
 interface CreateOrderParams {
   branch_id: string;
@@ -76,6 +78,7 @@ interface StoreContextType {
   updateRiderComment: (orderId: string, comment: string) => void;
   updateBranchStock: (branchId: string, productId: string, fullDelta: number, emptyDelta: number) => void;
   createBranch: (name: string, code: string, location_estate: string, contact_phone: string) => void;
+  resetDemoData: () => void;
   logout: () => void;
 }
 
@@ -91,7 +94,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Initialize from localStorage or mock defaults
+  // Initialize from localStorage or mock defaults (NO auto-login fallback)
   useEffect(() => {
     try {
       const storedUser = localStorage.getItem('gwg_user');
@@ -101,8 +104,44 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const storedOrders = localStorage.getItem('gwg_orders');
       const storedCustomers = localStorage.getItem('gwg_customers');
 
-      if (storedUser) setCurrentUser(JSON.parse(storedUser));
-      else setCurrentUser(INITIAL_STAFF[0]); // Default to admin for fast demo
+      if (storedUser) {
+        const parsed = JSON.parse(storedUser);
+        setCurrentUser(parsed);
+        setDemoSessionCookies(parsed.id, parsed.role, parsed.approval_status);
+      } else {
+        // Try reading real Supabase Auth session
+        try {
+          const supabase = createClient();
+          supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session?.user) {
+              supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', session.user.id)
+                .single()
+                .then(({ data: profile }) => {
+                  if (profile) {
+                    const u: StaffProfile = {
+                      id: profile.id,
+                      email: profile.email,
+                      full_name: profile.full_name,
+                      phone: profile.phone,
+                      role: profile.role,
+                      approval_status: profile.approval_status,
+                      vehicle_plate: profile.vehicle_plate,
+                      avatar_url: profile.avatar_url,
+                    };
+                    setCurrentUser(u);
+                    localStorage.setItem('gwg_user', JSON.stringify(u));
+                    setDemoSessionCookies(u.id, u.role, u.approval_status);
+                  }
+                });
+            }
+          });
+        } catch {
+          // ignore offline/no-auth
+        }
+      }
 
       if (storedStaff) setStaffList(JSON.parse(storedStaff));
       if (storedBranches) setBranches(JSON.parse(storedBranches));
@@ -110,7 +149,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (storedOrders) setOrders(JSON.parse(storedOrders));
       if (storedCustomers) setCustomers(JSON.parse(storedCustomers));
     } catch {
-      setCurrentUser(INITIAL_STAFF[0]);
+      // ignore
     }
     setIsLoaded(true);
   }, []);
@@ -399,9 +438,37 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
+  const resetDemoData = () => {
+    setStaffList(INITIAL_STAFF);
+    setBranches(INITIAL_BRANCHES);
+    setInventory(INITIAL_INVENTORY);
+    setOrders(INITIAL_ORDERS);
+    setCustomers(INITIAL_CUSTOMERS);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('gwg_staff', JSON.stringify(INITIAL_STAFF));
+      localStorage.setItem('gwg_branches', JSON.stringify(INITIAL_BRANCHES));
+      localStorage.setItem('gwg_inventory', JSON.stringify(INITIAL_INVENTORY));
+      localStorage.setItem('gwg_orders', JSON.stringify(INITIAL_ORDERS));
+      localStorage.setItem('gwg_customers', JSON.stringify(INITIAL_CUSTOMERS));
+    }
+  };
+
   const logout = () => {
     setCurrentUser(null);
-    localStorage.removeItem('gwg_user');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('gwg_user');
+      localStorage.removeItem('gwg_demo_user_id');
+    }
+    clearDemoSessionCookies();
+    try {
+      const supabase = createClient();
+      supabase.auth.signOut();
+    } catch {
+      // ignore
+    }
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
   };
 
   // Compute live rider performance leaderboard (strictly zero revenue/money columns)
@@ -462,6 +529,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         updateRiderComment,
         updateBranchStock,
         createBranch,
+        resetDemoData,
         logout,
       }}
     >

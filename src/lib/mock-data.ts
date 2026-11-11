@@ -126,6 +126,14 @@ export const INITIAL_STAFF: StaffProfile[] = [
     role: 'pending',
     approval_status: 'pending',
   },
+  {
+    id: 'u-rejected-1',
+    email: 'rejected.applicant@gatewaygas.co.ke',
+    full_name: 'Failed Applicant',
+    phone: '+254799000199',
+    role: 'pending',
+    approval_status: 'rejected',
+  },
 ];
 
 export const INITIAL_INVENTORY: BranchInventory[] = [
