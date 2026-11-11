@@ -71,13 +71,8 @@ export function PosAdvancedHeader({
 
   useEffect(() => {
     if (isExpanded && pendingFocus.current) {
-      const target = pendingFocus.current;
       pendingFocus.current = null;
-      if (target === 'receipt') receiptInputRef.current?.focus();
-      if (target === 'date') {
-        dateInputRef.current?.focus();
-        dateInputRef.current?.showPicker?.();
-      }
+      receiptInputRef.current?.focus();
     }
   }, [isExpanded]);
 
@@ -85,17 +80,6 @@ export function PosAdvancedHeader({
     pendingFocus.current = 'receipt';
     if (isExpanded) {
       receiptInputRef.current?.focus();
-    } else {
-      setIsExpanded(true);
-    }
-  };
-
-  const openAndFocusDate = () => {
-    if (!canEditDate) return;
-    pendingFocus.current = 'date';
-    if (isExpanded) {
-      dateInputRef.current?.focus();
-      dateInputRef.current?.showPicker?.();
     } else {
       setIsExpanded(true);
     }
@@ -116,21 +100,27 @@ export function PosAdvancedHeader({
             </span>
           </div>
 
+          {/* On-click date picker: no extra "change" text field, 1-tap direct date picker */}
           {canEditDate ? (
-            <button
-              type="button"
-              onClick={openAndFocusDate}
-              title="Click to edit sale date"
-              className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 hover:text-orange-600 transition rounded-xl px-2 py-1 hover:bg-orange-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-600"
+            <label
+              title="Click to change sale date"
+              className="relative flex items-center gap-1.5 text-sm font-semibold text-slate-700 hover:text-orange-600 transition rounded-xl px-2 py-1.5 hover:bg-orange-50 cursor-pointer"
             >
               <Calendar className="h-4 w-4 shrink-0 text-orange-600" aria-hidden="true" />
               <time dateTime={receiptDate} suppressHydrationWarning>
                 {formatSaleDate(receiptDate)}
               </time>
-              <span className="text-xs text-orange-600 underline font-normal">(change)</span>
-            </button>
+              <input
+                type="date"
+                value={receiptDate}
+                onChange={(e) => onChangeDate(e.target.value)}
+                onClick={(e) => (e.target as HTMLInputElement).showPicker?.()}
+                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                aria-label="Sale date"
+              />
+            </label>
           ) : (
-            <div className="flex items-center gap-1.5 text-sm text-slate-600 px-2 py-1">
+            <div className="flex items-center gap-1.5 text-sm text-slate-600 px-2 py-1.5">
               <Calendar className="h-4 w-4 shrink-0" aria-hidden="true" />
               <time dateTime={receiptDate} suppressHydrationWarning>
                 {formatSaleDate(receiptDate)}
@@ -205,7 +195,7 @@ export function PosAdvancedHeader({
                 type="text"
                 value={receiptNumber}
                 onChange={(e) => onChangeReceiptNumber(e.target.value)}
-                placeholder="e.g. WST-4102"
+                placeholder="e.g. NXG-4102"
                 autoComplete="off"
                 autoCapitalize="characters"
                 autoCorrect="off"

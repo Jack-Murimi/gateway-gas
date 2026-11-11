@@ -270,7 +270,7 @@ export function PosCustomerStep({
               required
               value={newEstate}
               onChange={(e) => setNewEstate(e.target.value)}
-              placeholder="e.g. Westlands / Kilimani"
+              placeholder="e.g. Nextgen / Lavington / Kileleshwa"
             />
             <Input
               label="Specific House / Apt Landmark"

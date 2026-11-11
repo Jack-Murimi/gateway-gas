@@ -68,10 +68,10 @@ BEGIN
 
   -- 3. Seed Branches
   INSERT INTO public.branches (id, name, code, location_estate, contact_phone, is_active) VALUES
-    (v_branch_westlands, 'Westlands Main Hub', 'WST-01', 'Westlands', '+254722111001', true),
-    (v_branch_kilimani, 'Kilimani Station', 'KLM-02', 'Kilimani', '+254722111002', true),
-    (v_branch_karen, 'Karen Depot', 'KRN-03', 'Karen', '+254722111003', true),
-    (v_branch_kasarani, 'Kasarani Sub-Hub', 'KSR-04', 'Kasarani', '+254722111004', true)
+    (v_branch_westlands, 'Nextgen', 'NXG-01', 'Nextgen Mall', '+254722111001', true),
+    (v_branch_kilimani, 'Lavington', 'LVN-02', 'Lavington', '+254722111002', true),
+    (v_branch_karen, 'Jamhuri', 'JMH-03', 'Jamhuri', '+254722111003', true),
+    (v_branch_kasarani, 'Kileleshwa', 'KLH-04', 'Kileleshwa', '+254722111004', true)
   ON CONFLICT (code) DO NOTHING;
 
   -- 4. Seed Products (Size-first names)

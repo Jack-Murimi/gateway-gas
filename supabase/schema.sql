@@ -292,10 +292,10 @@ CREATE TRIGGER on_auth_user_created
 -- Seed Default Branches
 INSERT INTO public.branches (id, name, code, location_estate, contact_phone)
 VALUES
-    ('b1111111-1111-1111-1111-111111111111', 'Westlands Hub', 'WST-01', 'Westlands, Nairobi', '+254711000101'),
-    ('b2222222-2222-2222-2222-222222222222', 'Kilimani Depot', 'KLM-02', 'Kilimani, Nairobi', '+254711000102'),
-    ('b3333333-3333-3333-3333-333333333333', 'Roysambu Station', 'RSB-03', 'Roysambu / Kasarani', '+254711000103'),
-    ('b4444444-4444-4444-4444-444444444444', 'South B Centre', 'STB-04', 'South B / South C', '+254711000104')
+    ('b1111111-1111-1111-1111-111111111111', 'Nextgen', 'NXG-01', 'Nextgen Mall, Nairobi', '+254711000101'),
+    ('b2222222-2222-2222-2222-222222222222', 'Lavington', 'LVN-02', 'Lavington, Nairobi', '+254711000102'),
+    ('b3333333-3333-3333-3333-333333333333', 'Jamhuri', 'JMH-03', 'Jamhuri / Ngong Rd', '+254711000103'),
+    ('b4444444-4444-4444-4444-444444444444', 'Kileleshwa', 'KLH-04', 'Kileleshwa, Nairobi', '+254711000104')
 ON CONFLICT (code) DO NOTHING;
 
 -- Seed Products Catalog

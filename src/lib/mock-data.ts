@@ -3,33 +3,33 @@ import { Branch, StaffProfile, Product, BranchInventory, Order, RiderLeaderboard
 export const INITIAL_BRANCHES: Branch[] = [
   {
     id: 'b1111111-1111-1111-1111-111111111111',
-    name: 'Westlands Hub',
-    code: 'WST-01',
-    location_estate: 'Westlands, Nairobi',
+    name: 'Nextgen',
+    code: 'NXG-01',
+    location_estate: 'Nextgen Mall / Mombasa Rd',
     contact_phone: '+254711000101',
     is_active: true,
   },
   {
     id: 'b2222222-2222-2222-2222-222222222222',
-    name: 'Kilimani Depot',
-    code: 'KLM-02',
-    location_estate: 'Kilimani, Nairobi',
+    name: 'Lavington',
+    code: 'LVN-02',
+    location_estate: 'Lavington, Nairobi',
     contact_phone: '+254711000102',
     is_active: true,
   },
   {
     id: 'b3333333-3333-3333-3333-333333333333',
-    name: 'Roysambu Station',
-    code: 'RSB-03',
-    location_estate: 'Roysambu / Kasarani',
+    name: 'Jamhuri',
+    code: 'JMH-03',
+    location_estate: 'Jamhuri / Ngong Rd',
     contact_phone: '+254711000103',
     is_active: true,
   },
   {
     id: 'b4444444-4444-4444-4444-444444444444',
-    name: 'South B Centre',
-    code: 'STB-04',
-    location_estate: 'South B / South C',
+    name: 'Kileleshwa',
+    code: 'KLH-04',
+    location_estate: 'Kileleshwa, Nairobi',
     contact_phone: '+254711000104',
     is_active: true,
   },
@@ -137,7 +137,7 @@ export const INITIAL_STAFF: StaffProfile[] = [
 ];
 
 export const INITIAL_INVENTORY: BranchInventory[] = [
-  // Westlands
+  // Nextgen
   { id: 'inv-1', branch_id: 'b1111111-1111-1111-1111-111111111111', product_id: 'c1', full_units: 35, empty_units: 12 },
   { id: 'inv-2', branch_id: 'b1111111-1111-1111-1111-111111111111', product_id: 'c2', full_units: 24, empty_units: 8 },
   { id: 'inv-3', branch_id: 'b1111111-1111-1111-1111-111111111111', product_id: 'c4', full_units: 18, empty_units: 6 },
@@ -146,15 +146,15 @@ export const INITIAL_INVENTORY: BranchInventory[] = [
   { id: 'inv-6', branch_id: 'b1111111-1111-1111-1111-111111111111', product_id: 'c8', full_units: 20, empty_units: 4 },
   { id: 'inv-7', branch_id: 'b1111111-1111-1111-1111-111111111111', product_id: 'a1', full_units: 40, empty_units: 0 },
   { id: 'inv-8', branch_id: 'b1111111-1111-1111-1111-111111111111', product_id: 'a2', full_units: 50, empty_units: 0 },
-  // Kilimani
+  // Lavington
   { id: 'inv-9', branch_id: 'b2222222-2222-2222-2222-222222222222', product_id: 'c1', full_units: 28, empty_units: 10 },
   { id: 'inv-10', branch_id: 'b2222222-2222-2222-2222-222222222222', product_id: 'c2', full_units: 30, empty_units: 15 },
   { id: 'inv-11', branch_id: 'b2222222-2222-2222-2222-222222222222', product_id: 'c4', full_units: 12, empty_units: 4 },
   { id: 'inv-12', branch_id: 'b2222222-2222-2222-2222-222222222222', product_id: 'c8', full_units: 16, empty_units: 7 },
-  // Roysambu
+  // Jamhuri
   { id: 'inv-13', branch_id: 'b3333333-3333-3333-3333-333333333333', product_id: 'c1', full_units: 42, empty_units: 18 },
   { id: 'inv-14', branch_id: 'b3333333-3333-3333-3333-333333333333', product_id: 'c2', full_units: 22, empty_units: 11 },
-  // South B
+  // Kileleshwa
   { id: 'inv-15', branch_id: 'b4444444-4444-4444-4444-444444444444', product_id: 'c1', full_units: 20, empty_units: 8 },
   { id: 'inv-16', branch_id: 'b4444444-4444-4444-4444-444444444444', product_id: 'c2', full_units: 19, empty_units: 5 },
 ];
@@ -169,8 +169,8 @@ export const INITIAL_ORDERS: Order[] = [
     is_pos_walkin: false,
     customer_name: 'Faith Auma',
     customer_phone: '+254712345678',
-    delivery_estate: 'Westlands',
-    delivery_address: 'Muthithi Road, Apex Apts Apt 4B',
+    delivery_estate: 'Nextgen',
+    delivery_address: 'Mombasa Road, Nextgen Park Apt 4B',
     delivery_status: 'in_transit',
     payment_method: 'mpesa',
     payment_status: 'paid',
@@ -205,8 +205,8 @@ export const INITIAL_ORDERS: Order[] = [
     is_pos_walkin: false,
     customer_name: 'Martin Mwangi',
     customer_phone: '+254723456789',
-    delivery_estate: 'Kilimani',
-    delivery_address: 'Dennis Pritt Court, House 12',
+    delivery_estate: 'Lavington',
+    delivery_address: 'James Gichuru Court, House 12',
     delivery_status: 'delivered',
     payment_method: 'mpesa',
     payment_status: 'paid',
@@ -241,8 +241,8 @@ export const INITIAL_ORDERS: Order[] = [
     is_pos_walkin: false,
     customer_name: 'Brenda Kerubo',
     customer_phone: '+254734567890',
-    delivery_estate: 'Westlands',
-    delivery_address: 'Raphta Road, Villa Rosa Court 8',
+    delivery_estate: 'Nextgen',
+    delivery_address: 'South C, Bellevue Court 8',
     delivery_status: 'pending',
     payment_method: 'cash',
     payment_status: 'pending',
@@ -276,7 +276,7 @@ export const INITIAL_ORDERS: Order[] = [
     is_pos_walkin: true,
     customer_name: 'Walk-in Customer (Stephen)',
     customer_phone: '+254700112233',
-    delivery_estate: 'Roysambu',
+    delivery_estate: 'Jamhuri',
     delivery_address: 'Over the counter at station',
     delivery_status: 'delivered',
     payment_method: 'mpesa',
@@ -336,8 +336,8 @@ export const INITIAL_CUSTOMERS: Customer[] = [
       { id: 'cp-2', customer_id: 'cust-1', phone_number: '+254722998877', is_primary: false },
     ],
     locations: [
-      { id: 'cl-1', customer_id: 'cust-1', estate: 'Westlands', specific_address: 'Rhapta Road, Apt 4B', is_default: true },
-      { id: 'cl-2', customer_id: 'cust-1', estate: 'Parklands', specific_address: '3rd Avenue, Hse 12', is_default: false },
+      { id: 'cl-1', customer_id: 'cust-1', estate: 'Nextgen', specific_address: 'Mombasa Road, Apt 4B', is_default: true },
+      { id: 'cl-2', customer_id: 'cust-1', estate: 'South C', specific_address: '3rd Avenue, Hse 12', is_default: false },
     ],
   },
   {
@@ -348,8 +348,8 @@ export const INITIAL_CUSTOMERS: Customer[] = [
       { id: 'cp-3', customer_id: 'cust-2', phone_number: '+254723456789', is_primary: true },
     ],
     locations: [
-      { id: 'cl-3', customer_id: 'cust-2', estate: 'Kilimani', specific_address: 'Wood Avenue, Court 12', is_default: true },
-      { id: 'cl-4', customer_id: 'cust-2', estate: 'Lavington', specific_address: 'James Gichuru Gate 8', is_default: false },
+      { id: 'cl-3', customer_id: 'cust-2', estate: 'Lavington', specific_address: 'James Gichuru, Court 12', is_default: true },
+      { id: 'cl-4', customer_id: 'cust-2', estate: 'Kileleshwa', specific_address: 'Mandera Road Gate 8', is_default: false },
     ],
   },
   {
@@ -361,7 +361,7 @@ export const INITIAL_CUSTOMERS: Customer[] = [
       { id: 'cp-5', customer_id: 'cust-3', phone_number: '+254711223344', is_primary: false },
     ],
     locations: [
-      { id: 'cl-5', customer_id: 'cust-3', estate: 'Roysambu', specific_address: 'Lumumba Drive, Block C2', is_default: true },
+      { id: 'cl-5', customer_id: 'cust-3', estate: 'Jamhuri', specific_address: 'Ngong Road, Block C2', is_default: true },
     ],
   },
   {
@@ -372,7 +372,7 @@ export const INITIAL_CUSTOMERS: Customer[] = [
       { id: 'cp-6', customer_id: 'cust-4', phone_number: '+254701234567', is_primary: true },
     ],
     locations: [
-      { id: 'cl-6', customer_id: 'cust-4', estate: 'South C', specific_address: 'Mugoya Phase 2, Hse 45', is_default: true },
+      { id: 'cl-6', customer_id: 'cust-4', estate: 'Kileleshwa', specific_address: 'Siaya Road, Hse 45', is_default: true },
     ],
   },
 ];

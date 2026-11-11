@@ -58,10 +58,10 @@ export default function HomePage() {
               Connected Hubs (Nairobi Station)
             </div>
             <div className="flex flex-wrap justify-center gap-1.5 pt-1">
-              <span className="px-2 py-0.5 rounded-lg bg-white border border-slate-300">Westlands (WST-01)</span>
-              <span className="px-2 py-0.5 rounded-lg bg-white border border-slate-300">Kilimani (KLM-02)</span>
-              <span className="px-2 py-0.5 rounded-lg bg-white border border-slate-300">Karen (KRN-03)</span>
-              <span className="px-2 py-0.5 rounded-lg bg-white border border-slate-300">Kasarani (KSR-04)</span>
+              <span className="px-2 py-0.5 rounded-lg bg-white border border-slate-300">Nextgen (NXG-01)</span>
+              <span className="px-2 py-0.5 rounded-lg bg-white border border-slate-300">Lavington (LVN-02)</span>
+              <span className="px-2 py-0.5 rounded-lg bg-white border border-slate-300">Jamhuri (JMH-03)</span>
+              <span className="px-2 py-0.5 rounded-lg bg-white border border-slate-300">Kileleshwa (KLH-04)</span>
             </div>
           </div>
 

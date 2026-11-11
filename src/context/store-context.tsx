@@ -144,7 +144,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (storedStaff) setStaffList(JSON.parse(storedStaff));
-      if (storedBranches) setBranches(JSON.parse(storedBranches));
+      if (storedBranches) {
+        const parsed: Branch[] = JSON.parse(storedBranches);
+        const hasLegacyBranch = parsed.some((b) =>
+          ['Westlands Hub', 'Kilimani Depot', 'Roysambu Station', 'South B Centre', 'Westlands', 'Kilimani', 'Karen', 'Kasarani'].includes(b.name)
+        );
+        if (hasLegacyBranch) {
+          setBranches(INITIAL_BRANCHES);
+          localStorage.setItem('gwg_branches', JSON.stringify(INITIAL_BRANCHES));
+        } else {
+          setBranches(parsed);
+        }
+      }
       if (storedInventory) setInventory(JSON.parse(storedInventory));
       if (storedOrders) setOrders(JSON.parse(storedOrders));
       if (storedCustomers) setCustomers(JSON.parse(storedCustomers));
