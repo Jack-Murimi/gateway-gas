@@ -30,17 +30,9 @@ export default function SalesPage() {
   const [selectedBranchId, setSelectedBranchId] = useState(branches[0]?.id || '');
   const activeBranch = branches.find((b) => b.id === selectedBranchId) || branches[0];
 
-  // Header: Date & Physical Receipt Book #
+  // Header: Date & Physical Receipt Book # (Blank by default for manual paper book entry)
   const [saleDate, setSaleDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [receiptNumber, setReceiptNumber] = useState('');
-
-  // Auto-suggest receipt number with branch code prefix
-  useEffect(() => {
-    if (activeBranch) {
-      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-      setReceiptNumber(`${activeBranch.code}-${randomSuffix}`);
-    }
-  }, [activeBranch]);
 
   // Customer state: default to null (anonymous Walk-in)
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -263,9 +255,7 @@ export default function SalesPage() {
       setCart([]);
       handleClearCustomerToWalkin();
       setPaymentReference('');
-      // regenerate next receipt number
-      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-      setReceiptNumber(`${activeBranch.code}-${randomSuffix}`);
+      setReceiptNumber(''); // Blank by default for next paper receipt entry
     } finally {
       setIsSubmitting(false);
     }
@@ -303,9 +293,9 @@ export default function SalesPage() {
             </div>
           </div>
 
-          {/* Physical Receipt # */}
+          {/* Physical Receipt # (Blank by default, solid black text) */}
           <div className="flex items-center gap-2">
-            <Receipt className="w-4 h-4 text-orange-600 shrink-0" />
+            <Receipt className="w-4 h-4 text-black shrink-0" />
             <div className="flex-1">
               <label className="block text-[10px] uppercase font-bold text-slate-400">
                 Receipt # (Paper Book) <span className="text-red-500">*</span>
@@ -315,8 +305,8 @@ export default function SalesPage() {
                 required
                 value={receiptNumber}
                 onChange={(e) => setReceiptNumber(e.target.value)}
-                placeholder="e.g. WST-1049"
-                className="w-full text-xs font-mono font-bold text-slate-900 border border-slate-300 rounded-lg px-2.5 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-orange-500"
+                placeholder={`e.g. ${activeBranch?.code || 'WST'}-1049`}
+                className="w-full text-xs font-mono font-bold text-black border border-slate-300 rounded-lg px-2.5 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-slate-900"
               />
             </div>
           </div>
