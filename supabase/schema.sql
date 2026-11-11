@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS public.products (
     name TEXT NOT NULL,
     brand TEXT NOT NULL,
     size_kg NUMERIC,
-    category TEXT NOT NULL CHECK (category IN ('cylinder', 'accessory')),
+    category TEXT NOT NULL CHECK (category IN ('cylinder', 'accessory', 'water')),
     refill_price_kes NUMERIC NOT NULL DEFAULT 0,
     complete_price_kes NUMERIC DEFAULT 0,
     accessory_price_kes NUMERIC DEFAULT 0,

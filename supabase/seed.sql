@@ -104,4 +104,33 @@ BEGIN
     complete_price_kes = EXCLUDED.complete_price_kes,
     accessory_price_kes = EXCLUDED.accessory_price_kes;
 
+  -- 5. Seed Initial Branch Inventory
+  INSERT INTO public.branch_inventory (branch_id, product_id, full_units, empty_units)
+  SELECT b.id, p.id,
+         CASE WHEN p.category = 'cylinder' THEN 25 ELSE 40 END AS full_units,
+         CASE WHEN p.category = 'cylinder' THEN 10 ELSE 0 END AS empty_units
+  FROM public.branches b
+  CROSS JOIN public.products p
+  ON CONFLICT (branch_id, product_id) DO NOTHING;
+
+  -- 6. Seed GoTrue Identities (Enables password sign-in via Supabase client)
+  INSERT INTO auth.identities (
+    id,
+    user_id,
+    identity_data,
+    provider,
+    provider_id,
+    last_sign_in_at,
+    created_at,
+    updated_at
+  ) VALUES
+    (v_admin_id, v_admin_id, jsonb_build_object('sub', v_admin_id, 'email', 'admin@gatewaygas.co.ke'), 'email', v_admin_id::text, now(), now(), now()),
+    (v_director_id, v_director_id, jsonb_build_object('sub', v_director_id, 'email', 'director@gatewaygas.co.ke'), 'email', v_director_id::text, now(), now(), now()),
+    (v_operator_id, v_operator_id, jsonb_build_object('sub', v_operator_id, 'email', 'operations@gatewaygas.co.ke'), 'email', v_operator_id::text, now(), now(), now()),
+    (v_sales_id, v_sales_id, jsonb_build_object('sub', v_sales_id, 'email', 'sales@gatewaygas.co.ke'), 'email', v_sales_id::text, now(), now(), now()),
+    (v_rider_id, v_rider_id, jsonb_build_object('sub', v_rider_id, 'email', 'rider.john@gatewaygas.co.ke'), 'email', v_rider_id::text, now(), now(), now()),
+    (v_pending_id, v_pending_id, jsonb_build_object('sub', v_pending_id, 'email', 'samuel.kamau@gatewaygas.co.ke'), 'email', v_pending_id::text, now(), now(), now()),
+    (v_rejected_id, v_rejected_id, jsonb_build_object('sub', v_rejected_id, 'email', 'rejected.applicant@gatewaygas.co.ke'), 'email', v_rejected_id::text, now(), now(), now())
+  ON CONFLICT DO NOTHING;
+
 END $$;
