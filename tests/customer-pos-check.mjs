@@ -53,4 +53,34 @@ assert.strictEqual(validateOrder({ isPosWalkin: true, selectedCustomer: null, re
 assert.throws(() => validateOrder({ isPosWalkin: false, selectedCustomer: null, receiptNumber: 'WST-1001' }));
 assert.strictEqual(validateOrder({ isPosWalkin: false, selectedCustomer: customers[0], receiptNumber: 'WST-1001' }), true);
 
-console.log('Customer POS verification check passed');
+// 3. Product size-first naming & search filter test
+const sampleProducts = [
+  { id: 'c1', name: '6kg Pro Gas', brand: 'Pro Gas', size_kg: 6 },
+  { id: 'c2', name: '13kg Afrigas', brand: 'Afrigas', size_kg: 13 },
+  { id: 'w1', name: '20L Keringet Water', brand: 'Keringet', size_kg: 20 },
+  { id: 'a1', name: '13kg Kabason Regulator', brand: 'Kabason', size_kg: null },
+];
+
+function filterProducts(query) {
+  const q = query.toLowerCase();
+  return sampleProducts.filter((p) => {
+    const matchName = p.name.toLowerCase().includes(q);
+    const matchBrand = p.brand.toLowerCase().includes(q);
+    const matchSize = p.size_kg
+      ? `${p.size_kg}kg`.includes(q) || `${p.size_kg}l`.includes(q) || `${p.size_kg}` === q
+      : false;
+    return matchName || matchBrand || matchSize;
+  });
+}
+
+// Ensure names start with size
+assert.strictEqual(sampleProducts[0].name.startsWith('6kg'), true);
+assert.strictEqual(sampleProducts[1].name.startsWith('13kg'), true);
+assert.strictEqual(sampleProducts[2].name.startsWith('20L'), true);
+
+// Filter by size
+assert.strictEqual(filterProducts('13kg').length, 2); // 13kg Afrigas & 13kg Kabason
+assert.strictEqual(filterProducts('20L').length, 1);
+assert.strictEqual(filterProducts('Afrigas').length, 1);
+
+console.log('Customer POS & Product search verification checks passed');

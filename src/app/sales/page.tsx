@@ -63,6 +63,7 @@ export default function SalesPage() {
   interface CartItem {
     id: string;
     productId: string;
+    productName: string;
     orderType: OrderType;
     outgoingBrand: string;
     incomingBrand: string;
@@ -75,6 +76,8 @@ export default function SalesPage() {
   const [itemType, setItemType] = useState<OrderType>('refill');
   const [selectedProductId, setSelectedProductId] = useState(products[0]?.id || '');
   const [productFilterCat, setProductFilterCat] = useState<'all' | 'cylinder' | 'water' | 'accessory'>('all');
+  const [productSearchQuery, setProductSearchQuery] = useState('');
+  const [showProductSearchResults, setShowProductSearchResults] = useState(false);
   const [incomingBrand, setIncomingBrand] = useState('Afrigas');
   const [itemQuantity, setItemQuantity] = useState(1);
   const [successOrderNumber, setSuccessOrderNumber] = useState<string | null>(null);
@@ -169,6 +172,7 @@ export default function SalesPage() {
       const newItem: CartItem = {
         id: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         productId: prod.id,
+        productName: prod.name,
         orderType: type,
         outgoingBrand: prod.brand,
         incomingBrand: incBrand,
@@ -263,10 +267,30 @@ export default function SalesPage() {
 
   const filteredProductsForSelect = products.filter((p) => {
     if (productFilterCat !== 'all' && p.category !== productFilterCat) return false;
-    if (itemType === 'refill') return p.refill_price_kes > 0;
-    if (itemType === 'complete') return p.complete_price_kes > 0;
-    return p.accessory_price_kes > 0;
+    if (itemType === 'refill' && p.refill_price_kes <= 0) return false;
+    if (itemType === 'complete' && p.complete_price_kes <= 0) return false;
+    if (itemType === 'accessory' && p.accessory_price_kes <= 0) return false;
+
+    if (productSearchQuery.trim()) {
+      const q = productSearchQuery.toLowerCase();
+      const matchName = p.name.toLowerCase().includes(q);
+      const matchBrand = p.brand.toLowerCase().includes(q);
+      const matchSize = p.size_kg
+        ? `${p.size_kg}kg`.includes(q) || `${p.size_kg}l`.includes(q) || `${p.size_kg}` === q
+        : false;
+      return matchName || matchBrand || matchSize;
+    }
+    return true;
   });
+
+  useEffect(() => {
+    if (filteredProductsForSelect.length > 0) {
+      const exists = filteredProductsForSelect.some((p) => p.id === selectedProductId);
+      if (!exists) {
+        setSelectedProductId(filteredProductsForSelect[0].id);
+      }
+    }
+  }, [filteredProductsForSelect, selectedProductId]);
 
   const isWaterProduct = selectedProduct?.category === 'water';
 
@@ -628,7 +652,7 @@ export default function SalesPage() {
         {/* Left 2 Cols: Item Picker & Payment */}
         <div className="lg:col-span-2 space-y-4">
           {/* Item Selector */}
-          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                 Select Product to Add
@@ -651,6 +675,86 @@ export default function SalesPage() {
               </div>
             </div>
 
+            {/* Smooth Product Live Search Bar */}
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={productSearchQuery}
+                onChange={(e) => {
+                  setProductSearchQuery(e.target.value);
+                  setShowProductSearchResults(true);
+                }}
+                onFocus={() => setShowProductSearchResults(true)}
+                placeholder="Search products by size or brand (e.g. 13kg Afrigas, 6kg Pro Gas, 20L Keringet)..."
+                className="w-full text-xs border border-slate-300 rounded-xl pl-9 pr-8 py-2 bg-slate-50/70 focus:bg-white focus:outline-none focus:ring-1 focus:ring-orange-500"
+              />
+              {productSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProductSearchQuery('');
+                    setShowProductSearchResults(false);
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+
+              {/* Live Search Floating Results */}
+              {showProductSearchResults && productSearchQuery.trim() && (
+                <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl z-20 max-h-56 overflow-y-auto divide-y divide-slate-100">
+                  {filteredProductsForSelect.length > 0 ? (
+                    filteredProductsForSelect.map((p) => {
+                      const price =
+                        itemType === 'refill'
+                          ? p.refill_price_kes
+                          : itemType === 'complete'
+                          ? p.complete_price_kes
+                          : p.accessory_price_kes;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedProductId(p.id);
+                            if (p.category === 'water') {
+                              setIncomingBrand(p.brand === 'Keringet' ? 'Keringet' : 'Aquamist');
+                            } else if (p.category === 'cylinder') {
+                              setIncomingBrand(p.brand);
+                            }
+                            setShowProductSearchResults(false);
+                          }}
+                          className={`w-full text-left px-3.5 py-2.5 hover:bg-orange-50/80 transition flex items-center justify-between text-xs ${
+                            selectedProductId === p.id ? 'bg-orange-50 font-bold' : ''
+                          }`}
+                        >
+                          <div>
+                            <span className="font-bold text-slate-900 block">
+                              {p.name} {itemType === 'refill' ? 'Refill' : itemType === 'complete' ? 'Complete' : ''}
+                            </span>
+                            <span className="text-[11px] text-slate-500">
+                              {p.brand} • {p.category === 'cylinder' ? 'Gas' : p.category === 'water' ? 'Water' : 'Accessory'}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <span className="font-bold text-orange-600 text-xs">
+                              KES {price.toLocaleString()}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <div className="p-3 text-center text-xs text-slate-400">
+                      No products match &quot;{productSearchQuery}&quot;
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 mb-1">Sale Type</label>
@@ -666,7 +770,9 @@ export default function SalesPage() {
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">Product</label>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                  Product {filteredProductsForSelect.length > 0 ? `(${filteredProductsForSelect.length})` : ''}
+                </label>
                 <select
                   value={selectedProductId}
                   onChange={(e) => {
@@ -674,18 +780,21 @@ export default function SalesPage() {
                     const chosen = products.find((p) => p.id === e.target.value);
                     if (chosen?.category === 'water') {
                       setIncomingBrand(chosen.brand === 'Keringet' ? 'Keringet' : 'Aquamist');
+                    } else if (chosen?.category === 'cylinder') {
+                      setIncomingBrand(chosen.brand);
                     }
                   }}
                   className="w-full min-h-[42px] text-xs border border-slate-300 rounded-xl px-2 bg-white text-slate-800"
                 >
                   {filteredProductsForSelect.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name} — KES{' '}
-                      {itemType === 'refill'
+                      {p.name} {itemType === 'refill' ? 'Refill' : itemType === 'complete' ? 'Complete' : ''} — KES{' '}
+                      {(itemType === 'refill'
                         ? p.refill_price_kes
                         : itemType === 'complete'
                         ? p.complete_price_kes
-                        : p.accessory_price_kes}
+                        : p.accessory_price_kes
+                      ).toLocaleString()}
                     </option>
                   ))}
                 </select>
@@ -819,7 +928,8 @@ export default function SalesPage() {
                   <div key={item.id} className="py-2.5 flex items-center justify-between gap-2 text-xs">
                     <div className="flex-1 min-w-0">
                       <div className="font-bold text-slate-900 truncate">
-                        {item.outgoingBrand} {item.cylinderSizeKg ? `${item.cylinderSizeKg}kg` : ''}
+                        {item.productName}{' '}
+                        {item.orderType === 'refill' ? 'Refill' : item.orderType === 'complete' ? 'Complete' : ''}
                       </div>
                       <div className="text-[10px] text-slate-500">
                         {item.orderType === 'refill' && `Swap: ${item.incomingBrand} in`}
