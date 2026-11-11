@@ -28,6 +28,7 @@ export interface StaffProfile {
   role: UserRole;
   approval_status: ApprovalStatus;
   vehicle_plate?: string | null;
+  avatar_url?: string | null;
   created_at?: string;
   updated_at?: string;
 }
