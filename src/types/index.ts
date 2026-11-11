@@ -38,7 +38,7 @@ export interface Product {
   name: string;
   brand: string;
   size_kg: number | null;
-  category: 'cylinder' | 'accessory';
+  category: 'cylinder' | 'accessory' | 'water';
   refill_price_kes: number;
   complete_price_kes: number;
   accessory_price_kes: number;

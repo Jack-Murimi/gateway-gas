@@ -19,6 +19,8 @@ import {
   Phone,
   MapPin,
   ChevronDown,
+  Droplets,
+  Wrench,
 } from 'lucide-react';
 
 export default function SalesPage() {
@@ -30,7 +32,7 @@ export default function SalesPage() {
   const [customerPhone, setCustomerPhone] = useState('+254700000000');
   const [deliveryEstate, setDeliveryEstate] = useState('Westlands');
   const [deliveryAddress, setDeliveryAddress] = useState('');
-  const [deliveryFee, setDeliveryFee] = useState(200);
+  const [deliveryFee, setDeliveryFee] = useState(0); // FREE DELIVERY!
 
   // Payment fields
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('mpesa');
@@ -52,11 +54,12 @@ export default function SalesPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [itemType, setItemType] = useState<OrderType>('refill');
   const [selectedProductId, setSelectedProductId] = useState(products[0]?.id || '');
+  const [productFilterCat, setProductFilterCat] = useState<'all' | 'cylinder' | 'water' | 'accessory'>('all');
   const [incomingBrand, setIncomingBrand] = useState('Afrigas');
   const [itemQuantity, setItemQuantity] = useState(1);
+  const [quickAddTab, setQuickAddTab] = useState<'gas' | 'accessories' | 'water'>('gas');
   const [successOrderNumber, setSuccessOrderNumber] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showMobileCartDrawer, setShowMobileCartDrawer] = useState(false);
 
   if (!currentUser || !['admin', 'director', 'operator', 'sales_rep'].includes(currentUser.role)) {
     return (
@@ -69,6 +72,7 @@ export default function SalesPage() {
   }
 
   const activeBranch = branches.find((b) => b.id === selectedBranchId) || branches[0];
+  const selectedProduct = products.find((p) => p.id === selectedProductId) || products[0];
 
   // Helper to add or merge item into cart (DEDUPLICATION FIX)
   const addProductToCart = (prod: Product, type: OrderType, incoming: string, qty: number) => {
@@ -77,7 +81,8 @@ export default function SalesPage() {
     else if (type === 'complete') price = prod.complete_price_kes;
     else price = prod.accessory_price_kes;
 
-    const incBrand = type === 'refill' ? (incoming || prod.brand) : '';
+    const isExchange = prod.category === 'cylinder' || (prod.category === 'water' && prod.refill_price_kes > 0);
+    const incBrand = type === 'refill' && isExchange ? (incoming || prod.brand) : '';
 
     setCart((prev) => {
       // Find existing item with matching productId, orderType, and incomingBrand
@@ -111,9 +116,8 @@ export default function SalesPage() {
   };
 
   const handleAddToCart = () => {
-    const prod = products.find((p) => p.id === selectedProductId);
-    if (!prod) return;
-    addProductToCart(prod, itemType, incomingBrand, itemQuantity);
+    if (!selectedProduct) return;
+    addProductToCart(selectedProduct, itemType, incomingBrand, itemQuantity);
     setItemQuantity(1);
   };
 
@@ -142,7 +146,8 @@ export default function SalesPage() {
 
   const totalCartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
   const subtotal = cart.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0);
-  const finalDeliveryFee = isPosWalkin ? 0 : deliveryFee;
+  // Free delivery across the board
+  const finalDeliveryFee = 0;
   const grandTotal = subtotal + finalDeliveryFee;
 
   // Toggle walkin defaults
@@ -161,7 +166,7 @@ export default function SalesPage() {
   const handleCreateOrder = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (cart.length === 0) {
-      alert('Please add at least one cylinder or accessory to the order.');
+      alert('Please add at least one cylinder, accessory, or water item to the order.');
       return;
     }
     if (!customerName || !customerPhone) {
@@ -201,11 +206,25 @@ export default function SalesPage() {
         setDeliveryAddress('');
       }
       setPaymentReference('');
-      setShowMobileCartDrawer(false);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  // Filter products for dropdown
+  const filteredProductsForSelect = products.filter((p) => {
+    if (productFilterCat !== 'all' && p.category !== productFilterCat) return false;
+    if (itemType === 'refill') {
+      return p.refill_price_kes > 0;
+    }
+    if (itemType === 'complete') {
+      return p.complete_price_kes > 0;
+    }
+    // Accessory or disposable
+    return p.accessory_price_kes > 0;
+  });
+
+  const isWaterProduct = selectedProduct?.category === 'water';
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-28 md:pb-12 space-y-6">
@@ -216,7 +235,7 @@ export default function SalesPage() {
             <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" /> POS & Fast Order Entry
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Quick cylinder exchange, instant walk-in cashiering, and estate deliveries.
+            Gas cylinders, water refills (Keringet/Aquamist), Japeli, and accessories with free delivery.
           </p>
         </div>
 
@@ -245,7 +264,7 @@ export default function SalesPage() {
             Order Complete: <span className="font-mono text-emerald-700">{successOrderNumber}</span>
           </h3>
           <p className="text-xs text-emerald-700 mt-0.5">
-            Stock automatically reconciled in {activeBranch.name}.
+            Stock automatically reconciled in {activeBranch.name}. Free delivery applied.
           </p>
           <button
             onClick={() => setSuccessOrderNumber(null)}
@@ -256,72 +275,217 @@ export default function SalesPage() {
         </div>
       )}
 
-      {/* 1-Tap Quick Refill Add Presets (SPEED UP SALE ENTRY) */}
-      <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200/80 rounded-2xl p-4 shadow-sm">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-orange-900 uppercase tracking-wider mb-2.5">
-          <Zap className="w-4 h-4 text-orange-600" /> Fast-Add Top Sellers (1 Tap to Cart)
+      {/* 1-Tap Quick Add Presets with Category Tabs (SPEED UP SALE ENTRY) */}
+      <div className="bg-gradient-to-r from-orange-50 via-amber-50 to-sky-50 border border-orange-200/80 rounded-2xl p-4 shadow-sm space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-orange-900 uppercase tracking-wider">
+            <Zap className="w-4 h-4 text-orange-600" /> Fast-Add Presets (1 Tap to Cart)
+          </div>
+
+          {/* Quick preset category pills */}
+          <div className="flex items-center gap-1 bg-white/80 p-0.5 rounded-xl border border-orange-200/60 self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setQuickAddTab('gas')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                quickAddTab === 'gas' ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Flame className="w-3 h-3" /> Gas Refills
+            </button>
+            <button
+              type="button"
+              onClick={() => setQuickAddTab('accessories')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                quickAddTab === 'accessories' ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Wrench className="w-3 h-3" /> Accessories
+            </button>
+            <button
+              type="button"
+              onClick={() => setQuickAddTab('water')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                quickAddTab === 'water' ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Droplets className="w-3 h-3" /> Water
+            </button>
+          </div>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
-          <button
-            type="button"
-            onClick={() => handleQuickAdd('Pro Gas 6kg', 'refill')}
-            className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
-          >
-            <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Pro Gas 6kg</div>
-            <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">Refill • 1,250/=</div>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleQuickAdd('Pro Gas 13kg', 'refill')}
-            className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
-          >
-            <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Pro Gas 13kg</div>
-            <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">Refill • 2,800/=</div>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleQuickAdd('K-Gas 13kg', 'refill')}
-            className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
-          >
-            <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">K-Gas 13kg</div>
-            <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">Refill • 2,850/=</div>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleQuickAdd('Total Gas 13kg', 'refill')}
-            className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
-          >
-            <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Total 13kg</div>
-            <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">Refill • 2,900/=</div>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleQuickAdd('Regulator', 'accessory')}
-            className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
-          >
-            <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Regulator 20mm</div>
-            <div className="text-[10px] text-slate-500 group-hover:text-orange-100 font-semibold">950/=</div>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleQuickAdd('Hose Pipe', 'accessory')}
-            className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
-          >
-            <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Gas Hose 1.5m</div>
-            <div className="text-[10px] text-slate-500 group-hover:text-orange-100 font-semibold">450/=</div>
-          </button>
-        </div>
+
+        {/* Tab 1: Gas Presets */}
+        {quickAddTab === 'gas' && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2">
+            <button
+              type="button"
+              onClick={() => handleQuickAdd('Pro Gas 6kg', 'refill')}
+              className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
+            >
+              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Pro Gas 6kg</div>
+              <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">Refill • 1,250/=</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickAdd('Pro Gas 13kg', 'refill')}
+              className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
+            >
+              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Pro Gas 13kg</div>
+              <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">Refill • 2,800/=</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickAdd('K-Gas 13kg', 'refill')}
+              className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
+            >
+              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">K-Gas 13kg</div>
+              <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">Refill • 2,850/=</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickAdd('Total Gas 13kg', 'refill')}
+              className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
+            >
+              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Total 13kg</div>
+              <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">Refill • 2,900/=</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickAdd('Afrigas 13kg', 'refill')}
+              className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
+            >
+              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Afrigas 13kg</div>
+              <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">Refill • 2,850/=</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickAdd('Ola Energy 13kg', 'refill')}
+              className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
+            >
+              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Ola 13kg</div>
+              <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">Refill • 2,800/=</div>
+            </button>
+          </div>
+        )}
+
+        {/* Tab 2: Accessories Presets (Exact User Prices) */}
+        {quickAddTab === 'accessories' && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2">
+            <button
+              type="button"
+              onClick={() => handleQuickAdd('Kabason Regulator 13kg', 'accessory')}
+              className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
+            >
+              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Kabason Reg 13kg</div>
+              <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">1,200/=</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickAdd('Kabason Regulator 6kg', 'accessory')}
+              className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
+            >
+              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Kabason Reg 6kg</div>
+              <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">1,200/=</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickAdd('Gas Burner', 'accessory')}
+              className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
+            >
+              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Gas Burner</div>
+              <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">1,200/=</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickAdd('Grill', 'accessory')}
+              className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
+            >
+              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Cylinder Grill</div>
+              <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">500/=</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickAdd('Clips', 'accessory')}
+              className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
+            >
+              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Gas Hose Clip</div>
+              <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">50/= each</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickAdd('Standard 1.5m', 'accessory')}
+              className="min-h-[44px] p-2.5 bg-white hover:bg-orange-500 hover:text-white border border-orange-200 rounded-xl text-left transition shadow-sm group"
+            >
+              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Hose Pipe (1.5m)</div>
+              <div className="text-[10px] text-orange-600 group-hover:text-orange-100 font-semibold">300/= std</div>
+            </button>
+          </div>
+        )}
+
+        {/* Tab 3: Water Presets (Keringet/Aquamist Refills + Japeli) */}
+        {quickAddTab === 'water' && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+            <button
+              type="button"
+              onClick={() => handleQuickAdd('Keringet Water 20L', 'refill')}
+              className="min-h-[44px] p-2.5 bg-white hover:bg-sky-600 hover:text-white border border-sky-200 rounded-xl text-left transition shadow-sm group"
+            >
+              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Keringet 20L</div>
+              <div className="text-[10px] text-sky-600 group-hover:text-sky-100 font-semibold">Swap Refill • 650/=</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickAdd('Aquamist Water 20L', 'refill')}
+              className="min-h-[44px] p-2.5 bg-white hover:bg-sky-600 hover:text-white border border-sky-200 rounded-xl text-left transition shadow-sm group"
+            >
+              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Aquamist 20L</div>
+              <div className="text-[10px] text-sky-600 group-hover:text-sky-100 font-semibold">Swap Refill • 600/=</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickAdd('Japeli Water 500ml', 'accessory')}
+              className="min-h-[44px] p-2.5 bg-white hover:bg-sky-600 hover:text-white border border-sky-200 rounded-xl text-left transition shadow-sm group"
+            >
+              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Japeli 500ml</div>
+              <div className="text-[10px] text-slate-500 group-hover:text-sky-100 font-semibold">50/= disp</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickAdd('Japeli Water 1L', 'accessory')}
+              className="min-h-[44px] p-2.5 bg-white hover:bg-sky-600 hover:text-white border border-sky-200 rounded-xl text-left transition shadow-sm group"
+            >
+              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Japeli 1 Litre</div>
+              <div className="text-[10px] text-slate-500 group-hover:text-sky-100 font-semibold">80/= disp</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickAdd('Japeli Water 5L', 'accessory')}
+              className="min-h-[44px] p-2.5 bg-white hover:bg-sky-600 hover:text-white border border-sky-200 rounded-xl text-left transition shadow-sm group"
+            >
+              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Japeli 5 Litre</div>
+              <div className="text-[10px] text-slate-500 group-hover:text-sky-100 font-semibold">250/= disp</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickAdd('Japeli Water 20L', 'accessory')}
+              className="min-h-[44px] p-2.5 bg-white hover:bg-sky-600 hover:text-white border border-sky-200 rounded-xl text-left transition shadow-sm group"
+            >
+              <div className="text-[11px] font-bold text-slate-900 group-hover:text-white truncate">Japeli 20L Disp</div>
+              <div className="text-[10px] text-slate-500 group-hover:text-sky-100 font-semibold">550/= disp</div>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Main Grid: Form Left, Cart Right */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left 2 Cols: Form Sections */}
         <div className="lg:col-span-2 space-y-5">
-          {/* Section 1: Sale Mode (Walk-In vs Delivery) */}
+          {/* Section 1: Sale Mode (Walk-In vs Free Delivery) */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Step 1: Order Mode</span>
-              {/* Segmented Control with 44px min-touch */}
+              {/* Segmented Control */}
               <div className="flex bg-slate-100 p-1 rounded-xl">
                 <button
                   type="button"
@@ -339,7 +503,7 @@ export default function SalesPage() {
                     !isPosWalkin ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-900'
                   }`}
                 >
-                  Bike Delivery
+                  Free Bike Delivery
                 </button>
               </div>
             </div>
@@ -400,63 +564,94 @@ export default function SalesPage() {
 
           {/* Section 2: Custom Item / Universal Brand Swap */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                Step 2: Custom Cylinder or Brand Exchange
+                Step 2: Choose Product (Gas, Water, or Accessories)
               </span>
+
+              {/* Category Filter Pills */}
+              <div className="flex items-center gap-1 self-start sm:self-auto overflow-x-auto pb-1">
+                {(['all', 'cylinder', 'water', 'accessory'] as const).map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setProductFilterCat(cat)}
+                    className={`min-h-[34px] px-2.5 py-1 text-[11px] font-bold rounded-lg capitalize transition ${
+                      productFilterCat === cat ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'
+                    }`}
+                  >
+                    {cat === 'all' ? 'All' : cat === 'cylinder' ? 'Gas' : cat === 'water' ? 'Water' : 'Accessories'}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">Type</label>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">Sale Type</label>
                 <select
                   value={itemType}
                   onChange={(e) => setItemType(e.target.value as OrderType)}
                   className="w-full min-h-[44px] text-xs font-semibold border border-slate-300 rounded-xl px-2.5 bg-white text-slate-800"
                 >
-                  <option value="refill">Refill (Cylinder Swap)</option>
-                  <option value="complete">Complete (New Unit)</option>
-                  <option value="accessory">Accessory</option>
+                  <option value="refill">Refill (Swap Empty for Full)</option>
+                  <option value="complete">Complete Unit (New Cylinder/Bottle)</option>
+                  <option value="accessory">Accessory / Disposable (One-way)</option>
                 </select>
               </div>
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                  {itemType === 'accessory' ? 'Product' : 'Outgoing Full Cylinder'}
+                  Product / Size
                 </label>
                 <select
                   value={selectedProductId}
-                  onChange={(e) => setSelectedProductId(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedProductId(e.target.value);
+                    const chosen = products.find((p) => p.id === e.target.value);
+                    if (chosen?.category === 'water') {
+                      setIncomingBrand(chosen.brand === 'Keringet' ? 'Keringet' : 'Aquamist');
+                    }
+                  }}
                   className="w-full min-h-[44px] text-xs border border-slate-300 rounded-xl px-2 bg-white text-slate-800"
                 >
-                  {products
-                    .filter((p) => (itemType === 'accessory' ? p.category === 'accessory' : p.category === 'cylinder'))
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} — KES{' '}
-                        {itemType === 'refill'
-                          ? p.refill_price_kes
-                          : itemType === 'complete'
-                          ? p.complete_price_kes
-                          : p.accessory_price_kes}
-                      </option>
-                    ))}
+                  {filteredProductsForSelect.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} — KES{' '}
+                      {itemType === 'refill'
+                        ? p.refill_price_kes
+                        : itemType === 'complete'
+                        ? p.complete_price_kes
+                        : p.accessory_price_kes}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               {itemType === 'refill' ? (
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Customer Tare In (Swap)</label>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                    Customer Tare In ({isWaterProduct ? 'Empty Bottle' : 'Empty Cylinder'})
+                  </label>
                   <select
                     value={incomingBrand}
                     onChange={(e) => setIncomingBrand(e.target.value)}
                     className="w-full min-h-[44px] text-xs border border-slate-300 rounded-xl px-2 bg-white text-slate-800"
                   >
-                    <option value="Pro Gas">Pro Gas (Empty)</option>
-                    <option value="TotalEnergies">TotalEnergies (Empty)</option>
-                    <option value="K-Gas">K-Gas (Empty)</option>
-                    <option value="Afrigas">Afrigas (Empty)</option>
-                    <option value="Ola Energy">Ola Energy (Empty)</option>
+                    {isWaterProduct ? (
+                      <>
+                        <option value="Keringet">Keringet (Empty 20L Bottle)</option>
+                        <option value="Aquamist">Aquamist (Empty 20L Bottle)</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="Pro Gas">Pro Gas (Empty)</option>
+                        <option value="TotalEnergies">TotalEnergies (Empty)</option>
+                        <option value="K-Gas">K-Gas (Empty)</option>
+                        <option value="Afrigas">Afrigas (Empty)</option>
+                        <option value="Ola Energy">Ola Energy (Empty)</option>
+                      </>
+                    )}
                   </select>
                 </div>
               ) : (
@@ -540,7 +735,7 @@ export default function SalesPage() {
           </div>
         </div>
 
-        {/* Right 1 Col: Cart & Order Review (Desktop + Sticky Drawer on Mobile) */}
+        {/* Right 1 Col: Cart & Order Review */}
         <div>
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm sticky top-20">
             <h3 className="text-base font-bold text-slate-900 mb-3 pb-2 border-b border-slate-100 flex items-center justify-between">
@@ -568,7 +763,7 @@ export default function SalesPage() {
                           <span className="text-orange-600 font-medium">Swap: {item.incomingBrand} in</span>
                         )}
                         {item.orderType === 'complete' && 'Complete Unit'}
-                        {item.orderType === 'accessory' && 'Accessory'}
+                        {item.orderType === 'accessory' && 'Accessory / Disposable'}
                       </div>
                       <div className="font-semibold text-slate-700 mt-0.5">
                         KES {(item.unitPrice * item.quantity).toLocaleString()}
@@ -615,10 +810,10 @@ export default function SalesPage() {
                 <span>Subtotal:</span>
                 <span className="font-semibold">KES {subtotal.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between text-slate-600">
+              <div className="flex justify-between text-emerald-600">
                 <span>Delivery Fee:</span>
-                <span className="font-semibold">
-                  {isPosWalkin ? 'KES 0 (Walk-In)' : `KES ${finalDeliveryFee.toLocaleString()}`}
+                <span className="font-bold uppercase tracking-wider text-[11px] bg-emerald-50 px-2 py-0.5 rounded">
+                  Free Delivery
                 </span>
               </div>
               <div className="flex justify-between text-slate-900 font-bold text-base pt-2 border-t border-slate-200">
@@ -643,7 +838,7 @@ export default function SalesPage() {
       <div className="md:hidden fixed bottom-14 left-0 right-0 bg-white/95 backdrop-blur border-t border-slate-200 p-3 z-40 shadow-lg">
         <div className="max-w-md mx-auto flex items-center justify-between gap-3">
           <div>
-            <span className="text-[10px] uppercase font-bold text-slate-400 block">Total ({totalCartCount} items)</span>
+            <span className="text-[10px] uppercase font-bold text-emerald-600 block">Free Delivery • {totalCartCount} items</span>
             <span className="text-base font-extrabold text-orange-600">KES {grandTotal.toLocaleString()}</span>
           </div>
 

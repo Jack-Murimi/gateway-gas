@@ -16,6 +16,8 @@ import {
   LayoutDashboard,
   Briefcase,
   Clock,
+  MoreHorizontal,
+  X,
 } from 'lucide-react';
 
 const roleConfig: Record<
@@ -119,6 +121,7 @@ function RoleAvatar({
 export function Navbar() {
   const { currentUser, setCurrentUser, staffList, logout } = useStore();
   const [showRoleSwitcher, setShowRoleSwitcher] = useState(false);
+  const [showMoreDrawer, setShowMoreDrawer] = useState(false);
   const pathname = usePathname();
 
   if (!currentUser) return null;
@@ -144,6 +147,14 @@ export function Navbar() {
   const visibleLinks = navLinks.filter(
     (l) => currentUser.approval_status === 'approved' && l.roles.includes(currentUser.role)
   );
+
+  // Big tech pattern: Max 4 bottom tabs on small screens (iOS HIG / Material 3)
+  // If > 4 items, show top 3 primary + 4th "More" tab that opens a clean bottom drawer
+  const maxTabs = 4;
+  const isOverflow = visibleLinks.length > maxTabs;
+  const primaryTabs = isOverflow ? visibleLinks.slice(0, 3) : visibleLinks;
+  const moreTabs = isOverflow ? visibleLinks.slice(3) : [];
+  const isMoreActive = isOverflow && moreTabs.some((t) => t.href === pathname);
 
   return (
     <>
@@ -284,9 +295,9 @@ export function Navbar() {
         </div>
       </header>
 
-      {/* Mobile Fixed Bottom Navigation Bar (Thumb Zone Friendly) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-white/95 backdrop-blur border-t border-slate-200 z-50 flex items-center justify-around px-2 shadow-lg">
-        {visibleLinks.map((link) => {
+      {/* Mobile Fixed Bottom Navigation Bar (Max 4 Items - Industry Standard) */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-white/95 backdrop-blur border-t border-slate-200 z-40 flex items-center justify-around px-2 shadow-lg">
+        {primaryTabs.map((link) => {
           const Icon = link.icon;
           const isActive = pathname === link.href;
           return (
@@ -304,11 +315,120 @@ export function Navbar() {
               >
                 <Icon className="w-4 h-4" />
               </div>
-              <span className="truncate max-w-[64px] mt-0.5">{link.label}</span>
+              <span className="truncate max-w-[68px] mt-0.5">{link.label}</span>
             </Link>
           );
         })}
+
+        {/* 4th Tab: "More" Bottom Sheet trigger for overflow routes */}
+        {isOverflow && (
+          <button
+            type="button"
+            onClick={() => setShowMoreDrawer(true)}
+            className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-[10px] font-bold transition ${
+              isMoreActive || showMoreDrawer ? 'text-orange-600' : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <div
+              className={`p-1 rounded-lg transition ${
+                isMoreActive || showMoreDrawer ? 'bg-orange-100/70 text-orange-600' : ''
+              }`}
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </div>
+            <span className="truncate max-w-[68px] mt-0.5">More</span>
+          </button>
+        )}
       </nav>
+
+      {/* "More" Bottom Sheet Drawer (Big Tech Standard: Spotify/Slack/Linear) */}
+      {showMoreDrawer && (
+        <div className="md:hidden fixed inset-0 z-50 flex flex-col justify-end">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+            onClick={() => setShowMoreDrawer(false)}
+          />
+
+          {/* Drawer content */}
+          <div className="relative bg-white rounded-t-3xl border-t border-slate-200 shadow-2xl p-5 pb-8 space-y-4 max-h-[80vh] overflow-y-auto animate-in slide-in-from-bottom duration-200">
+            {/* Grab handle */}
+            <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto" />
+
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                More Destinations
+              </h3>
+              <button
+                onClick={() => setShowMoreDrawer(false)}
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Overflow Links */}
+            <div className="grid grid-cols-1 gap-2">
+              {moreTabs.map((link) => {
+                const Icon = link.icon;
+                const isActive = pathname === link.href;
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setShowMoreDrawer(false)}
+                    className={`min-h-[48px] flex items-center gap-3 px-4 py-2.5 rounded-2xl text-xs font-bold transition ${
+                      isActive
+                        ? 'bg-orange-50 text-orange-600 border border-orange-200'
+                        : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <div
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                        isActive
+                          ? 'bg-orange-600 text-white'
+                          : 'bg-white border border-slate-200 text-slate-600'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <span className="text-sm font-semibold">{link.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+
+            {/* User profile row & fast logout */}
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <RoleAvatar
+                  role={currentUser.role}
+                  name={currentUser.full_name}
+                  avatarUrl={currentUser.avatar_url}
+                  size="sm"
+                />
+                <div className="text-left">
+                  <div className="text-xs font-bold text-slate-900 leading-tight">
+                    {currentUser.full_name}
+                  </div>
+                  <div className="text-[10px] text-slate-400 uppercase font-semibold">
+                    {currentUser.role.replace('_', ' ')}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowMoreDrawer(false);
+                  logout();
+                }}
+                className="min-h-[38px] px-3.5 py-1.5 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition flex items-center gap-1.5"
+              >
+                <LogOut className="w-3.5 h-3.5" /> Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

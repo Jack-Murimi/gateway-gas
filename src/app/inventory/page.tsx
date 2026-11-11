@@ -18,7 +18,7 @@ export default function InventoryPage() {
 
   const [selectedBranchId, setSelectedBranchId] = useState<string>(branches[0]?.id || '');
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterCategory, setFilterCategory] = useState<'all' | 'cylinder' | 'accessory'>('all');
+  const [filterCategory, setFilterCategory] = useState<'all' | 'cylinder' | 'water' | 'accessory'>('all');
 
   // New Branch modal state
   const [showBranchModal, setShowBranchModal] = useState(false);
@@ -170,15 +170,15 @@ export default function InventoryPage() {
             </div>
 
             <div className="flex items-center gap-1.5 self-start sm:self-auto overflow-x-auto w-full sm:w-auto pb-1">
-              {(['all', 'cylinder', 'accessory'] as const).map((cat) => (
+              {(['all', 'cylinder', 'water', 'accessory'] as const).map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setFilterCategory(cat)}
-                  className={`min-h-[38px] px-3.5 py-1 text-xs font-bold rounded-xl capitalize transition ${
+                  className={`min-h-[38px] px-3.5 py-1 text-xs font-bold rounded-xl capitalize transition whitespace-nowrap ${
                     filterCategory === cat ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'
                   }`}
                 >
-                  {cat}
+                  {cat === 'all' ? 'All' : cat === 'cylinder' ? 'Gas' : cat === 'water' ? 'Water' : 'Accessories'}
                 </button>
               ))}
             </div>
@@ -193,6 +193,7 @@ export default function InventoryPage() {
           const fullCount = invItem ? invItem.full_units : 0;
           const emptyCount = invItem ? invItem.empty_units : 0;
           const isEditing = editingStock?.productId === prod.id;
+          const isExchangeItem = prod.category === 'cylinder' || (prod.category === 'water' && prod.refill_price_kes > 0);
 
           return (
             <div key={prod.id} className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3">
@@ -200,17 +201,19 @@ export default function InventoryPage() {
                 <div>
                   <h3 className="font-bold text-sm text-slate-900">{prod.name}</h3>
                   <div className="text-xs text-slate-500 mt-0.5">
-                    {prod.brand} • {prod.category} {prod.size_kg ? `(${prod.size_kg}kg)` : ''}
+                    {prod.brand} • {prod.category === 'water' ? 'Water' : prod.category === 'cylinder' ? 'Gas' : 'Accessory'} {prod.size_kg ? `(${prod.size_kg}${prod.category === 'water' ? 'L' : 'kg'})` : ''}
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="text-xs font-bold text-slate-900">
                     KES{' '}
-                    {prod.category === 'cylinder'
+                    {prod.refill_price_kes > 0
                       ? prod.refill_price_kes.toLocaleString()
                       : prod.accessory_price_kes.toLocaleString()}
                   </div>
-                  <div className="text-[10px] text-slate-400">Refill Price</div>
+                  <div className="text-[10px] text-slate-400">
+                    {prod.refill_price_kes > 0 ? 'Refill Price' : 'Unit Price'}
+                  </div>
                 </div>
               </div>
 
@@ -234,8 +237,10 @@ export default function InventoryPage() {
                 </div>
 
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-amber-700 block">Empty Tare</span>
-                  {prod.category === 'cylinder' ? (
+                  <span className="text-[10px] uppercase font-bold text-amber-700 block">
+                    {prod.category === 'water' ? 'Empty Bottles' : 'Empty Tare'}
+                  </span>
+                  {isExchangeItem ? (
                     isEditing ? (
                       <input
                         type="number"
@@ -250,7 +255,7 @@ export default function InventoryPage() {
                       <span className="text-base font-bold text-slate-800">{emptyCount} empties</span>
                     )
                   ) : (
-                    <span className="text-xs text-slate-300 block pt-1.5">—</span>
+                    <span className="text-xs text-slate-300 block pt-1.5">— (Disposable)</span>
                   )}
                 </div>
               </div>
@@ -313,6 +318,7 @@ export default function InventoryPage() {
                 const fullCount = invItem ? invItem.full_units : 0;
                 const emptyCount = invItem ? invItem.empty_units : 0;
                 const isEditing = editingStock?.productId === prod.id;
+                const isExchangeItem = prod.category === 'cylinder' || (prod.category === 'water' && prod.refill_price_kes > 0);
 
                 return (
                   <tr key={prod.id} className="hover:bg-slate-50">
@@ -323,7 +329,7 @@ export default function InventoryPage() {
 
                     <td className="py-3.5 px-6">
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-100 text-slate-700">
-                        {prod.category} {prod.size_kg ? `• ${prod.size_kg}kg` : ''}
+                        {prod.category === 'water' ? 'Water' : prod.category === 'cylinder' ? 'Gas' : 'Accessory'} {prod.size_kg ? `• ${prod.size_kg}${prod.category === 'water' ? 'L' : 'kg'}` : ''}
                       </span>
                     </td>
 
@@ -350,7 +356,7 @@ export default function InventoryPage() {
                     </td>
 
                     <td className="py-3.5 px-6 text-center">
-                      {prod.category === 'cylinder' ? (
+                      {isExchangeItem ? (
                         isEditing ? (
                           <input
                             type="number"
@@ -370,7 +376,7 @@ export default function InventoryPage() {
                     </td>
 
                     <td className="py-3.5 px-6 text-right font-medium text-slate-700 text-xs">
-                      {prod.category === 'cylinder'
+                      {prod.refill_price_kes > 0
                         ? `KES ${prod.refill_price_kes.toLocaleString()}`
                         : `KES ${prod.accessory_price_kes.toLocaleString()}`}
                     </td>

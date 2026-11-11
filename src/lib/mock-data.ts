@@ -36,6 +36,7 @@ export const INITIAL_BRANCHES: Branch[] = [
 ];
 
 export const INITIAL_PRODUCTS: Product[] = [
+  // Gas Cylinders
   { id: 'c1', name: 'Pro Gas 6kg', brand: 'Pro Gas', size_kg: 6, category: 'cylinder', refill_price_kes: 1250, complete_price_kes: 4800, accessory_price_kes: 0, is_active: true },
   { id: 'c2', name: 'Pro Gas 13kg', brand: 'Pro Gas', size_kg: 13, category: 'cylinder', refill_price_kes: 2800, complete_price_kes: 8500, accessory_price_kes: 0, is_active: true },
   { id: 'c3', name: 'K-Gas 6kg', brand: 'K-Gas', size_kg: 6, category: 'cylinder', refill_price_kes: 1300, complete_price_kes: 4900, accessory_price_kes: 0, is_active: true },
@@ -45,9 +46,25 @@ export const INITIAL_PRODUCTS: Product[] = [
   { id: 'c7', name: 'Afrigas 13kg', brand: 'Afrigas', size_kg: 13, category: 'cylinder', refill_price_kes: 2850, complete_price_kes: 8600, accessory_price_kes: 0, is_active: true },
   { id: 'c8', name: 'Ola Energy 13kg', brand: 'Ola Energy', size_kg: 13, category: 'cylinder', refill_price_kes: 2800, complete_price_kes: 8500, accessory_price_kes: 0, is_active: true },
   { id: 'c9', name: 'Commercial Cylinder 50kg', brand: 'Pro Gas', size_kg: 50, category: 'cylinder', refill_price_kes: 10500, complete_price_kes: 24000, accessory_price_kes: 0, is_active: true },
-  { id: 'a1', name: 'Low Pressure 20mm Gas Regulator', brand: 'Generic', size_kg: null, category: 'accessory', refill_price_kes: 0, complete_price_kes: 0, accessory_price_kes: 950, is_active: true },
-  { id: 'a2', name: 'High Pressure Hose Pipe (1.5m with clamps)', brand: 'Generic', size_kg: null, category: 'accessory', refill_price_kes: 0, complete_price_kes: 0, accessory_price_kes: 450, is_active: true },
-  { id: 'a3', name: 'Single Burner Gas Cooker Stand', brand: 'Generic', size_kg: null, category: 'accessory', refill_price_kes: 0, complete_price_kes: 0, accessory_price_kes: 1200, is_active: true },
+
+  // Gas Accessories (exact user prices)
+  { id: 'a1', name: 'Kabason Regulator 13kg', brand: 'Kabason', size_kg: null, category: 'accessory', refill_price_kes: 0, complete_price_kes: 0, accessory_price_kes: 1200, is_active: true },
+  { id: 'a2', name: 'Kabason Regulator 6kg', brand: 'Kabason', size_kg: null, category: 'accessory', refill_price_kes: 0, complete_price_kes: 0, accessory_price_kes: 1200, is_active: true },
+  { id: 'a3', name: 'Gas Burner (6kg / Cooker)', brand: 'Kabason', size_kg: null, category: 'accessory', refill_price_kes: 0, complete_price_kes: 0, accessory_price_kes: 1200, is_active: true },
+  { id: 'a4', name: 'Cylinder Grill / Trivet', brand: 'Generic', size_kg: null, category: 'accessory', refill_price_kes: 0, complete_price_kes: 0, accessory_price_kes: 500, is_active: true },
+  { id: 'a5', name: 'Gas Hose Clips (Each)', brand: 'Generic', size_kg: null, category: 'accessory', refill_price_kes: 0, complete_price_kes: 0, accessory_price_kes: 50, is_active: true },
+  { id: 'a6', name: 'Gas Hose Pipe (Standard 1.5m)', brand: 'Generic', size_kg: null, category: 'accessory', refill_price_kes: 0, complete_price_kes: 0, accessory_price_kes: 300, is_active: true },
+  { id: 'a7', name: 'Gas Hose Pipe (Extra Per Meter)', brand: 'Generic', size_kg: null, category: 'accessory', refill_price_kes: 0, complete_price_kes: 0, accessory_price_kes: 300, is_active: true },
+
+  // Water: Returnable Bottles (full & empty exchange like gas)
+  { id: 'w1', name: 'Keringet Water 20L (Refill Bottle)', brand: 'Keringet', size_kg: 20, category: 'water', refill_price_kes: 650, complete_price_kes: 2200, accessory_price_kes: 0, is_active: true },
+  { id: 'w2', name: 'Aquamist Water 20L (Refill Bottle)', brand: 'Aquamist', size_kg: 20, category: 'water', refill_price_kes: 600, complete_price_kes: 2100, accessory_price_kes: 0, is_active: true },
+
+  // Water: Japeli Disposable Bottles
+  { id: 'w3', name: 'Japeli Water 500ml', brand: 'Japeli', size_kg: null, category: 'water', refill_price_kes: 0, complete_price_kes: 0, accessory_price_kes: 50, is_active: true },
+  { id: 'w4', name: 'Japeli Water 1L', brand: 'Japeli', size_kg: null, category: 'water', refill_price_kes: 0, complete_price_kes: 0, accessory_price_kes: 80, is_active: true },
+  { id: 'w5', name: 'Japeli Water 5L', brand: 'Japeli', size_kg: null, category: 'water', refill_price_kes: 0, complete_price_kes: 0, accessory_price_kes: 250, is_active: true },
+  { id: 'w6', name: 'Japeli Water 20L (Disposable)', brand: 'Japeli', size_kg: null, category: 'water', refill_price_kes: 0, complete_price_kes: 0, accessory_price_kes: 550, is_active: true },
 ];
 
 export const INITIAL_STAFF: StaffProfile[] = [
