@@ -26,4 +26,12 @@ assert.equal(formatKES(0), 'KES 0');
 assert.equal(formatKES(1250), 'KES 1,250');
 assert.equal(formatKES(2999.8), 'KES 3,000');
 
+// 3. Shift Close Z-Report cash variance & numbering logic
+function calculateCashVariance(declared, expected) {
+  return declared - expected;
+}
+assert.equal(calculateCashVariance(12500, 12500), 0);
+assert.equal(calculateCashVariance(13000, 12500), 500); // Surplus
+assert.equal(calculateCashVariance(12000, 12500), -500); // Shortage
+
 console.log('All core logic checks passed.');

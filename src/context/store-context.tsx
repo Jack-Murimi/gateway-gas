@@ -17,6 +17,7 @@ import {
   Customer,
   CustomerPhone,
   CustomerLocation,
+  ShiftZReport,
 } from '@/types';
 import {
   INITIAL_BRANCHES,
@@ -65,6 +66,7 @@ interface StoreContextType {
   orders: Order[];
   customers: Customer[];
   leaderboard: RiderLeaderboardEntry[];
+  shiftReports: ShiftZReport[];
   // Actions
   signupStaff: (email: string, full_name: string, phone: string, vehicle_plate?: string) => Promise<{ success: boolean; message: string }>;
   approveStaff: (staffId: string, role: UserRole) => void;
@@ -78,6 +80,7 @@ interface StoreContextType {
   updateRiderComment: (orderId: string, comment: string) => void;
   updateBranchStock: (branchId: string, productId: string, fullDelta: number, emptyDelta: number) => void;
   createBranch: (name: string, code: string, location_estate: string, contact_phone: string) => void;
+  createShiftReport: (data: Omit<ShiftZReport, 'id' | 'report_number' | 'closed_at'>) => Promise<ShiftZReport>;
   resetDemoData: () => void;
   logout: () => void;
 }
@@ -92,6 +95,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [inventory, setInventory] = useState<BranchInventory[]>(INITIAL_INVENTORY);
   const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
   const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
+  const [shiftReports, setShiftReports] = useState<ShiftZReport[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Initialize from localStorage or mock defaults (NO auto-login fallback)
@@ -103,6 +107,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const storedInventory = localStorage.getItem('gwg_inventory');
       const storedOrders = localStorage.getItem('gwg_orders');
       const storedCustomers = localStorage.getItem('gwg_customers');
+      const storedReports = localStorage.getItem('gwg_shift_reports');
 
       if (storedUser) {
         const parsed = JSON.parse(storedUser);
@@ -159,6 +164,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (storedInventory) setInventory(JSON.parse(storedInventory));
       if (storedOrders) setOrders(JSON.parse(storedOrders));
       if (storedCustomers) setCustomers(JSON.parse(storedCustomers));
+      if (storedReports) setShiftReports(JSON.parse(storedReports));
     } catch {
       // ignore
     }
@@ -177,10 +183,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('gwg_inventory', JSON.stringify(inventory));
       localStorage.setItem('gwg_orders', JSON.stringify(orders));
       localStorage.setItem('gwg_customers', JSON.stringify(customers));
+      localStorage.setItem('gwg_shift_reports', JSON.stringify(shiftReports));
     } catch {
       // quota or private mode fallback
     }
-  }, [currentUser, staffList, branches, inventory, orders, customers, isLoaded]);
+  }, [currentUser, staffList, branches, inventory, orders, customers, shiftReports, isLoaded]);
 
   // Staff signup
   const signupStaff = async (email: string, full_name: string, phone: string, vehicle_plate?: string) => {
@@ -449,18 +456,37 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
+  const createShiftReport = async (
+    data: Omit<ShiftZReport, 'id' | 'report_number' | 'closed_at'>
+  ): Promise<ShiftZReport> => {
+    const closedAt = new Date().toISOString();
+    const count = shiftReports.length + 1;
+    const branchCode = branches.find((b) => b.id === data.branch_id)?.code.split('-')[0] || 'STN';
+    const reportNumber = `Z-${branchCode}-${data.shift_date.replace(/-/g, '')}-${String(count).padStart(2, '0')}`;
+    const report: ShiftZReport = {
+      ...data,
+      id: `zrep-${Date.now()}`,
+      report_number: reportNumber,
+      closed_at: closedAt,
+    };
+    setShiftReports((prev) => [report, ...prev]);
+    return report;
+  };
+
   const resetDemoData = () => {
     setStaffList(INITIAL_STAFF);
     setBranches(INITIAL_BRANCHES);
     setInventory(INITIAL_INVENTORY);
     setOrders(INITIAL_ORDERS);
     setCustomers(INITIAL_CUSTOMERS);
+    setShiftReports([]);
     if (typeof window !== 'undefined') {
       localStorage.setItem('gwg_staff', JSON.stringify(INITIAL_STAFF));
       localStorage.setItem('gwg_branches', JSON.stringify(INITIAL_BRANCHES));
       localStorage.setItem('gwg_inventory', JSON.stringify(INITIAL_INVENTORY));
       localStorage.setItem('gwg_orders', JSON.stringify(INITIAL_ORDERS));
       localStorage.setItem('gwg_customers', JSON.stringify(INITIAL_CUSTOMERS));
+      localStorage.removeItem('gwg_shift_reports');
     }
   };
 
@@ -528,6 +554,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         orders,
         customers,
         leaderboard,
+        shiftReports,
         signupStaff,
         approveStaff,
         rejectStaff,
@@ -540,6 +567,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         updateRiderComment,
         updateBranchStock,
         createBranch,
+        createShiftReport,
         resetDemoData,
         logout,
       }}

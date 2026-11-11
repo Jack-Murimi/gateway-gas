@@ -122,6 +122,34 @@ export interface Order {
   sales_rep?: StaffProfile;
 }
 
+export interface ShiftZReport {
+  id: string;
+  report_number: string;
+  branch_id: string;
+  branch_name: string;
+  operator_id: string;
+  operator_name: string;
+  shift_date: string;
+  closed_at: string;
+  total_sales_count: number;
+  total_revenue_kes: number;
+  mpesa_total_kes: number;
+  cash_total_kes: number;
+  bank_total_kes: number;
+  expected_cash_kes: number;
+  declared_cash_kes: number;
+  cash_variance_kes: number;
+  cylinders_sold_count: number;
+  accessories_sold_count: number;
+  cylinder_breakdown: Array<{
+    brand: string;
+    size_kg: number | null;
+    full_sold: number;
+    empty_in: number;
+  }>;
+  notes?: string;
+}
+
 export interface RiderLeaderboardEntry {
   rider_id: string;
   rider_name: string;
