@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Branch, StaffProfile } from '@/types';
-import { Calendar, Receipt, Building2, ChevronDown, ChevronUp } from 'lucide-react';
+import { useEffect, useId, useRef, useState } from 'react';
+import type { Branch, StaffProfile } from '@/types';
+import { Building2, Calendar, ChevronDown, Lock, Receipt } from 'lucide-react';
 
 interface PosAdvancedHeaderProps {
   branches: Branch[];
@@ -15,6 +15,34 @@ interface PosAdvancedHeaderProps {
   currentUser: StaffProfile;
 }
 
+/** Today's date as YYYY-MM-DD in the device's own timezone (Nairobi for staff). */
+function todayLocalISO(): string {
+  const d = new Date();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${month}-${day}`;
+}
+
+/** "Today" or "11 Nov 2026". Falls back to the raw string if it can't be parsed. */
+function formatSaleDate(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return iso;
+  if (iso === todayLocalISO()) return 'Today';
+  return new Date(y, m - 1, d).toLocaleDateString('en-KE', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+// 16px text on inputs stops iOS Safari from zooming the page when a field is focused.
+const fieldClass =
+  'w-full min-h-[48px] rounded-xl border border-slate-300 bg-white px-3 text-base text-slate-900 ' +
+  'placeholder:text-slate-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 ' +
+  'disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500';
+
+const labelClass = 'mb-1 block text-sm font-semibold text-slate-700';
+
 export function PosAdvancedHeader({
   branches,
   selectedBranchId,
@@ -26,84 +54,195 @@ export function PosAdvancedHeader({
   currentUser,
 }: PosAdvancedHeaderProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const canEditDate = currentUser.role === 'admin' || currentUser.role === 'director' || currentUser.role === 'operator';
+  const receiptInputRef = useRef<HTMLInputElement>(null);
+  const dateInputRef = useRef<HTMLInputElement>(null);
+  const pendingFocus = useRef<'receipt' | 'date' | null>(null);
+
+  const uid = useId();
+  const panelId = `${uid}-panel`;
+  const branchId = `${uid}-branch`;
+  const receiptId = `${uid}-receipt`;
+  const dateId = `${uid}-date`;
+
+  // ponytail: role check determines date edit rights; upgrade to granular branch permission table if sub-roles are added.
+  const canEditDate = Boolean(currentUser && ['admin', 'director', 'operator'].includes(currentUser.role));
   const activeBranch = branches.find((b) => b.id === selectedBranchId) || branches[0];
+  const hasReceipt = receiptNumber.trim().length > 0;
+
+  useEffect(() => {
+    if (isExpanded && pendingFocus.current) {
+      const target = pendingFocus.current;
+      pendingFocus.current = null;
+      if (target === 'receipt') receiptInputRef.current?.focus();
+      if (target === 'date') {
+        dateInputRef.current?.focus();
+        dateInputRef.current?.showPicker?.();
+      }
+    }
+  }, [isExpanded]);
+
+  const openAndFocusReceipt = () => {
+    pendingFocus.current = 'receipt';
+    if (isExpanded) {
+      receiptInputRef.current?.focus();
+    } else {
+      setIsExpanded(true);
+    }
+  };
+
+  const openAndFocusDate = () => {
+    if (!canEditDate) return;
+    pendingFocus.current = 'date';
+    if (isExpanded) {
+      dateInputRef.current?.focus();
+      dateInputRef.current?.showPicker?.();
+    } else {
+      setIsExpanded(true);
+    }
+  };
 
   return (
-    <div className="bg-white rounded-2xl border-2 border-slate-200 shadow-sm p-3 text-left">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 flex-wrap text-sm font-bold text-slate-700">
-          <div className="flex items-center gap-1.5 bg-slate-100 px-3 py-1 rounded-xl">
-            <Building2 className="w-4 h-4 text-orange-600 shrink-0" />
-            <span className="font-black text-slate-900">{activeBranch?.name || 'Main Hub'}</span>
+    <section
+      aria-label="Branch, receipt number and sale date"
+      className="rounded-2xl border border-slate-200 bg-white text-left shadow-sm"
+    >
+      {/* Summary row: always visible, wraps cleanly from 320px up */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 p-3 sm:px-4">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <div className="flex max-w-full min-w-0 items-center gap-1.5 rounded-xl bg-slate-100 px-3 py-1.5">
+            <Building2 className="h-4 w-4 shrink-0 text-orange-600" aria-hidden="true" />
+            <span className="truncate text-sm font-bold text-slate-900">
+              {activeBranch?.name || 'Main Hub'}
+            </span>
           </div>
 
-          <div className="flex items-center gap-1.5 text-xs text-slate-500">
-            <Calendar className="w-3.5 h-3.5" />
-            <span>{receiptDate}</span>
-          </div>
-
-          {receiptNumber && (
-            <div className="flex items-center gap-1.5 text-xs text-slate-800 font-mono bg-slate-100 px-2 py-0.5 rounded">
-              <Receipt className="w-3.5 h-3.5" />
-              <span>#{receiptNumber}</span>
+          {canEditDate ? (
+            <button
+              type="button"
+              onClick={openAndFocusDate}
+              title="Click to edit sale date"
+              className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 hover:text-orange-600 transition rounded-xl px-2 py-1 hover:bg-orange-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-600"
+            >
+              <Calendar className="h-4 w-4 shrink-0 text-orange-600" aria-hidden="true" />
+              <time dateTime={receiptDate} suppressHydrationWarning>
+                {formatSaleDate(receiptDate)}
+              </time>
+              <span className="text-xs text-orange-600 underline font-normal">(change)</span>
+            </button>
+          ) : (
+            <div className="flex items-center gap-1.5 text-sm text-slate-600 px-2 py-1">
+              <Calendar className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <time dateTime={receiptDate} suppressHydrationWarning>
+                {formatSaleDate(receiptDate)}
+              </time>
             </div>
+          )}
+
+          {hasReceipt ? (
+            <div className="flex max-w-full min-w-0 items-center gap-1.5 rounded-lg bg-slate-100 px-2 py-1 font-mono text-sm text-slate-800">
+              <Receipt className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span className="truncate">#{receiptNumber}</span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={openAndFocusReceipt}
+              className="flex min-h-[36px] items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600"
+            >
+              <Receipt className="h-4 w-4 shrink-0" aria-hidden="true" />
+              Add receipt no.
+            </button>
           )}
         </div>
 
         <button
           type="button"
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="text-xs font-black text-orange-600 hover:text-orange-700 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-orange-50 transition"
+          onClick={() => setIsExpanded((v) => !v)}
+          aria-expanded={isExpanded}
+          aria-controls={panelId}
+          className="flex min-h-[44px] shrink-0 items-center gap-1 rounded-xl px-3 text-sm font-semibold text-orange-700 transition hover:bg-orange-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600"
         >
-          <span>{isExpanded ? 'Hide Options' : 'Station & Receipt Options'}</span>
-          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          <span>{isExpanded ? 'Done' : 'Edit details'}</span>
+          <ChevronDown
+            className={`h-4 w-4 transition-transform duration-200 motion-reduce:transition-none ${
+              isExpanded ? 'rotate-180' : ''
+            }`}
+            aria-hidden="true"
+          />
         </button>
       </div>
 
+      {/* Collapsible panel with standard conditional rendering for reliable form interactivity */}
       {isExpanded && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 mt-3 border-t-2 border-slate-100 animate-in slide-in-from-top-1">
-          {/* Branch Station */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Branch Station Hub</label>
-            <select
-              value={selectedBranchId}
-              onChange={(e) => onSelectBranch(e.target.value)}
-              className="w-full min-h-[44px] text-sm px-3 bg-white text-slate-900 border-2 border-slate-300 rounded-xl font-bold focus:border-orange-500 focus:outline-none"
-            >
-              {branches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name} ({b.code})
-                </option>
-              ))}
-            </select>
-          </div>
+        <div id={panelId} className="border-t border-slate-100 p-3 sm:p-4 animate-in slide-in-from-top-1 duration-150">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,13rem),1fr))] gap-3">
+            <div>
+              <label htmlFor={branchId} className={labelClass}>
+                Branch
+              </label>
+              <select
+                id={branchId}
+                value={selectedBranchId}
+                onChange={(e) => onSelectBranch(e.target.value)}
+                disabled={branches.length < 2}
+                className={`${fieldClass} font-semibold`}
+              >
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name} ({b.code})
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          {/* Physical Receipt Ticket Number */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Paper Receipt Ticket #</label>
-            <input
-              type="text"
-              value={receiptNumber}
-              onChange={(e) => onChangeReceiptNumber(e.target.value)}
-              placeholder="e.g. WST-4102"
-              className="w-full min-h-[44px] text-sm px-3 font-mono font-bold text-black border-2 border-slate-300 rounded-xl focus:border-orange-500 focus:outline-none"
-            />
-          </div>
+            <div>
+              <label htmlFor={receiptId} className={labelClass}>
+                Paper receipt no.
+              </label>
+              <input
+                ref={receiptInputRef}
+                id={receiptId}
+                type="text"
+                value={receiptNumber}
+                onChange={(e) => onChangeReceiptNumber(e.target.value)}
+                placeholder="e.g. WST-4102"
+                autoComplete="off"
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+                required
+                className={`${fieldClass} font-mono font-semibold`}
+              />
+            </div>
 
-          {/* Date */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Sale Date</label>
-            <input
-              type="date"
-              disabled={!canEditDate}
-              value={receiptDate}
-              onChange={(e) => onChangeDate(e.target.value)}
-              className="w-full min-h-[44px] text-sm px-3 bg-white text-slate-900 border-2 border-slate-300 rounded-xl font-bold disabled:bg-slate-100 disabled:text-slate-500 focus:border-orange-500 focus:outline-none"
-            />
+            <div>
+              <label htmlFor={dateId} className={labelClass}>
+                Sale date {canEditDate ? '' : '(Locked)'}
+              </label>
+              <input
+                ref={dateInputRef}
+                id={dateId}
+                type="date"
+                value={receiptDate}
+                onChange={(e) => onChangeDate(e.target.value)}
+                onClick={(e) => canEditDate && (e.target as HTMLInputElement).showPicker?.()}
+                disabled={!canEditDate}
+                aria-describedby={canEditDate ? undefined : `${dateId}-hint`}
+                className={`${fieldClass} ${canEditDate ? 'cursor-pointer hover:border-orange-500' : ''}`}
+              />
+              {!canEditDate && (
+                <p
+                  id={`${dateId}-hint`}
+                  className="mt-1 flex items-center gap-1 text-sm text-slate-500"
+                >
+                  <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  Only admins, directors and operators can change this.
+                </p>
+              )}
+            </div>
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }

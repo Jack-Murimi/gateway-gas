@@ -41,15 +41,17 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={{ toast, showSuccess, showError }}>
       {children}
-      {/* Toast Container - Mobile bottom / Desktop top-right */}
-      <div className="fixed bottom-20 sm:bottom-6 right-4 left-4 sm:left-auto sm:w-96 z-50 flex flex-col gap-2 pointer-events-none">
+      {/* Toast / Snackbar Container - Top screen snackbar */}
+      <div className="fixed top-4 left-4 right-4 sm:left-auto sm:right-6 sm:w-96 z-50 flex flex-col gap-2 pointer-events-none">
         {toasts.map((t) => {
           const isSuccess = t.type === 'success';
           const isError = t.type === 'error';
           return (
             <div
               key={t.id}
-              className={`pointer-events-auto p-4 rounded-2xl border-2 shadow-xl flex items-center justify-between gap-3 text-sm font-bold animate-in slide-in-from-bottom duration-200 ${
+              role="status"
+              aria-live="polite"
+              className={`pointer-events-auto p-3.5 sm:p-4 rounded-2xl border-2 shadow-2xl flex items-center justify-between gap-3 text-sm font-bold animate-in slide-in-from-top duration-200 ${
                 isSuccess
                   ? 'bg-emerald-950 text-emerald-100 border-emerald-500'
                   : isError
