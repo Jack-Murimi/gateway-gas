@@ -41,12 +41,17 @@ interface CreateOrderParams {
   customer_phone: string;
   delivery_estate?: string;
   delivery_address?: string;
+  rider_ids?: string[];
+  vehicle_plate?: string | null;
+  lpo_number?: string | null;
+  sale_comment?: string | null;
   payment_method: PaymentMethod;
   payment_status: PaymentStatus;
   payment_reference?: string;
   delivery_fee_kes: number;
   items: Array<{
     product_id: string;
+    branch_id?: string;
     order_type: OrderType;
     outgoing_brand: string;
     incoming_brand?: string;
@@ -260,6 +265,22 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   // Create Order / POS sale with brand swap & inventory reconciliation
   const createOrder = async (params: CreateOrderParams): Promise<Order> => {
+    // Validate aggregated demand per product and source branch before mutating inventory.
+    const requestedBySource = new Map<string, number>();
+    params.items.forEach(item => {
+      const key = `${item.branch_id || params.branch_id}:${item.product_id}`;
+      requestedBySource.set(key, (requestedBySource.get(key) || 0) + item.quantity);
+    });
+    for (const [key, requested] of requestedBySource) {
+      const [sourceBranchId, productId] = key.split(':');
+      const stock = inventory.find(row => row.branch_id === sourceBranchId && row.product_id === productId);
+      if (!stock || stock.full_units < requested) {
+        const productName = products.find(product => product.id === productId)?.name || 'Selected product';
+        const branchName = branches.find(branch => branch.id === sourceBranchId)?.name || 'selected branch';
+        throw new Error(`Insufficient stock: ${productName} has ${stock?.full_units ?? 0} available at ${branchName}, but ${requested} requested.`);
+      }
+    }
+
     const orderNumber = `GWG-${Math.floor(1000 + Math.random() * 9000)}`;
     const orderId = `ord-${Date.now()}`;
 
@@ -274,6 +295,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       quantity: item.quantity,
       unit_price_kes: item.unit_price_kes,
       subtotal_kes: item.quantity * item.unit_price_kes,
+      branch_id: item.branch_id || params.branch_id,
     }));
 
     const subtotal = items.reduce((acc, i) => acc + i.subtotal_kes, 0);
@@ -285,14 +307,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       receipt_number: params.receipt_number || null,
       branch_id: params.branch_id,
       sales_rep_id: currentUser?.id || null,
-      rider_id: null,
+      rider_id: params.rider_ids?.[0] || null,
+      rider_ids: params.rider_ids || [],
+      vehicle_plate: params.vehicle_plate || null,
+      lpo_number: params.lpo_number || null,
+      sale_comment: params.sale_comment || null,
       customer_id: params.customer_id || null,
       is_pos_walkin: params.is_pos_walkin,
       customer_name: params.customer_name,
       customer_phone: params.customer_phone,
       delivery_estate: params.delivery_estate || null,
       delivery_address: params.delivery_address || null,
-      delivery_status: params.is_pos_walkin ? 'delivered' : 'pending',
+      delivery_status: params.is_pos_walkin ? 'delivered' : params.rider_ids?.length ? 'assigned' : 'pending',
       payment_method: params.payment_method,
       payment_status: params.payment_status,
       payment_reference: params.payment_reference || null,
@@ -300,6 +326,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       subtotal_kes: subtotal,
       delivery_fee_kes: params.delivery_fee_kes,
       total_kes: total,
+      assigned_at: !params.is_pos_walkin && params.rider_ids?.length ? new Date().toISOString() : null,
       delivered_at: params.is_pos_walkin ? new Date().toISOString() : null,
       created_at: params.created_at || new Date().toISOString(),
       items,
@@ -309,8 +336,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     // 1. Outgoing product: deduct full_units
     // 2. If refill with brand swap: add empty_units for incoming brand
     items.forEach((item) => {
-      // Deduct full units of the outgoing product
-      updateBranchStock(params.branch_id, item.product_id, -item.quantity, 0);
+      const itemBranchId = item.branch_id || params.branch_id;
+      // Deduct stock from the branch selected on this specific cart line.
+      updateBranchStock(itemBranchId, item.product_id, -item.quantity, 0);
 
       // If refill and incoming brand differs, find matching product for incoming brand and increment its empties
       if (item.order_type === 'refill' && item.incoming_brand && item.cylinder_size_kg) {
@@ -318,10 +346,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           (p) => p.brand.toLowerCase() === item.incoming_brand!.toLowerCase() && p.size_kg === item.cylinder_size_kg
         );
         if (incomingProduct) {
-          updateBranchStock(params.branch_id, incomingProduct.id, 0, item.quantity);
+          updateBranchStock(itemBranchId, incomingProduct.id, 0, item.quantity);
         } else {
           // If no separate brand row, add empties to current product
-          updateBranchStock(params.branch_id, item.product_id, 0, item.quantity);
+          updateBranchStock(itemBranchId, item.product_id, 0, item.quantity);
         }
       }
     });
@@ -338,6 +366,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           ? {
               ...o,
               rider_id: riderId,
+              rider_ids: [riderId],
               delivery_status: 'assigned',
               assigned_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
@@ -512,7 +541,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const leaderboard: RiderLeaderboardEntry[] = staffList
     .filter((s) => s.role === 'rider' && s.approval_status === 'approved')
     .map((r) => {
-      const riderOrders = orders.filter((o) => o.rider_id === r.id);
+      const riderOrders = orders.filter((o) => o.rider_id === r.id || o.rider_ids?.includes(r.id));
       const completed = riderOrders.filter((o) => o.delivery_status === 'delivered');
       const active = riderOrders.filter((o) => o.delivery_status === 'in_transit' || o.delivery_status === 'assigned');
 

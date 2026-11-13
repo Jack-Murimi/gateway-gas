@@ -44,7 +44,7 @@ export default function RiderPage() {
   }
 
   // Filter orders assigned to this rider
-  const myDeliveries = orders.filter((o) => o.rider_id === currentUser.id);
+  const myDeliveries = orders.filter((o) => o.rider_id === currentUser.id || o.rider_ids?.includes(currentUser.id));
   const activeDeliveries = myDeliveries.filter(
     (o) => o.delivery_status !== 'delivered' && o.delivery_status !== 'cancelled'
   );
