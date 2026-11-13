@@ -85,6 +85,11 @@ CREATE TABLE IF NOT EXISTS public.orders (
     branch_id UUID NOT NULL REFERENCES public.branches(id),
     sales_rep_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
     rider_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    rider_ids UUID[] NOT NULL DEFAULT '{}',
+    vehicle_plate TEXT,
+    receipt_number TEXT,
+    lpo_number TEXT,
+    sale_comment TEXT,
     is_pos_walkin BOOLEAN NOT NULL DEFAULT false,
     customer_name TEXT NOT NULL,
     customer_phone TEXT NOT NULL,
@@ -108,6 +113,7 @@ CREATE TABLE IF NOT EXISTS public.orders (
 CREATE TABLE IF NOT EXISTS public.order_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     order_id UUID NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
+    branch_id UUID REFERENCES public.branches(id),
     product_id UUID REFERENCES public.products(id) ON DELETE SET NULL,
     order_type order_type NOT NULL,
     outgoing_brand TEXT NOT NULL,
@@ -227,7 +233,7 @@ CREATE POLICY "Riders view assigned orders"
     ON public.orders FOR SELECT
     TO authenticated
     USING (
-        public.current_user_role() = 'rider' AND rider_id = auth.uid()
+        public.current_user_role() = 'rider' AND (rider_id = auth.uid() OR auth.uid() = ANY(rider_ids))
     );
 
 CREATE POLICY "Sales Reps, Operators, Admins create orders"
@@ -257,7 +263,7 @@ CREATE POLICY "Staff view order items"
             public.current_user_role() = 'rider'
             AND EXISTS (
                 SELECT 1 FROM public.orders o
-                WHERE o.id = order_items.order_id AND o.rider_id = auth.uid()
+                WHERE o.id = order_items.order_id AND (o.rider_id = auth.uid() OR auth.uid() = ANY(o.rider_ids))
             )
         )
     );
