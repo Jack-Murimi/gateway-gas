@@ -22,7 +22,7 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 DO $$ BEGIN
-    CREATE TYPE payment_method AS ENUM ('mpesa', 'cash', 'bank_transfer');
+    CREATE TYPE payment_method AS ENUM ('mpesa', 'cash', 'bank_transfer', 'pdq', 'cheque');
 EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 DO $$ BEGIN
