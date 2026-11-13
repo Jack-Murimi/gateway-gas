@@ -1,3 +1,6 @@
+ALTER TYPE public.payment_method ADD VALUE IF NOT EXISTS 'pdq';
+ALTER TYPE public.payment_method ADD VALUE IF NOT EXISTS 'cheque';
+
 -- POS workspace: support per-line stock source and multi-rider delivery assignment.
 -- Safe to run against an existing Gateway database.
 
