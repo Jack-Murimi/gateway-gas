@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Product, OrderType } from '@/types';
 import {
-  Search, Plus, Minus, Trash2, Repeat, Package, X, Check, ChevronDown,
+  Search, Plus, Minus, Trash2, X, ChevronDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatKES, hasEmptyState } from '@/lib/formatters';
@@ -122,6 +122,9 @@ export function PosItemsStep({
   };
 
   const returnable = activeProduct ? hasEmptyState(activeProduct) : false;
+  const tareBrands = activeProduct?.category === 'water'
+    ? ['KERINGET', 'AQUAMIST']
+    : ['AFRIGAS', 'K-GAS', 'TOTAL', 'OLA', 'PROGAS', 'TOSHA', 'LAKE', 'HASHI', 'SUPA', 'JATEL', 'SEAGAS', 'RAHA', 'BONOKO', 'PURE', 'HUNKER', 'HASS'];
   const validLine = Boolean(activeProduct) &&
     Number.isInteger(Number(itemQuantity)) && Number(itemQuantity) > 0 &&
     Number.isFinite(Number(unitPrice)) && Number(unitPrice) >= 0;
@@ -257,7 +260,7 @@ export function PosItemsStep({
                       onChange={(event) => setIncomingTareBrand(event.target.value)}
                       className={inputClass + ' appearance-none pr-9'}
                     >
-                      {['AFRIGAS', 'K-GAS', 'TOTAL', 'OLA', 'PROGAS', 'TOSHA', 'LAKE', 'HASHI', 'SUPA', 'JATEL', 'SEAGAS', 'RAHA', 'BONOKO', 'PURE', 'HUNKER', 'HASS'].map((brand) => (
+                      {tareBrands.map((brand) => (
                         <option key={brand} value={brand}>{brand}</option>
                       ))}
                     </select>
