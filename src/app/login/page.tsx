@@ -38,6 +38,32 @@ function LoginContent() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetMessage, setResetMessage] = useState('');
+  const [isSendingReset, setIsSendingReset] = useState(false);
+
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetMessage('');
+    if (!resetEmail.trim()) {
+      setResetMessage('Enter your work email address first.');
+      return;
+    }
+    setIsSendingReset(true);
+    try {
+      const supabase = createClient();
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(resetEmail.trim(), {
+        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+      });
+      if (resetError) throw resetError;
+      setResetMessage('If an account exists for that email, a password reset link has been sent.');
+    } catch (err: unknown) {
+      setResetMessage(err instanceof Error ? err.message : 'Could not send the reset email. Please try again.');
+    } finally {
+      setIsSendingReset(false);
+    }
+  };
 
   // Navigate according to user role
   const navigateByRole = (user: StaffProfile) => {
@@ -213,8 +239,18 @@ function LoginContent() {
             />
 
             <div className="flex items-center justify-between text-xs font-bold">
-              <span className="text-slate-500">Forgot password? Contact Station Admin</span>
+              <button type="button" onClick={() => { setShowForgotPassword((v) => !v); setResetMessage(''); setResetEmail(identifier.includes('@') ? identifier : ''); }} className="text-orange-600 hover:underline">
+                {showForgotPassword ? 'Back to sign in' : 'Forgot password?'}
+              </button>
             </div>
+            {showForgotPassword && (
+              <form onSubmit={handlePasswordReset} className="rounded-2xl border border-orange-200 bg-orange-50 p-4 space-y-3">
+                <p className="text-sm font-semibold text-slate-700">Enter your work email and we’ll send you a secure reset link.</p>
+                <Input label="Work Email" type="email" required value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} placeholder="name@example.com" leftIcon={<Mail className="w-5 h-5" />} />
+                {resetMessage && <p role="status" className="text-xs font-semibold text-slate-700">{resetMessage}</p>}
+                <Button type="submit" isLoading={isSendingReset} size="lg" className="w-full">Send reset link</Button>
+              </form>
+            )}
 
             <Button type="submit" isLoading={isSubmitting} size="lg" className="w-full">
               Sign In to Station <ArrowRight className="w-5 h-5 ml-2" />
