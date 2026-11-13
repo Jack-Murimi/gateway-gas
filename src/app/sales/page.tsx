@@ -75,7 +75,7 @@ export default function SalesPage() {
   const handleAddToCart = (newItem: PosCartItem) => {
     setCart((prev) => {
       const idx = prev.findIndex(
-        (i) => i.productId === newItem.productId && i.orderType === newItem.orderType && i.incomingBrand === newItem.incomingBrand
+        (i) => i.productId === newItem.productId && i.orderType === newItem.orderType && i.incomingBrand === newItem.incomingBrand && i.unitPrice === newItem.unitPrice
       );
       if (idx >= 0) {
         const copy = [...prev];
