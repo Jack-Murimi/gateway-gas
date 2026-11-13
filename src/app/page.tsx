@@ -213,7 +213,7 @@ export default function HomePage() {
   }
 
   if (currentUser.role === 'rider') {
-    const myDeliveries = orders.filter((order) => order.rider_id === currentUser.id);
+    const myDeliveries = orders.filter((order) => order.rider_id === currentUser.id || order.rider_ids?.includes(currentUser.id));
     const activeJobs = myDeliveries
       .filter((order) => order.delivery_status === 'assigned' || order.delivery_status === 'in_transit')
       .sort((a, b) => (a.assigned_at || a.created_at).localeCompare(b.assigned_at || b.created_at));
