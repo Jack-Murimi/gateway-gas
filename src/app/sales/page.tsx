@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { useStore } from '@/context/store-context';
 import { useToast } from '@/components/ui/toast';
-import { PosWorkspace, PosSaleSubmission } from '@/components/pos/pos-workspace';
+import { PosWorkspace, type PosSaleSubmission } from '@/components/pos/pos-workspace';
 
 export default function SalesPage() {
   const { currentUser, branches, products, inventory, customers, staffList, createOrder, createCustomer } = useStore();
