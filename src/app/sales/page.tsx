@@ -7,7 +7,7 @@ import { useToast } from '@/components/ui/toast';
 import { PosWorkspace, PosSaleSubmission } from '@/components/pos/pos-workspace';
 
 export default function SalesPage() {
-  const { currentUser, branches, products, customers, staffList, createOrder, createCustomer } = useStore();
+  const { currentUser, branches, products, inventory, customers, staffList, createOrder, createCustomer } = useStore();
   const { showError, showSuccess } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [completedOrderNumber, setCompletedOrderNumber] = useState<string | null>(null);
@@ -41,6 +41,7 @@ export default function SalesPage() {
     <PosWorkspace
       branches={branches}
       products={products}
+      inventory={inventory}
       customers={customers}
       staffList={staffList}
       currentUser={currentUser}
