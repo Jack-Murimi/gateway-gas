@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useStore } from '@/context/store-context';
@@ -10,8 +10,8 @@ import {
   LayoutDashboard,
   ShoppingCart,
   Package,
-  Send, // Distinct icon for Dispatch (not Bike!)
-  Bike, // Distinct icon for Rider Deliveries
+  Send,
+  Bike,
   Users,
   LogOut,
   MoreHorizontal,
@@ -29,10 +29,29 @@ export function Navbar() {
 
   useEffect(() => {
     const saved = localStorage.getItem('gwg_locale') as Locale | null;
-    if (saved === 'sw' || saved === 'en') {
-      setLocale(saved);
-    }
+    if (saved === 'sw' || saved === 'en') setLocale(saved);
   }, []);
+
+  useEffect(() => {
+    if (!showMoreDrawer) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowMoreDrawer(false);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showMoreDrawer]);
+
+  useEffect(() => {
+    setShowMoreDrawer(false);
+  }, [pathname]);
 
   const toggleLocale = () => {
     const next: Locale = locale === 'en' ? 'sw' : 'en';
@@ -40,11 +59,9 @@ export function Navbar() {
     localStorage.setItem('gwg_locale', next);
   };
 
-  const t = translations[locale];
-
   if (!currentUser) return null;
 
-  // Master link definitions with distinct icons & localized labels
+  const t = translations[locale];
   const allNavLinks = [
     { href: '/', label: t.navOverview, icon: LayoutDashboard, roles: ['admin', 'director', 'operator'] },
     { href: '/sales', label: t.navPOS, icon: ShoppingCart, roles: ['admin', 'director', 'operator', 'sales_rep'] },
@@ -55,59 +72,59 @@ export function Navbar() {
     { href: '/staff', label: t.navStaff, icon: Users, roles: ['admin', 'director'] },
   ];
 
-  // Filter links authorized for current role
   const roleLinks = allNavLinks.filter(
-    (l) => currentUser.approval_status === 'approved' && l.roles.includes(currentUser.role)
+    (link) => currentUser.approval_status === 'approved' && link.roles.includes(currentUser.role)
   );
 
-  // Mobile Bottom Navigation:
-  // - Riders see only their delivery page (1-2 tabs)
-  // - Sales Reps see POS & Stock (2 tabs)
-  // - If <= 4 links, render all directly with zero "More" drawer!
-  // - If > 4 links (Admins), show top 3 + More sheet
   const isOverflow = roleLinks.length > 4;
   const primaryMobileTabs = isOverflow ? roleLinks.slice(0, 3) : roleLinks;
   const overflowMobileTabs = isOverflow ? roleLinks.slice(3) : [];
-  const isOverflowActive = isOverflow && overflowMobileTabs.some((t) => t.href === pathname);
+  const isActive = (href: string) =>
+    href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
+  const isOverflowActive = overflowMobileTabs.some((link) => isActive(link.href));
+
+  const roleLabel = currentUser.role.replace('_', ' ');
 
   return (
     <>
-      {/* 1. TOP HEADER (Desktop + Mobile clean utility bar) */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b-2 border-slate-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-14 sm:h-16">
-            {/* Brand Logo */}
-            <div className="flex items-center gap-6">
-              <Link href={currentUser.role === 'sales_rep' ? '/sales' : currentUser.role === 'rider' ? '/rider' : '/'} className="flex items-center gap-2.5">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-orange-600 flex items-center justify-center text-white shadow-md">
-                  <Flame className="w-5 h-5 sm:w-6 sm:h-6" />
-                </div>
-                <div>
-                  <span className="font-black text-lg sm:text-xl tracking-tight text-slate-900 block leading-tight">
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/90">
+        <div className="mx-auto max-w-[1440px] px-3 sm:px-5 lg:px-7">
+          <div className="flex h-14 items-center justify-between gap-3 sm:h-16">
+            <div className="flex min-w-0 items-center gap-5">
+              <Link
+                href={currentUser.role === 'sales_rep' ? '/sales' : currentUser.role === 'rider' ? '/rider' : '/'}
+                aria-label="Gateway Gas home"
+                className="flex shrink-0 items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-600 text-white shadow-sm sm:h-10 sm:w-10">
+                  <Flame className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block whitespace-nowrap text-base font-black leading-tight tracking-tight text-slate-900 sm:text-lg">
                     GATEWAY GAS
                   </span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600 block">
+                  <span className="block text-[9px] font-bold uppercase leading-tight tracking-[0.16em] text-orange-700 sm:text-[10px]">
                     Nairobi Station
                   </span>
-                </div>
+                </span>
               </Link>
 
-              {/* Desktop Nav Links */}
-              <nav className="hidden lg:flex items-center space-x-1.5 ml-6">
+              <nav aria-label="Main navigation" className="hidden items-center gap-1 xl:flex">
                 {roleLinks.map((link) => {
                   const Icon = link.icon;
-                  const isActive = pathname === link.href;
+                  const active = isActive(link.href);
                   return (
                     <Link
                       key={link.href}
                       href={link.href}
-                      className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold transition ${
-                        isActive
+                      aria-current={active ? 'page' : undefined}
+                      className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-2.5 py-2 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 2xl:px-3 2xl:text-sm ${
+                        active
                           ? 'bg-slate-900 text-white shadow-sm'
-                          : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
                       }`}
                     >
-                      <Icon className="w-4 h-4" />
+                      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
                       <span>{link.label}</span>
                     </Link>
                   );
@@ -115,128 +132,138 @@ export function Navbar() {
               </nav>
             </div>
 
-            {/* Right: User Role & Sign Out */}
-            <div className="flex items-center gap-2.5">
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
               <button
                 type="button"
                 onClick={toggleLocale}
-                className="min-h-[40px] px-2.5 py-1 rounded-xl border-2 border-slate-200 hover:border-slate-300 bg-slate-50 text-xs font-black text-slate-800 transition flex items-center gap-1.5"
-                title="Badili Lugha / Toggle English & Swahili"
+                aria-label={locale === 'en' ? 'Switch language to Swahili' : 'Switch language to English'}
+                title="Badili lugha / Toggle language"
+                className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
               >
-                <Languages className="w-3.5 h-3.5 text-orange-600" />
+                <Languages className="h-4 w-4 text-orange-600" aria-hidden="true" />
                 <span>{locale === 'en' ? 'SW' : 'EN'}</span>
               </button>
 
-              <div className="flex items-center gap-2">
+              <div className="hidden min-w-0 items-center gap-2 sm:flex">
                 <Badge variant={currentUser.role === 'admin' ? 'purple' : currentUser.role === 'rider' ? 'warning' : 'default'}>
-                  {currentUser.role.replace('_', ' ')}
+                  {roleLabel}
                 </Badge>
-                <span className="hidden sm:inline text-sm font-bold text-slate-800">
+                <span className="max-w-[150px] truncate text-sm font-semibold text-slate-700 2xl:max-w-[210px]">
                   {currentUser.full_name}
                 </span>
               </div>
 
               <button
+                type="button"
                 onClick={logout}
+                aria-label="Sign out"
                 title="Sign out"
-                className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
               >
-                <LogOut className="w-5 h-5" />
+                <LogOut className="h-5 w-5" aria-hidden="true" />
               </button>
             </div>
           </div>
         </div>
       </header>
 
-      {/* 2. MOBILE BOTTOM NAVIGATION (Ergonomic 56px touch bar at thumb reach) */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-white/95 backdrop-blur border-t-2 border-slate-200 z-30 flex items-center justify-around px-2 shadow-xl">
+      <nav
+        aria-label="Mobile navigation"
+        className="fixed inset-x-0 bottom-0 z-40 flex min-h-16 items-stretch border-t border-slate-200 bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_24px_rgba(15,23,42,0.08)] backdrop-blur xl:hidden"
+      >
         {primaryMobileTabs.map((link) => {
           const Icon = link.icon;
-          const isActive = pathname === link.href;
+          const active = isActive(link.href);
           return (
             <Link
               key={link.href}
               href={link.href}
-              className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-xs font-bold transition select-none active:scale-95 ${
-                isActive ? 'text-orange-600' : 'text-slate-600 hover:text-slate-900'
+              aria-current={active ? 'page' : undefined}
+              className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 py-2 text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange-500 ${
+                active ? 'text-orange-700' : 'text-slate-500 hover:text-slate-900'
               }`}
             >
-              <div
-                className={`p-1.5 rounded-xl transition ${
-                  isActive ? 'bg-orange-100 text-orange-600' : ''
-                }`}
-              >
-                <Icon className="w-5 h-5" />
-              </div>
-              <span className="truncate max-w-[76px] mt-0.5 leading-tight">{link.label}</span>
+              <span className={`flex h-8 w-10 items-center justify-center rounded-xl transition-colors ${active ? 'bg-orange-50' : ''}`}>
+                <Icon className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <span className="max-w-full truncate leading-tight">{link.label}</span>
             </Link>
           );
         })}
 
-        {/* More tab for Admin overflow */}
         {isOverflow && (
           <button
             type="button"
             onClick={() => setShowMoreDrawer(true)}
-            className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-xs font-bold transition select-none ${
-              isOverflowActive || showMoreDrawer ? 'text-orange-600' : 'text-slate-600 hover:text-slate-900'
+            aria-haspopup="dialog"
+            aria-expanded={showMoreDrawer}
+            className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 py-2 text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange-500 ${
+              isOverflowActive || showMoreDrawer ? 'text-orange-700' : 'text-slate-500 hover:text-slate-900'
             }`}
           >
-            <div
-              className={`p-1.5 rounded-xl transition ${
-                isOverflowActive || showMoreDrawer ? 'bg-orange-100 text-orange-600' : ''
-              }`}
-            >
-              <MoreHorizontal className="w-5 h-5" />
-            </div>
-            <span className="truncate max-w-[76px] mt-0.5 leading-tight">More</span>
+            <span className={`flex h-8 w-10 items-center justify-center rounded-xl ${isOverflowActive || showMoreDrawer ? 'bg-orange-50' : ''}`}>
+              <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <span>More</span>
           </button>
         )}
       </nav>
 
-      {/* 3. MOBILE OVERFLOW DRAWER */}
       {showMoreDrawer && (
-        <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end">
-          <div
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"
+        <div className="fixed inset-0 z-50 flex flex-col justify-end xl:hidden">
+          <button
+            type="button"
+            aria-label="Close navigation menu"
+            className="absolute inset-0 bg-slate-950/50 backdrop-blur-[2px]"
             onClick={() => setShowMoreDrawer(false)}
           />
-          <div className="relative bg-white rounded-t-3xl border-t-2 border-slate-300 shadow-2xl p-5 pb-8 space-y-4 max-h-[75vh] overflow-y-auto animate-in slide-in-from-bottom duration-200">
-            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto" />
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
-                Management Destinations
-              </h3>
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mobile-more-title"
+            className="relative max-h-[80vh] overflow-y-auto rounded-t-3xl border-t border-slate-200 bg-white px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-4 shadow-2xl"
+          >
+            <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-slate-300" />
+            <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h2 id="mobile-more-title" className="text-sm font-bold text-slate-900">
+                  More destinations
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-500">Management and account pages</p>
+              </div>
               <button
+                type="button"
                 onClick={() => setShowMoreDrawer(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center"
+                aria-label="Close menu"
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
               >
-                <X className="w-4 h-4" />
+                <X className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-2 pt-1">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {overflowMobileTabs.map((link) => {
                 const Icon = link.icon;
-                const isActive = pathname === link.href;
+                const active = isActive(link.href);
                 return (
                   <Link
                     key={link.href}
                     href={link.href}
                     onClick={() => setShowMoreDrawer(false)}
-                    className={`flex items-center gap-3 p-3.5 rounded-2xl text-base font-bold transition border-2 ${
-                      isActive
-                        ? 'bg-slate-900 text-white border-slate-900'
-                        : 'bg-slate-50 text-slate-800 border-slate-200 hover:bg-slate-100'
+                    aria-current={active ? 'page' : undefined}
+                    className={`flex min-h-12 items-center gap-3 rounded-xl border px-3.5 py-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${
+                      active
+                        ? 'border-slate-900 bg-slate-900 text-white'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
                     }`}
                   >
-                    <Icon className="w-5 h-5" />
+                    <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
                     <span>{link.label}</span>
                   </Link>
                 );
               })}
             </div>
-          </div>
+          </section>
         </div>
       )}
     </>
