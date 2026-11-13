@@ -43,8 +43,7 @@ function LoginContent() {
   const [resetMessage, setResetMessage] = useState('');
   const [isSendingReset, setIsSendingReset] = useState(false);
 
-  const handlePasswordReset = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handlePasswordReset = async () => {
     setResetMessage('');
     if (!resetEmail.trim()) {
       setResetMessage('Enter your work email address first.');
@@ -244,12 +243,12 @@ function LoginContent() {
               </button>
             </div>
             {showForgotPassword && (
-              <form onSubmit={handlePasswordReset} className="rounded-2xl border border-orange-200 bg-orange-50 p-4 space-y-3">
+              <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 space-y-3">
                 <p className="text-sm font-semibold text-slate-700">Enter your work email and we’ll send you a secure reset link.</p>
                 <Input label="Work Email" type="email" required value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} placeholder="name@example.com" leftIcon={<Mail className="w-5 h-5" />} />
                 {resetMessage && <p role="status" className="text-xs font-semibold text-slate-700">{resetMessage}</p>}
-                <Button type="submit" isLoading={isSendingReset} size="lg" className="w-full">Send reset link</Button>
-              </form>
+                <Button type="button" isLoading={isSendingReset} size="lg" className="w-full" onClick={() => void handlePasswordReset()}>Send reset link</Button>
+              </div>
             )}
 
             <Button type="submit" isLoading={isSubmitting} size="lg" className="w-full">
