@@ -108,7 +108,8 @@ export function PosWorkspace({
   const searchRef = useRef<HTMLInputElement>(null);
 
   const activeRiders = staffList.filter(s => s.role === 'rider' && s.approval_status === 'approved');
-  const vehicleOptions = Array.from(new Set(activeRiders.map(r => r.vehicle_plate).filter((v): v is string => Boolean(v))));
+  const selectedRiders = activeRiders.filter(r => riderIds.includes(r.id));
+  const vehicleOptions = Array.from(new Set(selectedRiders.map(r => r.vehicle_plate).filter((v): v is string => Boolean(v))));
   const activeBranch = branches.find(b => b.id === branchId);
   const matchingCustomers = customerQuery.trim()
     ? customers.filter(c => c.name.toLowerCase().includes(customerQuery.toLowerCase()) ||
@@ -291,7 +292,7 @@ export function PosWorkspace({
             <div><label className={labelClass+' md:hidden'}>Quantity</label><input aria-label={`Quantity for ${line.productName}`} className={fieldClass} type="number" min="1" step="1" value={line.quantity} onChange={e=>updateLine(line.id,{quantity:Math.max(1,Math.floor(Number(e.target.value)||1))})} /></div>
             <div><label className={labelClass+' md:hidden'}>Unit price</label><input aria-label={`Unit price for ${line.productName}`} className={fieldClass} type="number" min="0" value={line.unitPrice} onChange={e=>updateLine(line.id,{unitPrice:Math.max(0,Number(e.target.value)||0)})} /></div>
             <div className="flex items-center justify-between md:block"><span className="text-xs text-slate-500 md:hidden">Line total</span><strong className="text-sm text-slate-950">{formatKES(line.quantity*line.unitPrice)}</strong></div>
-            <div><label className={labelClass+' md:hidden'}>Stock location</label><select className={fieldClass} value={line.branchId} onChange={e=>updateLine(line.id,{branchId:e.target.value})}>{branches.filter(b=>b.is_active).map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
+            <div><label className={labelClass+' md:hidden'}>Stock location</label><select className={fieldClass} value={line.branchId} onChange={e=>updateLine(line.id,{branchId:e.target.value})}>{branches.filter(b=>b.is_active).map(b=><option key={b.id} value={b.id}>{b.name} · {inventory.find(i=>i.branch_id===b.id&&i.product_id===line.productId)?.full_units ?? 0} available</option>)}</select></div>
             <button type="button" aria-label={`Remove ${line.productName}`} onClick={()=>removeLine(line.id)} className="flex h-10 w-10 items-center justify-center rounded-lg text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /></button>
           </div>)}
         </div>
@@ -300,7 +301,7 @@ export function PosWorkspace({
       {isDelivery && <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="mb-3"><h2 className="font-bold text-slate-900">Delivery assignment</h2><p className="text-xs text-slate-500">Assign one or more approved riders. Vehicle choices come from registered rider vehicles.</p></div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <div><label className={labelClass}><Users className="mr-1 inline h-3.5 w-3.5" />Rider(s)</label><div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-2">{activeRiders.length ? activeRiders.map(r=><label key={r.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 hover:bg-slate-50"><input type="checkbox" checked={riderIds.includes(r.id)} onChange={e=>setRiderIds(prev=>e.target.checked?[...prev,r.id]:prev.filter(id=>id!==r.id))} /><span className="min-w-0 flex-1 text-sm font-medium text-slate-800">{r.full_name}</span><span className="text-xs text-slate-500">{r.vehicle_plate||'No vehicle'}</span></label>) : <p className="p-2 text-xs text-slate-500">No approved riders are registered.</p>}</div></div>
+          <div><label className={labelClass}><Users className="mr-1 inline h-3.5 w-3.5" />Rider(s)</label><div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-2">{activeRiders.length ? activeRiders.map(r=><label key={r.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 hover:bg-slate-50"><input type="checkbox" checked={riderIds.includes(r.id)} onChange={e=>{const next=e.target.checked?[...riderIds,r.id]:riderIds.filter(id=>id!==r.id);setRiderIds(next);if(!e.target.checked&&r.vehicle_plate===vehiclePlate&&!activeRiders.some(other=>next.includes(other.id)&&other.vehicle_plate===vehiclePlate))setVehiclePlate('');if(e.target.checked&&!vehiclePlate&&r.vehicle_plate)setVehiclePlate(r.vehicle_plate);}} /><span className="min-w-0 flex-1 text-sm font-medium text-slate-800">{r.full_name}</span><span className="text-xs text-slate-500">{r.vehicle_plate||'No vehicle'}</span></label>) : <p className="p-2 text-xs text-slate-500">No approved riders are registered.</p>}</div></div>
           <div><label className={labelClass}><Truck className="mr-1 inline h-3.5 w-3.5" />Vehicle</label><select className={fieldClass} value={vehiclePlate} onChange={e=>setVehiclePlate(e.target.value)}><option value="">Select vehicle</option>{vehicleOptions.map(v=><option key={v} value={v}>{v}</option>)}</select><p className="mt-1 text-xs text-slate-400">If riders use different vehicles, record separate delivery assignments after saving.</p></div>
         </div>
       </section>}
