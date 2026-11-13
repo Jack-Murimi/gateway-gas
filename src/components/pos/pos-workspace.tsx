@@ -6,7 +6,7 @@ import {
   CheckCircle2, CreditCard, Package, Plus, ReceiptText, Search, Smartphone,
   Trash2, Truck, Users, X,
 } from 'lucide-react';
-import type { Branch, Customer, OrderType, PaymentMethod, PaymentStatus, Product, StaffProfile } from '@/types';
+import type { Branch, BranchInventory, Customer, OrderType, PaymentMethod, PaymentStatus, Product, StaffProfile } from '@/types';
 import { Button } from '@/components/ui/button';
 import { formatKES, hasEmptyState } from '@/lib/formatters';
 
@@ -50,6 +50,7 @@ export interface PosSaleSubmission {
 interface PosWorkspaceProps {
   branches: Branch[];
   products: Product[];
+  inventory: BranchInventory[];
   customers: Customer[];
   staffList: StaffProfile[];
   currentUser: StaffProfile;
@@ -64,7 +65,7 @@ const fieldClass = 'min-h-11 w-full rounded-lg border border-slate-300 bg-white 
 const labelClass = 'mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-slate-500';
 
 export function PosWorkspace({
-  branches, products, customers, staffList, currentUser, createCustomer, onSubmit,
+  branches, products, inventory, customers, staffList, currentUser, createCustomer, onSubmit,
   isSubmitting, completedOrderNumber, onStartNextSale,
 }: PosWorkspaceProps) {
   const today = () => {
@@ -278,7 +279,7 @@ export function PosWorkspace({
             {hasEmptyState(selectedProduct) && itemType==='refill' && <div><label className={labelClass}>Empty returned brand</label><select className={fieldClass} value={incomingBrand} onChange={e=>setIncomingBrand(e.target.value)}>{(selectedProduct.category==='water'?['KERINGET','AQUAMIST']:['AFRIGAS','K-GAS','TOTAL','OLA','PROGAS','TOSHA','LAKE','HASHI','SUPA','JATEL','SEAGAS','RAHA','BONOKO','PURE','HUNKER','HASS']).map(b=><option key={b} value={b}>{b}</option>)}</select></div>}
             <div><label className={labelClass}>Quantity</label><input className={fieldClass} type="number" min="1" step="1" value={quantity} onChange={e=>setQuantity(e.target.value)} /></div>
             <div><label className={labelClass}>Unit price (KES)</label><input className={fieldClass} type="number" min="0" step="1" value={unitPrice} onChange={e=>setUnitPrice(e.target.value)} /></div>
-            <div><label className={labelClass}>Stock location</label><select className={fieldClass} value={lineBranchId} onChange={e=>setLineBranchId(e.target.value)}>{branches.filter(b=>b.is_active).map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
+            <div><label className={labelClass}>Stock location</label><select className={fieldClass} value={lineBranchId} onChange={e=>setLineBranchId(e.target.value)}>{branches.filter(b=>b.is_active).map(b=><option key={b.id} value={b.id}>{b.name} · {inventory.find(i=>i.branch_id===b.id&&i.product_id===selectedProduct.id)?.full_units ?? 0} available</option>)}</select></div>
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-orange-200 pt-3"><span className="text-sm text-slate-600">Line total <strong className="ml-2 text-base text-slate-950">{formatKES((Number(quantity)||0)*(Number(unitPrice)||0))}</strong></span><Button type="button" onClick={addLine} disabled={!Number.isInteger(Number(quantity))||Number(quantity)<1||!Number.isFinite(Number(unitPrice))||Number(unitPrice)<0||!lineBranchId|| (itemType==='refill'&&hasEmptyState(selectedProduct)&&!incomingBrand)}><Plus className="mr-1 h-4 w-4" />Add product</Button></div>
         </div>}
