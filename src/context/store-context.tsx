@@ -41,12 +41,17 @@ interface CreateOrderParams {
   customer_phone: string;
   delivery_estate?: string;
   delivery_address?: string;
+  rider_ids?: string[];
+  vehicle_plate?: string | null;
+  lpo_number?: string | null;
+  sale_comment?: string | null;
   payment_method: PaymentMethod;
   payment_status: PaymentStatus;
   payment_reference?: string;
   delivery_fee_kes: number;
   items: Array<{
     product_id: string;
+    branch_id?: string;
     order_type: OrderType;
     outgoing_brand: string;
     incoming_brand?: string;
@@ -274,6 +279,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       quantity: item.quantity,
       unit_price_kes: item.unit_price_kes,
       subtotal_kes: item.quantity * item.unit_price_kes,
+      branch_id: item.branch_id || params.branch_id,
     }));
 
     const subtotal = items.reduce((acc, i) => acc + i.subtotal_kes, 0);
@@ -285,7 +291,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       receipt_number: params.receipt_number || null,
       branch_id: params.branch_id,
       sales_rep_id: currentUser?.id || null,
-      rider_id: null,
+      rider_id: params.rider_ids?.[0] || null,
+      rider_ids: params.rider_ids || [],
+      vehicle_plate: params.vehicle_plate || null,
+      lpo_number: params.lpo_number || null,
+      sale_comment: params.sale_comment || null,
       customer_id: params.customer_id || null,
       is_pos_walkin: params.is_pos_walkin,
       customer_name: params.customer_name,
@@ -318,10 +328,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           (p) => p.brand.toLowerCase() === item.incoming_brand!.toLowerCase() && p.size_kg === item.cylinder_size_kg
         );
         if (incomingProduct) {
-          updateBranchStock(params.branch_id, incomingProduct.id, 0, item.quantity);
+          updateBranchStock(itemBranchId, incomingProduct.id, 0, item.quantity);
         } else {
           // If no separate brand row, add empties to current product
-          updateBranchStock(params.branch_id, item.product_id, 0, item.quantity);
+          updateBranchStock(itemBranchId, item.product_id, 0, item.quantity);
         }
       }
     });
