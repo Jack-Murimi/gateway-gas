@@ -540,7 +540,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const leaderboard: RiderLeaderboardEntry[] = staffList
     .filter((s) => s.role === 'rider' && s.approval_status === 'approved')
     .map((r) => {
-      const riderOrders = orders.filter((o) => o.rider_id === r.id);
+      const riderOrders = orders.filter((o) => o.rider_id === r.id || o.rider_ids?.includes(r.id));
       const completed = riderOrders.filter((o) => o.delivery_status === 'delivered');
       const active = riderOrders.filter((o) => o.delivery_status === 'in_transit' || o.delivery_status === 'assigned');
 
