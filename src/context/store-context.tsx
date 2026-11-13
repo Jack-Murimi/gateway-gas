@@ -319,8 +319,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     // 1. Outgoing product: deduct full_units
     // 2. If refill with brand swap: add empty_units for incoming brand
     items.forEach((item) => {
-      // Deduct full units of the outgoing product
-      updateBranchStock(params.branch_id, item.product_id, -item.quantity, 0);
+      const itemBranchId = item.branch_id || params.branch_id;
+      // Deduct stock from the branch selected on this specific cart line.
+      updateBranchStock(itemBranchId, item.product_id, -item.quantity, 0);
 
       // If refill and incoming brand differs, find matching product for incoming brand and increment its empties
       if (item.order_type === 'refill' && item.incoming_brand && item.cylinder_size_kg) {
