@@ -3,7 +3,7 @@ export type UserRole = 'admin' | 'director' | 'operator' | 'sales_rep' | 'rider'
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
 export type OrderType = 'refill' | 'complete' | 'accessory';
 export type DeliveryStatus = 'pending' | 'assigned' | 'in_transit' | 'delivered' | 'cancelled';
-export type PaymentMethod = 'mpesa' | 'cash' | 'bank_transfer';
+export type PaymentMethod = 'mpesa' | 'cash' | 'bank_transfer' | 'pdq' | 'cheque';
 export type PaymentStatus = 'pending' | 'paid';
 
 export interface Branch {
