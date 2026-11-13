@@ -2,9 +2,9 @@
 
 import { useMemo, useRef, useState } from 'react';
 import {
-  AlertCircle, ArrowRight, Banknote, Bike, Building2, CalendarDays, Check,
-  CheckCircle2, ChevronDown, CreditCard, MapPin, Package, Plus, ReceiptText,
-  Search, Smartphone, Trash2, Truck, UserRound, Users, X,
+  AlertCircle, ArrowRight, Banknote, Building2, CalendarDays, Check,
+  CheckCircle2, CreditCard, Package, Plus, ReceiptText, Search, Smartphone,
+  Trash2, Truck, Users, X,
 } from 'lucide-react';
 import type { Branch, Customer, OrderType, PaymentMethod, PaymentStatus, Product, StaffProfile } from '@/types';
 import { Button } from '@/components/ui/button';
