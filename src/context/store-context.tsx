@@ -366,6 +366,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           ? {
               ...o,
               rider_id: riderId,
+              rider_ids: [riderId],
               delivery_status: 'assigned',
               assigned_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
