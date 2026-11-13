@@ -35,7 +35,7 @@ function LoginContent() {
 
   const { setCurrentUser, staffList } = useStore();
   const [identifier, setIdentifier] = useState(''); // Email or Kenyan phone
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = useState('');\n  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
