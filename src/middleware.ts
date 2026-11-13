@@ -19,11 +19,12 @@ export function middleware(request: NextRequest) {
   const userId = request.cookies.get('gwg_user_id')?.value;
 
   const isAuthRoute = pathname === '/login' || pathname === '/signup';
+  const isPasswordRecoveryRoute = pathname === '/auth/callback' || pathname === '/reset-password';
   const isAuthenticated = Boolean(userId && role);
 
   // 3. Unauthenticated -> allow / and auth pages, redirect rest to /login
   if (!isAuthenticated) {
-    if (pathname === '/' || isAuthRoute) {
+    if (pathname === '/' || isAuthRoute || isPasswordRecoveryRoute) {
       return NextResponse.next();
     }
     const loginUrl = new URL('/login', request.url);
