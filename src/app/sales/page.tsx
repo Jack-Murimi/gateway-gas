@@ -38,7 +38,12 @@ export default function SalesPage() {
 
   // Station & Receipt Options
   const [selectedBranchId, setSelectedBranchId] = useState(branches[0]?.id || '');
-  const [receiptDate, setReceiptDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [receiptDate, setReceiptDate] = useState(() => {
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${now.getFullYear()}-${month}-${day}`;
+  });
   const [receiptNumber, setReceiptNumber] = useState(''); // Sensible default: blank for cashier manual paper ticket
 
   // Step 1: Customer & Delivery Mode
