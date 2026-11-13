@@ -265,14 +265,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   // Create Order / POS sale with brand swap & inventory reconciliation
   const createOrder = async (params: CreateOrderParams): Promise<Order> => {
-    // Validate stock against the source branch on every cart line before mutating inventory.
-    for (const item of params.items) {
-      const sourceBranchId = item.branch_id || params.branch_id;
-      const stock = inventory.find(row => row.branch_id === sourceBranchId && row.product_id === item.product_id);
-      if (!stock || stock.full_units < item.quantity) {
-        const productName = products.find(product => product.id === item.product_id)?.name || 'Selected product';
+    // Validate aggregated demand per product and source branch before mutating inventory.
+    const requestedBySource = new Map<string, number>();
+    params.items.forEach(item => {
+      const key = `${item.branch_id || params.branch_id}:${item.product_id}`;
+      requestedBySource.set(key, (requestedBySource.get(key) || 0) + item.quantity);
+    });
+    for (const [key, requested] of requestedBySource) {
+      const [sourceBranchId, productId] = key.split(':');
+      const stock = inventory.find(row => row.branch_id === sourceBranchId && row.product_id === productId);
+      if (!stock || stock.full_units < requested) {
+        const productName = products.find(product => product.id === productId)?.name || 'Selected product';
         const branchName = branches.find(branch => branch.id === sourceBranchId)?.name || 'selected branch';
-        throw new Error(`Insufficient stock: ${productName} has ${stock?.full_units ?? 0} available at ${branchName}, but ${item.quantity} requested.`);
+        throw new Error(`Insufficient stock: ${productName} has ${stock?.full_units ?? 0} available at ${branchName}, but ${requested} requested.`);
       }
     }
 
