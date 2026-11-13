@@ -51,7 +51,7 @@ export function PosItemsStep({
 
   // Active item config for cylinder exchange / sale type
   const [itemType, setItemType] = useState<OrderType>('refill');
-  const [incomingTareBrand, setIncomingTareBrand] = useState('Afrigas');
+  const [incomingTareBrand, setIncomingTareBrand] = useState('AFRIGAS');
   const [itemQuantity, setItemQuantity] = useState(1);
 
   // Filter products by search & category
@@ -75,7 +75,7 @@ export function PosItemsStep({
       setIncomingTareBrand('');
     } else if (p.category === 'water') {
       setItemType('refill');
-      setIncomingTareBrand(p.brand === 'Keringet' ? 'Keringet' : 'Aquamist');
+      setIncomingTareBrand(p.brand === 'KERINGET' ? 'KERINGET' : 'AQUAMIST');
     } else {
       setItemType('refill');
       setIncomingTareBrand(p.brand);
@@ -143,7 +143,7 @@ export function PosItemsStep({
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Filter by size or brand (e.g. 13kg Afrigas, 6kg Pro Gas, 20L Keringet)..."
+          placeholder="Filter by size or brand (e.g. 13KG AFRIGAS, 6KG PROGAS, 20L KERINGET)..."
           className="w-full min-h-[48px] pl-11 pr-10 text-base bg-white border-2 border-slate-300 rounded-2xl font-medium focus:border-orange-500 focus:outline-none"
         />
         {searchQuery && (
@@ -257,16 +257,27 @@ export function PosItemsStep({
                   >
                     {activeProduct.category === 'water' ? (
                       <>
-                        <option value="Keringet">Keringet 20L Empty</option>
-                        <option value="Aquamist">Aquamist 20L Empty</option>
+                        <option value="KERINGET">KERINGET 20L EMPTY</option>
+                        <option value="AQUAMIST">AQUAMIST 20L EMPTY</option>
                       </>
                     ) : (
                       <>
-                        <option value="Afrigas">Afrigas Tare</option>
-                        <option value="Pro Gas">Pro Gas Tare</option>
-                        <option value="K-Gas">K-Gas Tare</option>
-                        <option value="TotalEnergies">TotalEnergies Tare</option>
-                        <option value="Ola Energy">Ola Energy Tare</option>
+                        <option value="AFRIGAS">AFRIGAS TARE</option>
+                        <option value="K-GAS">K-GAS TARE</option>
+                        <option value="TOTAL">TOTAL TARE</option>
+                        <option value="OLA">OLA TARE</option>
+                        <option value="PROGAS">PROGAS TARE</option>
+                        <option value="TOSHA">TOSHA TARE</option>
+                        <option value="LAKE">LAKE TARE</option>
+                        <option value="HASHI">HASHI TARE</option>
+                        <option value="SUPA">SUPA TARE</option>
+                        <option value="JATEL">JATEL TARE</option>
+                        <option value="SEAGAS">SEAGAS TARE</option>
+                        <option value="RAHA">RAHA TARE</option>
+                        <option value="BONOKO">BONOKO TARE</option>
+                        <option value="PURE">PURE TARE</option>
+                        <option value="HUNKER">HUNKER TARE</option>
+                        <option value="HASS">HASS TARE</option>
                       </>
                     )}
                   </select>

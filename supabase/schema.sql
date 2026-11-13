@@ -298,28 +298,89 @@ VALUES
     ('b4444444-4444-4444-4444-444444444444', 'Kileleshwa', 'KLH-04', 'Kileleshwa, Nairobi', '+254711000104')
 ON CONFLICT (code) DO NOTHING;
 
--- Seed Products Catalog
-INSERT INTO public.products (id, name, brand, size_kg, category, refill_price_kes, complete_price_kes, accessory_price_kes)
+-- Seed Products Catalog (ALL CAPS catalog from cylinder.md)
+INSERT INTO public.products (id, name, brand, size_kg, category, refill_price_kes, complete_price_kes, accessory_price_kes, is_active)
 VALUES
-    ('c1111111-1111-1111-1111-111111111111', 'Pro Gas 6kg', 'Pro Gas', 6, 'cylinder', 1250, 4800, 0),
-    ('c2222222-2222-2222-2222-222222222222', 'Pro Gas 13kg', 'Pro Gas', 13, 'cylinder', 2800, 8500, 0),
-    ('c3333333-3333-3333-3333-333333333333', 'K-Gas 6kg', 'K-Gas', 6, 'cylinder', 1300, 4900, 0),
-    ('c4444444-4444-4444-4444-444444444444', 'K-Gas 13kg', 'K-Gas', 13, 'cylinder', 2850, 8600, 0),
-    ('c5555555-5555-5555-5555-555555555555', 'Total Gas 6kg', 'TotalEnergies', 6, 'cylinder', 1350, 5000, 0),
-    ('c6666666-6666-6666-6666-666666666666', 'Total Gas 13kg', 'TotalEnergies', 13, 'cylinder', 2900, 8800, 0),
-    ('c7777777-7777-7777-7777-777777777777', 'Afrigas 13kg', 'Afrigas', 13, 'cylinder', 2850, 8600, 0),
-    ('c8888888-8888-8888-8888-888888888888', 'Ola Energy 13kg', 'Ola Energy', 13, 'cylinder', 2800, 8500, 0),
-    ('c9999999-9999-9999-9999-999999999999', 'Commercial Cylinder 50kg', 'Pro Gas', 50, 'cylinder', 10500, 24000, 0),
-    ('a1111111-1111-1111-1111-111111111111', 'Low Pressure 20mm Gas Regulator', 'Generic', NULL, 'accessory', 0, 0, 950),
-    ('a2222222-2222-2222-2222-222222222222', 'High Pressure Hose Pipe (1.5m with clamps)', 'Generic', NULL, 'accessory', 0, 0, 450),
-    ('a3333333-3333-3333-3333-333333333333', 'Single Burner Gas Cooker Stand', 'Generic', NULL, 'accessory', 0, 0, 1200)
-ON CONFLICT DO NOTHING;
+    ('c0001-0000-0000-0000-000000000001', '3KG LAKE', 'LAKE', 3, 'cylinder', 1000, 3500, 0, true),
+    ('c0002-0000-0000-0000-000000000002', '3KG TOTAL', 'TOTAL', 3, 'cylinder', 1000, 3500, 0, true),
+    ('c0003-0000-0000-0000-000000000003', '6KG AFRIGAS', 'AFRIGAS', 6, 'cylinder', 1350, 4800, 0, true),
+    ('c0004-0000-0000-0000-000000000004', '6KG K-GAS', 'K-GAS', 6, 'cylinder', 1350, 4800, 0, true),
+    ('c0005-0000-0000-0000-000000000005', '6KG TOTAL', 'TOTAL', 6, 'cylinder', 1350, 4800, 0, true),
+    ('c0006-0000-0000-0000-000000000006', '6KG OLA', 'OLA', 6, 'cylinder', 1350, 4800, 0, true),
+    ('c0007-0000-0000-0000-000000000007', '6KG PROGAS', 'PROGAS', 6, 'cylinder', 1350, 4800, 0, true),
+    ('c0008-0000-0000-0000-000000000008', '6KG TOSHA', 'TOSHA', 6, 'cylinder', 1350, 4800, 0, true),
+    ('c0009-0000-0000-0000-000000000009', '6KG LAKE', 'LAKE', 6, 'cylinder', 1350, 4800, 0, true),
+    ('c0010-0000-0000-0000-000000000010', '6KG HASHI', 'HASHI', 6, 'cylinder', 1350, 4800, 0, true),
+    ('c0011-0000-0000-0000-000000000011', '6KG SUPA', 'SUPA', 6, 'cylinder', 1350, 4800, 0, true),
+    ('c0012-0000-0000-0000-000000000012', '6KG JATEL', 'JATEL', 6, 'cylinder', 1350, 4800, 0, true),
+    ('c0013-0000-0000-0000-000000000013', '6KG SEAGAS', 'SEAGAS', 6, 'cylinder', 1350, 4800, 0, true),
+    ('c0014-0000-0000-0000-000000000014', '6KG RAHA', 'RAHA', 6, 'cylinder', 1350, 4800, 0, true),
+    ('c0015-0000-0000-0000-000000000015', '6KG BONOKO', 'BONOKO', 6, 'cylinder', 1350, 4800, 0, true),
+    ('c0016-0000-0000-0000-000000000016', '13KG AFRIGAS', 'AFRIGAS', 13, 'cylinder', 3100, 9200, 0, true),
+    ('c0017-0000-0000-0000-000000000017', '13KG K-GAS', 'K-GAS', 13, 'cylinder', 3100, 9200, 0, true),
+    ('c0018-0000-0000-0000-000000000018', '13KG TOTAL', 'TOTAL', 13, 'cylinder', 3100, 9200, 0, true),
+    ('c0019-0000-0000-0000-000000000019', '13KG OLA', 'OLA', 13, 'cylinder', 3100, 9200, 0, true),
+    ('c0020-0000-0000-0000-000000000020', '13KG PROGAS', 'PROGAS', 13, 'cylinder', 3100, 9200, 0, true),
+    ('c0021-0000-0000-0000-000000000021', '13KG TOSHA', 'TOSHA', 13, 'cylinder', 3100, 9200, 0, true),
+    ('c0022-0000-0000-0000-000000000022', '13KG LAKE', 'LAKE', 13, 'cylinder', 3100, 9200, 0, true),
+    ('c0023-0000-0000-0000-000000000023', '13KG HASHI', 'HASHI', 13, 'cylinder', 3100, 9200, 0, true),
+    ('c0024-0000-0000-0000-000000000024', '13KG SUPA', 'SUPA', 13, 'cylinder', 3100, 9200, 0, true),
+    ('c0025-0000-0000-0000-000000000025', '13KG JATEL', 'JATEL', 13, 'cylinder', 3100, 9200, 0, true),
+    ('c0026-0000-0000-0000-000000000026', '13KG SEAGAS', 'SEAGAS', 13, 'cylinder', 3100, 9200, 0, true),
+    ('c0027-0000-0000-0000-000000000027', '13KG RAHA', 'RAHA', 13, 'cylinder', 3100, 9200, 0, true),
+    ('c0028-0000-0000-0000-000000000028', '13KG BONOKO', 'BONOKO', 13, 'cylinder', 3100, 9200, 0, true),
+    ('c0029-0000-0000-0000-000000000029', '22.5KG TOTAL', 'TOTAL', 22.5, 'cylinder', 6300, 15500, 0, true),
+    ('c0030-0000-0000-0000-000000000030', '35KG HASHI', 'HASHI', 35, 'cylinder', 9000, 21000, 0, true),
+    ('c0031-0000-0000-0000-000000000031', '35KG K-GAS', 'K-GAS', 35, 'cylinder', 9000, 21000, 0, true),
+    ('c0032-0000-0000-0000-000000000032', '45KG AFRIGAS', 'AFRIGAS', 45, 'cylinder', 11500, 26500, 0, true),
+    ('c0033-0000-0000-0000-000000000033', '50KG TOTAL', 'TOTAL', 50, 'cylinder', 12000, 28000, 0, true),
+    ('c0034-0000-0000-0000-000000000034', '50KG HASHI', 'HASHI', 50, 'cylinder', 12000, 28000, 0, true),
+    ('c0035-0000-0000-0000-000000000035', '50KG LAKE', 'LAKE', 50, 'cylinder', 12000, 28000, 0, true),
+    ('c0036-0000-0000-0000-000000000036', '50KG SUPA', 'SUPA', 50, 'cylinder', 12000, 28000, 0, true),
+    ('c0037-0000-0000-0000-000000000037', '50KG PURE', 'PURE', 50, 'cylinder', 12000, 28000, 0, true),
+    ('c0038-0000-0000-0000-000000000038', '50KG HUNKER', 'HUNKER', 50, 'cylinder', 12000, 28000, 0, true),
+    ('c0039-0000-0000-0000-000000000039', '50KG JATEL', 'JATEL', 50, 'cylinder', 12000, 28000, 0, true),
+    ('c0040-0000-0000-0000-000000000040', '50KG PROGAS', 'PROGAS', 50, 'cylinder', 12000, 28000, 0, true),
+    ('c0041-0000-0000-0000-000000000041', '50KG RAHA', 'RAHA', 50, 'cylinder', 12000, 28000, 0, true),
+    ('c0042-0000-0000-0000-000000000042', '50KG HASS', 'HASS', 50, 'cylinder', 12000, 28000, 0, true),
+    ('c0043-0000-0000-0000-000000000043', '50KG BONOKO', 'BONOKO', 50, 'cylinder', 12000, 28000, 0, true),
+    ('w0001-0000-0000-0000-000000000001', '20L KERINGET WATER', 'KERINGET', 20, 'water', 700, 2300, 0, true),
+    ('w0002-0000-0000-0000-000000000002', '20L AQUAMIST WATER', 'AQUAMIST', 20, 'water', 650, 2200, 0, true),
+    ('w0003-0000-0000-0000-000000000003', '500ML JAPELI WATER', 'JAPELI', NULL, 'water', 0, 0, 50, true),
+    ('w0004-0000-0000-0000-000000000004', '1L JAPELI WATER', 'JAPELI', NULL, 'water', 0, 0, 80, true),
+    ('w0005-0000-0000-0000-000000000005', '5L JAPELI WATER', 'JAPELI', NULL, 'water', 0, 0, 250, true),
+    ('w0006-0000-0000-0000-000000000006', '20L JAPELI WATER', 'JAPELI', NULL, 'water', 0, 0, 600, true),
+    ('a1', '13kg Kabason Regulator', 'Kabason', NULL, 'accessory', 0, 0, 1200, true),
+    ('a2', '6kg Kabason Regulator', 'Kabason', NULL, 'accessory', 0, 0, 1200, true),
+    ('a3', '6kg Gas Burner Cooker', 'Kabason', NULL, 'accessory', 0, 0, 1200, true),
+    ('a4', 'Cylinder Grill / Trivet', 'Generic', NULL, 'accessory', 0, 0, 500, true),
+    ('a5', 'Gas Hose Clips (Each)', 'Generic', NULL, 'accessory', 0, 0, 50, true),
+    ('a6', 'Gas Hose Pipe (Standard 1.5m)', 'Generic', NULL, 'accessory', 0, 0, 300, true),
+    ('a7', 'Gas Hose Pipe (Extra Per Meter)', 'Generic', NULL, 'accessory', 0, 0, 300, true)
+ON CONFLICT (id) DO UPDATE SET
+    name = EXCLUDED.name,
+    brand = EXCLUDED.brand,
+    size_kg = EXCLUDED.size_kg,
+    category = EXCLUDED.category,
+    refill_price_kes = EXCLUDED.refill_price_kes,
+    complete_price_kes = EXCLUDED.complete_price_kes,
+    accessory_price_kes = EXCLUDED.accessory_price_kes,
+    is_active = EXCLUDED.is_active;
 
 -- Seed Initial Inventory for Each Branch
 INSERT INTO public.branch_inventory (branch_id, product_id, full_units, empty_units)
-SELECT b.id, p.id, 
-       CASE WHEN p.category = 'cylinder' THEN 20 ELSE 15 END AS full_units,
-       CASE WHEN p.category = 'cylinder' THEN 10 ELSE 0 END AS empty_units
+SELECT b.id, p.id,
+       CASE
+         WHEN p.category = 'cylinder' THEN 20
+         WHEN p.category = 'water' AND p.size_kg IS NOT NULL AND p.refill_price_kes > 0 THEN 18
+         WHEN p.category = 'water' THEN 30
+         ELSE 15
+       END AS full_units,
+       CASE
+         WHEN p.category = 'cylinder' THEN 10
+         WHEN p.category = 'water' AND p.size_kg IS NOT NULL AND p.refill_price_kes > 0 THEN 8
+         ELSE 0
+       END AS empty_units
 FROM public.branches b
 CROSS JOIN public.products p
 ON CONFLICT (branch_id, product_id) DO NOTHING;

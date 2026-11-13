@@ -1314,7 +1314,7 @@ export default function InventoryPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 aria-label="Search inventory"
-                placeholder="Search 13kg, Pro Gas, 20L…"
+                placeholder="Search 13KG, PROGAS, 20L…"
                 className="h-11 w-full rounded-xl bg-slate-50 pl-10 pr-10 text-sm font-medium text-slate-900 ring-1 ring-slate-200 outline-none transition placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-orange-500"
               />
               {searchQuery ? (

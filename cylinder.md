@@ -20,3 +20,9 @@ Total, Hashi, Lake, Supa, Pure, Hunker, Jatel, Progas, Raha, Hass, Bonoko
 
 3kg
 Lake, Total
+
+Water with cylinder
+Keringet, Aquamist
+
+Disposable water (all of them are Japeli eg Japeli 1L)
+500ml, 1L, 5L, 20L
