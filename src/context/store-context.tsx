@@ -265,6 +265,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   // Create Order / POS sale with brand swap & inventory reconciliation
   const createOrder = async (params: CreateOrderParams): Promise<Order> => {
+    // Validate stock against the source branch on every cart line before mutating inventory.
+    for (const item of params.items) {
+      const sourceBranchId = item.branch_id || params.branch_id;
+      const stock = inventory.find(row => row.branch_id === sourceBranchId && row.product_id === item.product_id);
+      if (!stock || stock.full_units < item.quantity) {
+        const productName = products.find(product => product.id === item.product_id)?.name || 'Selected product';
+        const branchName = branches.find(branch => branch.id === sourceBranchId)?.name || 'selected branch';
+        throw new Error(`Insufficient stock: ${productName} has ${stock?.full_units ?? 0} available at ${branchName}, but ${item.quantity} requested.`);
+      }
+    }
+
     const orderNumber = `GWG-${Math.floor(1000 + Math.random() * 9000)}`;
     const orderId = `ord-${Date.now()}`;
 
