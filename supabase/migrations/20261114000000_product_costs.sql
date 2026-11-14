@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS public.product_costs (
 
 ALTER TABLE public.product_costs ENABLE ROW LEVEL SECURITY;
 
+REVOKE ALL ON public.product_costs FROM anon;
 GRANT SELECT, INSERT, UPDATE ON public.product_costs TO authenticated;
 
 DROP POLICY IF EXISTS "Admin and director view product costs" ON public.product_costs;
