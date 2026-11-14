@@ -33,9 +33,9 @@ function CountControl({ value, disabled, onSave, label }: {
   </button>;
 }
 
-function stockStatus(product: Product, stock: Stock, branchStocks: Stock[]) {
+function stockStatus(product: Product, stock: Stock) {
   if (stock.full <= 0) return 'Out of stock';
-  if (product.category === 'cylinder' && (branchStocks.length ? branchStocks.some(s => s.full <= 5) : stock.full <= 5)) return 'Low stock';
+  if (product.category === 'cylinder' && stock.full <= 5) return 'Low stock';
   return 'In stock';
 }
 
@@ -70,7 +70,7 @@ export default function InventoryPage() {
       const stock = branchId === 'all'
         ? branchStocks.reduce((sum, s) => ({ full: sum.full + s.full, empty: sum.empty + s.empty }), { ...ZERO })
         : stockMap.get(keyOf(branchId, product.id)) ?? ZERO;
-      const status = stockStatus(product, stock, branchId === 'all' ? branchStocks : []);
+      const status = stockStatus(product, stock);
       return { product, stock, status };
     }).filter(row => !lowOnly || row.status !== 'In stock');
 
