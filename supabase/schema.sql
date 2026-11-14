@@ -67,6 +67,17 @@ CREATE TABLE IF NOT EXISTS public.products (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- 3a. Private product costs. Kept separate from products so regular staff
+-- cannot read cost prices through the Supabase Data API.
+CREATE TABLE IF NOT EXISTS public.product_costs (
+    product_id UUID PRIMARY KEY REFERENCES public.products(id) ON DELETE CASCADE,
+    refill_cost_kes NUMERIC(12,2) CHECK (refill_cost_kes IS NULL OR refill_cost_kes >= 0),
+    complete_cost_kes NUMERIC(12,2) CHECK (complete_cost_kes IS NULL OR complete_cost_kes >= 0),
+    accessory_cost_kes NUMERIC(12,2) CHECK (accessory_cost_kes IS NULL OR accessory_cost_kes >= 0),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL
+);
+
 -- 4. Multi-Branch Inventory (Full & Tare/Empty Units)
 CREATE TABLE IF NOT EXISTS public.branch_inventory (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -169,6 +180,7 @@ GROUP BY p.id, p.full_name, p.vehicle_plate;
 ALTER TABLE public.branches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.product_costs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.branch_inventory ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
@@ -211,6 +223,23 @@ CREATE POLICY "Admin manage products"
     ON public.products FOR ALL
     TO authenticated
     USING (public.current_user_role() = 'admin');
+
+-- Only Admin and Director can read or change product costs.
+CREATE POLICY "Admin and Director view product costs"
+    ON public.product_costs FOR SELECT
+    TO authenticated
+    USING (public.current_user_role() IN ('admin', 'director'));
+
+CREATE POLICY "Admin and Director insert product costs"
+    ON public.product_costs FOR INSERT
+    TO authenticated
+    WITH CHECK (public.current_user_role() IN ('admin', 'director'));
+
+CREATE POLICY "Admin and Director update product costs"
+    ON public.product_costs FOR UPDATE
+    TO authenticated
+    USING (public.current_user_role() IN ('admin', 'director'))
+    WITH CHECK (public.current_user_role() IN ('admin', 'director'));
 
 -- Branch Inventory Policies
 CREATE POLICY "Approved staff view branch inventory"
