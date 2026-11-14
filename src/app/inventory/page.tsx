@@ -91,6 +91,7 @@ export default function InventoryPage() {
       showError('You do not have permission to adjust stock.');
       return;
     }
+    const current = stockMap.get(keyOf(branchId, productId)) ?? ZERO;
     const delta = Math.max(0, Math.min(99999, next)) - current[unit];
     if (!delta) return;
     updateBranchStock(branchId, productId, unit === 'full' ? delta : 0, unit === 'empty' ? delta : 0);
