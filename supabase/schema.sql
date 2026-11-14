@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS public.product_costs (
     product_id UUID PRIMARY KEY REFERENCES public.products(id) ON DELETE CASCADE,
     refill_cost_kes NUMERIC(12,2) CHECK (refill_cost_kes IS NULL OR refill_cost_kes >= 0),
     complete_cost_kes NUMERIC(12,2) CHECK (complete_cost_kes IS NULL OR complete_cost_kes >= 0),
-    accessory_cost_kes NUMERIC(12,2) CHECK (accessory_cost_kes IS NULL OR accessory_cost_kes >= 0),
+    unit_cost_kes NUMERIC(12,2) CHECK (unit_cost_kes IS NULL OR unit_cost_kes >= 0),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL
 );
