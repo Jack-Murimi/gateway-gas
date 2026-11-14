@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import {
   Branch,
   StaffProfile,
@@ -19,15 +19,6 @@ import {
   CustomerLocation,
   ShiftZReport,
 } from '@/types';
-import {
-  INITIAL_BRANCHES,
-  INITIAL_PRODUCTS,
-  INITIAL_STAFF,
-  INITIAL_INVENTORY,
-  INITIAL_ORDERS,
-  INITIAL_LEADERBOARD,
-  INITIAL_CUSTOMERS,
-} from '@/lib/mock-data';
 import { createClient } from '@/lib/supabase/client';
 import { setDemoSessionCookies, clearDemoSessionCookies } from '@/lib/demo-mode';
 
@@ -72,8 +63,7 @@ interface StoreContextType {
   customers: Customer[];
   leaderboard: RiderLeaderboardEntry[];
   shiftReports: ShiftZReport[];
-  // Actions
-  signupStaff: (email: string, full_name: string, phone: string, vehicle_plate?: string) => Promise<{ success: boolean; message: string }>;
+  signupStaff: (email: string, password: string, full_name: string, phone: string, vehicle_plate?: string) => Promise<{ success: boolean; message: string }>;
   approveStaff: (staffId: string, role: UserRole) => void;
   rejectStaff: (staffId: string) => void;
   createOrder: (params: CreateOrderParams) => Promise<Order>;
@@ -94,471 +84,336 @@ const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<StaffProfile | null>(null);
-  const [staffList, setStaffList] = useState<StaffProfile[]>(INITIAL_STAFF);
-  const [branches, setBranches] = useState<Branch[]>(INITIAL_BRANCHES);
-  const [products] = useState<Product[]>(INITIAL_PRODUCTS);
-  const [inventory, setInventory] = useState<BranchInventory[]>(INITIAL_INVENTORY);
-  const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
-  const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
+  const [staffList, setStaffList] = useState<StaffProfile[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [inventory, setInventory] = useState<BranchInventory[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [shiftReports, setShiftReports] = useState<ShiftZReport[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Initialize from localStorage or mock defaults (NO auto-login fallback)
-  useEffect(() => {
+  const fetchLiveData = useCallback(async () => {
     try {
-      const storedUser = localStorage.getItem('gwg_user');
-      const storedStaff = localStorage.getItem('gwg_staff');
-      const storedBranches = localStorage.getItem('gwg_branches');
-      const storedInventory = localStorage.getItem('gwg_inventory');
-      const storedOrders = localStorage.getItem('gwg_orders');
-      const storedCustomers = localStorage.getItem('gwg_customers');
-      const storedReports = localStorage.getItem('gwg_shift_reports');
+      const supabase = createClient();
+      const [branchesRes, productsRes, inventoryRes, ordersRes, staffRes, customersRes] = await Promise.all([
+        supabase.from('branches').select('*').eq('is_active', true).order('code'),
+        supabase.from('products').select('*').eq('is_active', true).order('category').order('name'),
+        supabase.from('branch_inventory').select('*'),
+        supabase.from('orders').select('*, items:order_items(*)').order('created_at', { ascending: false }),
+        supabase.from('profiles').select('*').order('created_at', { ascending: true }),
+        supabase.from('customers').select('*, phones:customer_phones(*), locations:customer_locations(*)').order('created_at', { ascending: false }),
+      ]);
 
-      if (storedUser) {
-        const parsed = JSON.parse(storedUser);
-        setCurrentUser(parsed);
-        setDemoSessionCookies(parsed.id, parsed.role, parsed.approval_status);
-      } else {
-        // Try reading real Supabase Auth session
-        try {
-          const supabase = createClient();
-          supabase.auth.getSession().then(({ data: { session } }) => {
-            if (session?.user) {
-              supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', session.user.id)
-                .single()
-                .then(({ data: profile }) => {
-                  if (profile) {
-                    const u: StaffProfile = {
-                      id: profile.id,
-                      email: profile.email,
-                      full_name: profile.full_name,
-                      phone: profile.phone,
-                      role: profile.role,
-                      approval_status: profile.approval_status,
-                      vehicle_plate: profile.vehicle_plate,
-                      avatar_url: profile.avatar_url,
-                    };
-                    setCurrentUser(u);
-                    localStorage.setItem('gwg_user', JSON.stringify(u));
-                    setDemoSessionCookies(u.id, u.role, u.approval_status);
-                  }
-                });
-            }
-          });
-        } catch {
-          // ignore offline/no-auth
-        }
-      }
-
-      if (storedStaff) setStaffList(JSON.parse(storedStaff));
-      if (storedBranches) {
-        const parsed: Branch[] = JSON.parse(storedBranches);
-        const hasLegacyBranch = parsed.some((b) =>
-          ['Westlands Hub', 'Kilimani Depot', 'Roysambu Station', 'South B Centre', 'Westlands', 'Kilimani', 'Karen', 'Kasarani'].includes(b.name)
-        );
-        if (hasLegacyBranch) {
-          setBranches(INITIAL_BRANCHES);
-          localStorage.setItem('gwg_branches', JSON.stringify(INITIAL_BRANCHES));
-        } else {
-          setBranches(parsed);
-        }
-      }
-      if (storedInventory) setInventory(JSON.parse(storedInventory));
-      if (storedOrders) setOrders(JSON.parse(storedOrders));
-      if (storedCustomers) setCustomers(JSON.parse(storedCustomers));
-      if (storedReports) setShiftReports(JSON.parse(storedReports));
-    } catch {
-      // ignore
+      if (!branchesRes.error && branchesRes.data) setBranches(branchesRes.data as Branch[]);
+      if (!productsRes.error && productsRes.data) setProducts(productsRes.data as Product[]);
+      if (!inventoryRes.error && inventoryRes.data) setInventory(inventoryRes.data as BranchInventory[]);
+      if (!ordersRes.error && ordersRes.data) setOrders(ordersRes.data as Order[]);
+      if (!staffRes.error && staffRes.data) setStaffList(staffRes.data as StaffProfile[]);
+      if (!customersRes.error && customersRes.data) setCustomers(customersRes.data as Customer[]);
+      // orders/customers may fail if related tables differ; keep empty in that case
+    } catch (e) {
+      console.error('Failed to load live data', e);
     }
-    setIsLoaded(true);
   }, []);
 
-  // Save changes to localStorage
+  // Initialize session and load live data
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+          if (mounted && profile) {
+            const u: StaffProfile = {
+              id: profile.id,
+              email: profile.email,
+              full_name: profile.full_name,
+              phone: profile.phone,
+              role: profile.role,
+              approval_status: profile.approval_status,
+              vehicle_plate: profile.vehicle_plate,
+              avatar_url: profile.avatar_url,
+            };
+            setCurrentUser(u);
+            setDemoSessionCookies(u.id, u.role, u.approval_status);
+          }
+        } else {
+          clearDemoSessionCookies();
+        }
+
+        await fetchLiveData();
+      } catch (e) {
+        console.error('Store init error', e);
+      } finally {
+        if (mounted) setIsLoaded(true);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [fetchLiveData]);
+
+  // Persist only current user session hint locally (no mock business data)
   useEffect(() => {
     if (!isLoaded) return;
     try {
       if (currentUser) localStorage.setItem('gwg_user', JSON.stringify(currentUser));
       else localStorage.removeItem('gwg_user');
+    } catch {}
+  }, [currentUser, isLoaded]);
 
-      localStorage.setItem('gwg_staff', JSON.stringify(staffList));
-      localStorage.setItem('gwg_branches', JSON.stringify(branches));
-      localStorage.setItem('gwg_inventory', JSON.stringify(inventory));
-      localStorage.setItem('gwg_orders', JSON.stringify(orders));
-      localStorage.setItem('gwg_customers', JSON.stringify(customers));
-      localStorage.setItem('gwg_shift_reports', JSON.stringify(shiftReports));
-    } catch {
-      // quota or private mode fallback
-    }
-  }, [currentUser, staffList, branches, inventory, orders, customers, shiftReports, isLoaded]);
+  const signupStaff = async (email: string, password: string, full_name: string, phone: string, vehicle_plate?: string) => {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name, phone, vehicle_plate: vehicle_plate || null },
+        },
+      });
+      if (error) return { success: false, message: error.message };
 
-  // Staff signup
-  const signupStaff = async (email: string, full_name: string, phone: string, vehicle_plate?: string) => {
-    const existing = staffList.find((s) => s.email.toLowerCase() === email.toLowerCase());
-    if (existing) {
-      return { success: false, message: 'An account with this email already exists.' };
-    }
-
-    const newStaff: StaffProfile = {
-      id: `u-${Date.now()}`,
-      email,
-      full_name,
-      phone,
-      vehicle_plate: vehicle_plate || null,
-      role: 'pending',
-      approval_status: 'pending',
-      created_at: new Date().toISOString(),
-    };
-
-    setStaffList((prev) => [...prev, newStaff]);
-    setCurrentUser(newStaff);
-    return { success: true, message: 'Account registered. Waiting for admin approval.' };
-  };
-
-  // Admin approves staff
-  const approveStaff = (staffId: string, role: UserRole) => {
-    setStaffList((prev) =>
-      prev.map((s) => (s.id === staffId ? { ...s, role, approval_status: 'approved', updated_at: new Date().toISOString() } : s))
-    );
-    if (currentUser?.id === staffId) {
-      setCurrentUser((prev) => (prev ? { ...prev, role, approval_status: 'approved' } : null));
-    }
-  };
-
-  // Admin rejects staff
-  const rejectStaff = (staffId: string) => {
-    setStaffList((prev) =>
-      prev.map((s) => (s.id === staffId ? { ...s, approval_status: 'rejected', updated_at: new Date().toISOString() } : s))
-    );
-  };
-
-  // Stock update helper
-  const updateBranchStock = (branchId: string, productId: string, fullDelta: number, emptyDelta: number) => {
-    setInventory((prev) => {
-      const idx = prev.findIndex((i) => i.branch_id === branchId && i.product_id === productId);
-      if (idx >= 0) {
-        const copy = [...prev];
-        copy[idx] = {
-          ...copy[idx],
-          full_units: Math.max(0, copy[idx].full_units + fullDelta),
-          empty_units: Math.max(0, copy[idx].empty_units + emptyDelta),
-          updated_at: new Date().toISOString(),
-        };
-        return copy;
-      } else {
-        return [
-          ...prev,
-          {
-            id: `inv-${Date.now()}`,
-            branch_id: branchId,
-            product_id: productId,
-            full_units: Math.max(0, fullDelta),
-            empty_units: Math.max(0, emptyDelta),
-            updated_at: new Date().toISOString(),
-          },
-        ];
+      // Ensure profile has phone/vehicle fields if trigger created minimal row
+      if (data.user) {
+        await supabase.from('profiles').update({ full_name, phone, vehicle_plate: vehicle_plate || null }).eq('id', data.user.id);
       }
-    });
+
+      return { success: true, message: 'Account created. Awaiting approval.' };
+    } catch (e) {
+      return { success: false, message: e instanceof Error ? e.message : 'Sign up failed.' };
+    }
   };
 
-  // Create Order / POS sale with brand swap & inventory reconciliation
+  const approveStaff = (staffId: string, role: UserRole) => {
+    (async () => {
+      try {
+        const supabase = createClient();
+        await supabase.from('profiles').update({ role, approval_status: 'approved', updated_at: new Date().toISOString() }).eq('id', staffId);
+        await fetchLiveData();
+        if (currentUser?.id === staffId) {
+          setCurrentUser((prev) => (prev ? { ...prev, role, approval_status: 'approved' } : null));
+          setDemoSessionCookies(staffId, role, 'approved');
+        }
+      } catch (e) { console.error(e); }
+    })();
+  };
+
+  const rejectStaff = (staffId: string) => {
+    (async () => {
+      try {
+        const supabase = createClient();
+        await supabase.from('profiles').update({ approval_status: 'rejected', updated_at: new Date().toISOString() }).eq('id', staffId);
+        await fetchLiveData();
+      } catch (e) { console.error(e); }
+    })();
+  };
+
+  const updateBranchStock = (branchId: string, productId: string, fullDelta: number, emptyDelta: number) => {
+    (async () => {
+      try {
+        const supabase = createClient();
+        const current = inventory.find((i) => i.branch_id === branchId && i.product_id === productId);
+        const full_units = Math.max(0, (current?.full_units ?? 0) + fullDelta);
+        const empty_units = Math.max(0, (current?.empty_units ?? 0) + emptyDelta);
+        await supabase.from('branch_inventory').upsert({ branch_id: branchId, product_id: productId, full_units, empty_units, updated_at: new Date().toISOString() }, { onConflict: 'branch_id,product_id' });
+        await fetchLiveData();
+      } catch (e) { console.error(e); }
+    })();
+  };
+
   const createOrder = async (params: CreateOrderParams): Promise<Order> => {
-    // Validate aggregated demand per product and source branch before mutating inventory.
+    const supabase = createClient();
+
+    // Validate stock locally against latest known inventory
     const requestedBySource = new Map<string, number>();
-    params.items.forEach(item => {
+    params.items.forEach((item) => {
       const key = `${item.branch_id || params.branch_id}:${item.product_id}`;
       requestedBySource.set(key, (requestedBySource.get(key) || 0) + item.quantity);
     });
     for (const [key, requested] of requestedBySource) {
       const [sourceBranchId, productId] = key.split(':');
-      const stock = inventory.find(row => row.branch_id === sourceBranchId && row.product_id === productId);
+      const stock = inventory.find((row) => row.branch_id === sourceBranchId && row.product_id === productId);
       if (!stock || stock.full_units < requested) {
-        const productName = products.find(product => product.id === productId)?.name || 'Selected product';
-        const branchName = branches.find(branch => branch.id === sourceBranchId)?.name || 'selected branch';
+        const productName = products.find((p) => p.id === productId)?.name || 'Selected product';
+        const branchName = branches.find((b) => b.id === sourceBranchId)?.name || 'selected branch';
         throw new Error(`Insufficient stock: ${productName} has ${stock?.full_units ?? 0} available at ${branchName}, but ${requested} requested.`);
       }
     }
 
     const orderNumber = `GWG-${Math.floor(1000 + Math.random() * 9000)}`;
-    const orderId = `ord-${Date.now()}`;
-
-    const items: OrderItem[] = params.items.map((item, idx) => ({
-      id: `item-${Date.now()}-${idx}`,
-      order_id: orderId,
+    const itemsPayload = params.items.map((item) => ({
       product_id: item.product_id,
       order_type: item.order_type,
       outgoing_brand: item.outgoing_brand,
       incoming_brand: item.incoming_brand || null,
-      cylinder_size_kg: item.cylinder_size_kg || null,
+      cylinder_size_kg: item.cylinder_size_kg ?? null,
       quantity: item.quantity,
       unit_price_kes: item.unit_price_kes,
       subtotal_kes: item.quantity * item.unit_price_kes,
       branch_id: item.branch_id || params.branch_id,
     }));
-
-    const subtotal = items.reduce((acc, i) => acc + i.subtotal_kes, 0);
+    const subtotal = itemsPayload.reduce((acc, i) => acc + i.subtotal_kes, 0);
     const total = subtotal + params.delivery_fee_kes;
 
-    const newOrder: Order = {
-      id: orderId,
-      order_number: orderNumber,
-      receipt_number: params.receipt_number || null,
-      branch_id: params.branch_id,
-      sales_rep_id: currentUser?.id || null,
-      rider_id: params.rider_ids?.[0] || null,
-      rider_ids: params.rider_ids || [],
-      vehicle_plate: params.vehicle_plate || null,
-      lpo_number: params.lpo_number || null,
-      sale_comment: params.sale_comment || null,
-      customer_id: params.customer_id || null,
-      is_pos_walkin: params.is_pos_walkin,
-      customer_name: params.customer_name,
-      customer_phone: params.customer_phone,
-      delivery_estate: params.delivery_estate || null,
-      delivery_address: params.delivery_address || null,
-      delivery_status: params.is_pos_walkin ? 'delivered' : params.rider_ids?.length ? 'assigned' : 'pending',
-      payment_method: params.payment_method,
-      payment_status: params.payment_status,
-      payment_reference: params.payment_reference || null,
-      rider_comment: null,
-      subtotal_kes: subtotal,
-      delivery_fee_kes: params.delivery_fee_kes,
-      total_kes: total,
-      assigned_at: !params.is_pos_walkin && params.rider_ids?.length ? new Date().toISOString() : null,
-      delivered_at: params.is_pos_walkin ? new Date().toISOString() : null,
-      created_at: params.created_at || new Date().toISOString(),
-      items,
-    };
-
-    // Deduct stock in branch:
-    // 1. Outgoing product: deduct full_units
-    // 2. If refill with brand swap: add empty_units for incoming brand
-    items.forEach((item) => {
-      const itemBranchId = item.branch_id || params.branch_id;
-      // Deduct stock from the branch selected on this specific cart line.
-      updateBranchStock(itemBranchId, item.product_id, -item.quantity, 0);
-
-      // If refill and incoming brand differs, find matching product for incoming brand and increment its empties
-      if (item.order_type === 'refill' && item.incoming_brand && item.cylinder_size_kg) {
-        const incomingProduct = products.find(
-          (p) => p.brand.toLowerCase() === item.incoming_brand!.toLowerCase() && p.size_kg === item.cylinder_size_kg
-        );
-        if (incomingProduct) {
-          updateBranchStock(itemBranchId, incomingProduct.id, 0, item.quantity);
-        } else {
-          // If no separate brand row, add empties to current product
-          updateBranchStock(itemBranchId, item.product_id, 0, item.quantity);
-        }
-      }
-    });
-
-    setOrders((prev) => [newOrder, ...prev]);
-    return newOrder;
-  };
-
-  // Assign Rider to order
-  const assignRider = (orderId: string, riderId: string) => {
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.id === orderId
-          ? {
-              ...o,
-              rider_id: riderId,
-              rider_ids: [riderId],
-              delivery_status: 'assigned',
-              assigned_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            }
-          : o
-      )
-    );
-  };
-
-  // Update Delivery Status (Rider or Operator)
-  const updateDeliveryStatus = (orderId: string, status: DeliveryStatus, comment?: string) => {
-    setOrders((prev) =>
-      prev.map((o) => {
-        if (o.id !== orderId) return o;
-        return {
-          ...o,
-          delivery_status: status,
-          rider_comment: comment !== undefined ? comment : o.rider_comment,
-          delivered_at: status === 'delivered' ? new Date().toISOString() : o.delivered_at,
-          updated_at: new Date().toISOString(),
-        };
+    const { data: inserted, error: orderError } = await supabase
+      .from('orders')
+      .insert({
+        order_number: orderNumber,
+        branch_id: params.branch_id,
+        sales_rep_id: currentUser?.id || null,
+        rider_id: params.rider_ids?.[0] || null,
+        rider_ids: params.rider_ids || [],
+        vehicle_plate: params.vehicle_plate || null,
+        receipt_number: params.receipt_number || null,
+        lpo_number: params.lpo_number || null,
+        sale_comment: params.sale_comment || null,
+        is_pos_walkin: params.is_pos_walkin,
+        customer_name: params.customer_name,
+        customer_phone: params.customer_phone,
+        delivery_estate: params.delivery_estate || null,
+        delivery_address: params.delivery_address || null,
+        delivery_status: params.is_pos_walkin ? 'delivered' : params.rider_ids?.length ? 'assigned' : 'pending',
+        payment_method: params.payment_method,
+        payment_status: params.payment_status,
+        payment_reference: params.payment_reference || null,
+        subtotal_kes: subtotal,
+        delivery_fee_kes: params.delivery_fee_kes,
+        total_kes: total,
+        assigned_at: !params.is_pos_walkin && params.rider_ids?.length ? new Date().toISOString() : null,
+        delivered_at: params.is_pos_walkin ? new Date().toISOString() : null,
+        created_at: params.created_at || new Date().toISOString(),
       })
-    );
+      .select('*')
+      .single();
+    if (orderError || !inserted) throw orderError || new Error('Failed to create order');
+
+    const withOrderId = itemsPayload.map((it) => ({ ...it, order_id: inserted.id }));
+    const { error: itemsError } = await supabase.from('order_items').insert(withOrderId);
+    if (itemsError) throw itemsError;
+
+    // Update inventory in DB
+    for (const item of params.items) {
+      const itemBranchId = item.branch_id || params.branch_id;
+      const stockRow = inventory.find((i) => i.branch_id === itemBranchId && i.product_id === item.product_id);
+      const newFull = Math.max(0, (stockRow?.full_units ?? 0) - item.quantity);
+      let newEmpty = stockRow?.empty_units ?? 0;
+      await supabase.from('branch_inventory').upsert({ branch_id: itemBranchId, product_id: item.product_id, full_units: newFull, empty_units: newEmpty, updated_at: new Date().toISOString() }, { onConflict: 'branch_id,product_id' });
+
+      if (item.order_type === 'refill' && item.incoming_brand && item.cylinder_size_kg) {
+        const incomingProduct = products.find((p) => p.brand.toLowerCase() === item.incoming_brand!.toLowerCase() && p.size_kg === item.cylinder_size_kg);
+        const targetId = incomingProduct?.id || item.product_id;
+        const targetRow = inventory.find((i) => i.branch_id === itemBranchId && i.product_id === targetId);
+        const targetEmpty = Math.max(0, (targetRow?.empty_units ?? 0) + item.quantity);
+        const targetFull = targetId === item.product_id ? newFull : (targetRow?.full_units ?? 0);
+        await supabase.from('branch_inventory').upsert({ branch_id: itemBranchId, product_id: targetId, full_units: targetFull, empty_units: targetEmpty, updated_at: new Date().toISOString() }, { onConflict: 'branch_id,product_id' });
+      }
+    }
+
+    await fetchLiveData();
+    const refreshed = await supabase.from('orders').select('*, items:order_items(*)').eq('id', inserted.id).single();
+    return (refreshed.data || { ...inserted, items: withOrderId }) as Order;
   };
 
-  // Rider updates comment
+  const createCustomer = (_name: string, _phone: string, _estate: string, _specificAddress?: string): Customer => {
+    // Live customer creation can be added when customer tables/API are finalized.
+    throw new Error('Customer records are managed in the live system. Create via supported flow.');
+  };
+
+  const addCustomerPhone = (_customerId: string, _phone: string) => {};
+  const addCustomerLocation = (_customerId: string, _estate: string, _specificAddress?: string) => {};
+
+  const assignRider = (orderId: string, riderId: string) => {
+    (async () => {
+      try {
+        const supabase = createClient();
+        await supabase.from('orders').update({ rider_id: riderId, rider_ids: [riderId], delivery_status: 'assigned', assigned_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', orderId);
+        await fetchLiveData();
+      } catch (e) { console.error(e); }
+    })();
+  };
+
+  const updateDeliveryStatus = (orderId: string, status: DeliveryStatus, comment?: string) => {
+    (async () => {
+      try {
+        const supabase = createClient();
+        const patch: Record<string, unknown> = { delivery_status: status, updated_at: new Date().toISOString() };
+        if (comment !== undefined) patch.rider_comment = comment;
+        if (status === 'delivered') patch.delivered_at = new Date().toISOString();
+        await supabase.from('orders').update(patch).eq('id', orderId);
+        await fetchLiveData();
+      } catch (e) { console.error(e); }
+    })();
+  };
+
   const updateRiderComment = (orderId: string, comment: string) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, rider_comment: comment, updated_at: new Date().toISOString() } : o))
-    );
+    (async () => {
+      try {
+        const supabase = createClient();
+        await supabase.from('orders').update({ rider_comment: comment, updated_at: new Date().toISOString() }).eq('id', orderId);
+        await fetchLiveData();
+      } catch (e) { console.error(e); }
+    })();
   };
 
-  // Add Branch
   const createBranch = (name: string, code: string, location_estate: string, contact_phone: string) => {
-    const newBranch: Branch = {
-      id: `b-${Date.now()}`,
-      name,
-      code,
-      location_estate,
-      contact_phone,
-      is_active: true,
-      created_at: new Date().toISOString(),
-    };
-    setBranches((prev) => [...prev, newBranch]);
+    (async () => {
+      try {
+        const supabase = createClient();
+        await supabase.from('branches').insert({ name, code, location_estate, contact_phone, is_active: true });
+        await fetchLiveData();
+      } catch (e) { console.error(e); }
+    })();
   };
 
-  // Customers
-  const createCustomer = (name: string, phone: string, estate: string, specificAddress?: string): Customer => {
-    const custId = `cust-${Date.now()}`;
-    const newCust: Customer = {
-      id: custId,
-      name,
-      created_at: new Date().toISOString(),
-      phones: [
-        {
-          id: `cp-${Date.now()}`,
-          customer_id: custId,
-          phone_number: phone,
-          is_primary: true,
-        },
-      ],
-      locations: [
-        {
-          id: `cl-${Date.now()}`,
-          customer_id: custId,
-          estate,
-          specific_address: specificAddress || null,
-          is_default: true,
-        },
-      ],
-    };
-    setCustomers((prev) => [newCust, ...prev]);
-    return newCust;
-  };
-
-  const addCustomerPhone = (customerId: string, phone: string) => {
-    setCustomers((prev) =>
-      prev.map((c) =>
-        c.id === customerId
-          ? {
-              ...c,
-              phones: [
-                ...c.phones,
-                {
-                  id: `cp-${Date.now()}`,
-                  customer_id: customerId,
-                  phone_number: phone,
-                  is_primary: c.phones.length === 0,
-                },
-              ],
-            }
-          : c
-      )
-    );
-  };
-
-  const addCustomerLocation = (customerId: string, estate: string, specificAddress?: string) => {
-    setCustomers((prev) =>
-      prev.map((c) =>
-        c.id === customerId
-          ? {
-              ...c,
-              locations: [
-                ...c.locations,
-                {
-                  id: `cl-${Date.now()}`,
-                  customer_id: customerId,
-                  estate,
-                  specific_address: specificAddress || null,
-                  is_default: c.locations.length === 0,
-                },
-              ],
-            }
-          : c
-      )
-    );
-  };
-
-  const createShiftReport = async (
-    data: Omit<ShiftZReport, 'id' | 'report_number' | 'closed_at'>
-  ): Promise<ShiftZReport> => {
+  const createShiftReport = async (data: Omit<ShiftZReport, 'id' | 'report_number' | 'closed_at'>): Promise<ShiftZReport> => {
+    // Store locally for now; persist to DB if shift_reports table exists.
     const closedAt = new Date().toISOString();
     const count = shiftReports.length + 1;
     const branchCode = branches.find((b) => b.id === data.branch_id)?.code.split('-')[0] || 'STN';
     const reportNumber = `Z-${branchCode}-${data.shift_date.replace(/-/g, '')}-${String(count).padStart(2, '0')}`;
-    const report: ShiftZReport = {
-      ...data,
-      id: `zrep-${Date.now()}`,
-      report_number: reportNumber,
-      closed_at: closedAt,
-    };
+    const report: ShiftZReport = { ...data, id: crypto.randomUUID(), report_number: reportNumber, closed_at: closedAt };
     setShiftReports((prev) => [report, ...prev]);
     return report;
   };
 
   const resetDemoData = () => {
-    setStaffList(INITIAL_STAFF);
-    setBranches(INITIAL_BRANCHES);
-    setInventory(INITIAL_INVENTORY);
-    setOrders(INITIAL_ORDERS);
-    setCustomers(INITIAL_CUSTOMERS);
-    setShiftReports([]);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('gwg_staff', JSON.stringify(INITIAL_STAFF));
-      localStorage.setItem('gwg_branches', JSON.stringify(INITIAL_BRANCHES));
-      localStorage.setItem('gwg_inventory', JSON.stringify(INITIAL_INVENTORY));
-      localStorage.setItem('gwg_orders', JSON.stringify(INITIAL_ORDERS));
-      localStorage.setItem('gwg_customers', JSON.stringify(INITIAL_CUSTOMERS));
-      localStorage.removeItem('gwg_shift_reports');
-    }
+    // No-op: live data only
   };
 
   const logout = () => {
     setCurrentUser(null);
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('gwg_user');
-      localStorage.removeItem('gwg_demo_user_id');
-    }
     clearDemoSessionCookies();
     try {
+      localStorage.removeItem('gwg_user');
+      localStorage.removeItem('gwg_demo_user_id');
+    } catch {}
+    try {
       const supabase = createClient();
-      supabase.auth.signOut();
-    } catch {
-      // ignore
-    }
-    if (typeof window !== 'undefined') {
-      window.location.href = '/login';
-    }
+      void supabase.auth.signOut();
+    } catch {}
+    if (typeof window !== 'undefined') window.location.href = '/login';
   };
 
-  // Compute live rider performance leaderboard (strictly zero revenue/money columns)
   const leaderboard: RiderLeaderboardEntry[] = staffList
     .filter((s) => s.role === 'rider' && s.approval_status === 'approved')
     .map((r) => {
       const riderOrders = orders.filter((o) => o.rider_id === r.id || o.rider_ids?.includes(r.id));
       const completed = riderOrders.filter((o) => o.delivery_status === 'delivered');
       const active = riderOrders.filter((o) => o.delivery_status === 'in_transit' || o.delivery_status === 'assigned');
-
       let totalMinutes = 0;
       let countWithTiming = 0;
       completed.forEach((o) => {
         if (o.assigned_at && o.delivered_at) {
           const diffMin = Math.round((new Date(o.delivered_at).getTime() - new Date(o.assigned_at).getTime()) / 60000);
-          if (diffMin > 0) {
-            totalMinutes += diffMin;
-            countWithTiming += 1;
-          }
+          if (diffMin > 0) { totalMinutes += diffMin; countWithTiming += 1; }
         }
       });
-
-      const avg_delivery_minutes = countWithTiming > 0 ? Math.round(totalMinutes / countWithTiming) : 25;
-
       return {
         rider_id: r.id,
         rider_name: r.full_name,
@@ -566,10 +421,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         total_assigned: riderOrders.length,
         completed_deliveries: completed.length,
         active_deliveries: active.length,
-        avg_delivery_minutes,
+        avg_delivery_minutes: countWithTiming > 0 ? Math.round(totalMinutes / countWithTiming) : 0,
       };
     })
     .sort((a, b) => b.completed_deliveries - a.completed_deliveries);
+
+  if (!isLoaded) {
+    return <div className="flex min-h-screen items-center justify-center text-sm text-slate-500">Loading…</div>;
+  }
 
   return (
     <StoreContext.Provider

@@ -42,7 +42,7 @@ export default function SignupPage() {
     const cleanPhone = normalizeKenyanPhone(phone);
 
     setSubmitting(true);
-    const result = await signupStaff(email, fullName, cleanPhone, roleHint === 'rider' ? vehiclePlate.toUpperCase() : undefined);
+    const result = await signupStaff(email, password, fullName, cleanPhone, roleHint === 'rider' ? vehiclePlate.toUpperCase() : undefined);
     setSubmitting(false);
 
     if (result.success) {

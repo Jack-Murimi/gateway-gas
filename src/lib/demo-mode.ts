@@ -1,4 +1,5 @@
-export const IS_DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+// Demo mode disabled: app runs on live Supabase data only.
+export const IS_DEMO_MODE = false;
 
 export function setDemoSessionCookies(userId: string, role: string, status: string) {
   if (typeof document === 'undefined') return;
