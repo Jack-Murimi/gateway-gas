@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeftRight, Building2, Search, SlidersHorizontal, X, Minus, Plus, Package, Flame, Droplets } from 'lucide-react';
 import { useStore } from '@/context/store-context';
 import { useToast } from '@/components/ui/toast';
 import { formatKES, hasEmptyState } from '@/lib/formatters';
+import { createClient } from '@/lib/supabase/client';
 import type { Product } from '@/types';
 
 type Stock = { full: number; empty: number };
@@ -33,6 +34,41 @@ function CountControl({ value, disabled, onSave, label }: {
   </button>;
 }
 
+
+type ProductCost = {
+  product_id: string;
+  refill_cost_kes: number | null;
+  complete_cost_kes: number | null;
+  accessory_cost_kes: number | null;
+};
+
+function CostControl({ value, label, onSave }: {
+  value: number | null; label: string; onSave: (value: number) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value === null ? '' : String(value));
+  if (editing) {
+    return <input autoFocus type="number" min="0" step="0.01" value={draft} aria-label={label}
+      placeholder="0.00"
+      onChange={e => setDraft(e.target.value)}
+      onBlur={() => {
+        const n = Number(draft);
+        if (draft.trim() !== '' && Number.isFinite(n) && n >= 0 && n !== value) onSave(n);
+        setEditing(false);
+      }}
+      onKeyDown={e => {
+        if (e.key === 'Enter') e.currentTarget.blur();
+        if (e.key === 'Escape') { setDraft(value === null ? '' : String(value)); setEditing(false); }
+      }}
+      className="h-8 w-24 rounded-lg border border-orange-300 bg-white px-2 text-right text-xs font-semibold tabular-nums text-slate-900 outline-none focus:ring-2 focus:ring-orange-100" />;
+  }
+  return <button type="button" onClick={() => { setDraft(value === null ? '' : String(value)); setEditing(true); }}
+    title={'Set ' + label}
+    className="rounded-md px-1.5 py-1 text-xs font-semibold tabular-nums text-slate-800 hover:bg-orange-50">
+    {value === null ? <span className="text-orange-700">Set cost</span> : formatKES(value)}
+  </button>;
+}
+
 function stockStatus(product: Product, stock: Stock) {
   if (stock.full <= 0) return 'Out of stock';
   if (product.category === 'cylinder' && stock.full <= 5) return 'Low stock';
@@ -48,9 +84,11 @@ export default function InventoryPage() {
   const [brand, setBrand] = useState('all');
   const [lowOnly, setLowOnly] = useState(false);
   const [sort, setSort] = useState('name');
+  const [productCosts, setProductCosts] = useState<Record<string, ProductCost>>({});
 
   const approved = currentUser?.approval_status === 'approved';
   const canEdit = approved && !!currentUser && EDIT_ROLES.includes(currentUser.role);
+  const canViewCost = approved && !!currentUser && ['admin', 'director'].includes(currentUser.role);
   const branchMap = useMemo(() => new Map(branches.map(b => [b.id, b])), [branches]);
   const stockMap = useMemo(() => {
     const map = new Map<string, Stock>();
@@ -58,6 +96,69 @@ export default function InventoryPage() {
     return map;
   }, [inventory]);
   const brands = useMemo(() => Array.from(new Set(products.map(p => p.brand))).sort(), [products]);
+  useEffect(() => {
+    let active = true;
+    if (!canViewCost) {
+      setProductCosts({});
+      return () => { active = false; };
+    }
+    const supabase = createClient();
+    void supabase.from('product_costs')
+      .select('product_id, refill_cost_kes, complete_cost_kes, accessory_cost_kes')
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) {
+          console.error('Could not load product costs:', error.message);
+          showError('Could not load cost prices. Refresh and try again.');
+          return;
+        }
+        const next: Record<string, ProductCost> = {};
+        (data ?? []).forEach(row => {
+          next[row.product_id] = {
+            product_id: row.product_id,
+            refill_cost_kes: row.refill_cost_kes === null ? null : Number(row.refill_cost_kes),
+            complete_cost_kes: row.complete_cost_kes === null ? null : Number(row.complete_cost_kes),
+            accessory_cost_kes: row.accessory_cost_kes === null ? null : Number(row.accessory_cost_kes),
+          };
+        });
+        setProductCosts(next);
+      });
+    return () => { active = false; };
+  }, [canViewCost, showError]);
+
+  const saveProductCost = async (product: Product, field: 'refill_cost_kes' | 'complete_cost_kes' | 'accessory_cost_kes', value: number) => {
+    if (!canViewCost || !currentUser) return;
+    const current = productCosts[product.id];
+    const payload: ProductCost & { updated_by: string; updated_at: string } = {
+      product_id: product.id,
+      refill_cost_kes: current?.refill_cost_kes ?? null,
+      complete_cost_kes: current?.complete_cost_kes ?? null,
+      accessory_cost_kes: current?.accessory_cost_kes ?? null,
+      [field]: value,
+      updated_by: currentUser.id,
+      updated_at: new Date().toISOString(),
+    };
+    const supabase = createClient();
+    const { data, error } = await supabase.from('product_costs')
+      .upsert(payload, { onConflict: 'product_id' })
+      .select('product_id, refill_cost_kes, complete_cost_kes, accessory_cost_kes')
+      .single();
+    if (error || !data) {
+      showError(error?.message || 'Could not save cost price.');
+      return;
+    }
+    setProductCosts(prev => ({
+      ...prev,
+      [product.id]: {
+        product_id: data.product_id,
+        refill_cost_kes: data.refill_cost_kes === null ? null : Number(data.refill_cost_kes),
+        complete_cost_kes: data.complete_cost_kes === null ? null : Number(data.complete_cost_kes),
+        accessory_cost_kes: data.accessory_cost_kes === null ? null : Number(data.accessory_cost_kes),
+      },
+    }));
+    showSuccess('Product cost price saved.');
+  };
+
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -156,6 +257,7 @@ export default function InventoryPage() {
       </div>
     </section>
 
+    {canViewCost && <p className="text-xs text-slate-500">Cost prices are private to Admin and Director. Select a cost to enter or update it.</p>}
     {branchId === 'all' && <p className="text-xs text-slate-500">Showing combined stock across all branches. Select a branch to make stock adjustments.</p>}
     {branchId !== 'all' && activeBranch && <p className="text-xs text-slate-500">Showing stock at <strong className="text-slate-700">{activeBranch.name}</strong>{canEdit ? ' · Tap a quantity to edit it.' : ' · View only.'}</p>}
 
@@ -165,7 +267,7 @@ export default function InventoryPage() {
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
               <th className="px-4 py-3">Product</th>
-              <th className="px-3 py-3 text-right">Cost</th>
+              {canViewCost && <th className="px-3 py-3 text-right">Cost</th>}
               <th className="px-3 py-3">Selling price</th>
               <th className="px-3 py-3">Remaining stock</th>
               <th className="px-3 py-3">Branch</th>
@@ -190,7 +292,12 @@ export default function InventoryPage() {
                     <span className="min-w-0"><span className="block truncate font-semibold text-slate-900">{p.name}</span><span className="block truncate text-xs text-slate-500">{p.brand}{p.size_kg ? ` · ${p.size_kg}kg` : ''}</span></span>
                   </div>
                 </td>
-                <td className="px-3 py-3 text-right text-xs text-slate-400" title="Cost price is not currently stored in the product catalogue">—</td>
+                {canViewCost && <td className="px-3 py-3 text-right">
+                  {p.category === 'cylinder' ? <div className="space-y-0.5">
+                    <div className="flex items-center justify-end gap-1.5"><span className="text-[10px] text-slate-400">Refill</span><CostControl value={productCosts[p.id]?.refill_cost_kes ?? null} label={p.name + ' refill cost'} onSave={n => void saveProductCost(p, 'refill_cost_kes', n)} /></div>
+                    <div className="flex items-center justify-end gap-1.5"><span className="text-[10px] text-slate-400">New</span><CostControl value={productCosts[p.id]?.complete_cost_kes ?? null} label={p.name + ' complete cost'} onSave={n => void saveProductCost(p, 'complete_cost_kes', n)} /></div>
+                  </div> : <CostControl value={productCosts[p.id]?.accessory_cost_kes ?? null} label={p.name + ' unit cost'} onSave={n => void saveProductCost(p, 'accessory_cost_kes', n)} />}
+                </td>}
                 <td className="px-3 py-3 text-xs text-slate-600">{selling}</td>
                 <td className="px-3 py-3">
                   <div className="flex items-center gap-3 whitespace-nowrap">
@@ -202,10 +309,10 @@ export default function InventoryPage() {
                 <td className="px-4 py-3 text-right font-bold tabular-nums text-slate-900">{total.toLocaleString()}</td>
               </tr>;
             })}
-            {rows.length === 0 && <tr><td colSpan={6} className="px-4 py-14 text-center"><p className="font-semibold text-slate-800">No matching products</p><p className="mt-1 text-xs text-slate-500">Try changing your search or filters.</p></td></tr>}
+            {rows.length === 0 && <tr><td colSpan={canViewCost ? 6 : 5} className="px-4 py-14 text-center"><p className="font-semibold text-slate-800">No matching products</p><p className="mt-1 text-xs text-slate-500">Try changing your search or filters.</p></td></tr>}
           </tbody>
           {rows.length > 0 && <tfoot><tr className="border-t-2 border-slate-200 bg-slate-50 text-sm font-bold text-slate-900">
-            <td colSpan={5} className="px-4 py-3 text-right">Total stock</td>
+            <td colSpan={canViewCost ? 5 : 4} className="px-4 py-3 text-right">Total stock</td>
             <td className="px-4 py-3 text-right tabular-nums">{rows.reduce((sum, row) => sum + row.stock.full + (hasEmptyState(row.product) ? row.stock.empty : 0), 0).toLocaleString()}</td>
           </tr></tfoot>}
         </table>
