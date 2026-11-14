@@ -183,36 +183,36 @@ function LoginContent() {
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center px-4 py-8">
-      <div className="max-w-md w-full space-y-6">
+      <div className="w-full max-w-md space-y-6">
         {/* Brand Card */}
-        <div className="bg-white rounded-3xl shadow-xl border-2 border-slate-200 p-6 sm:p-8 space-y-6">
-          <div className="flex items-center justify-between">
+        <div className="space-y-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-orange-600 flex items-center justify-center text-white shadow-md">
-                <Flame className="w-6 h-6" />
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-orange-600 text-white">
+                <Flame className="h-5 w-5" />
               </div>
               <div>
-                <span className="font-black text-xl tracking-tight text-slate-900 block leading-tight">
-                  GATEWAY GAS
+                <span className="block text-lg font-semibold tracking-tight text-slate-900 leading-tight">
+                  Gateway Gas
                 </span>
-                <span className="text-xs font-bold uppercase tracking-wider text-orange-600 block">
+                <span className="block text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
                   Operations Portal
                 </span>
               </div>
             </div>
-            {IS_DEMO_MODE && <Badge variant="warning">Demo Active</Badge>}
+            {IS_DEMO_MODE && <Badge variant="warning">Demo</Badge>}
           </div>
 
           <div>
-            <h1 className="text-2xl font-black text-slate-900">Sign In</h1>
-            <p className="text-sm font-medium text-slate-500 mt-1">
-              Internal staff credentials. Access managed by branch permissions.
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Sign in</h1>
+            <p className="mt-1 text-sm text-slate-600">
+              Use your staff email or phone number and password.
             </p>
           </div>
 
           {error && (
-            <div className="p-4 bg-red-50 border-2 border-red-300 rounded-2xl text-sm font-bold text-red-700 flex items-center gap-2.5">
-              <AlertCircle className="w-5 h-5 shrink-0" />
+            <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3.5 text-sm text-red-700">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{error}</span>
             </div>
           )}
@@ -244,16 +244,16 @@ function LoginContent() {
               </button>
             </div>
             {showForgotPassword && (
-              <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 space-y-3">
-                <p className="text-sm font-semibold text-slate-700">Enter your work email and we’ll send you a secure reset link.</p>
-                <Input label="Work Email" type="email" required value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} placeholder="name@example.com" leftIcon={<Mail className="w-5 h-5" />} />
-                {resetMessage && <p role="status" className="text-xs font-semibold text-slate-700">{resetMessage}</p>}
-                <Button type="button" isLoading={isSendingReset} size="lg" className="w-full" onClick={() => void handlePasswordReset()}>Send reset link</Button>
+              <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm text-slate-700">Enter your work email and we’ll send a password reset link.</p>
+                <Input label="Work email" type="email" required value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} placeholder="name@gatewaygas.co.ke" leftIcon={<Mail className="h-4 w-4" />} />
+                {resetMessage && <p role="status" className="text-xs text-slate-600">{resetMessage}</p>}
+                <Button type="button" isLoading={isSendingReset} className="w-full" onClick={() => void handlePasswordReset()}>Send reset link</Button>
               </div>
             )}
 
             <Button type="submit" isLoading={isSubmitting} size="lg" className="w-full">
-              Sign In to Station <ArrowRight className="w-5 h-5 ml-2" />
+              Sign in <ArrowRight className="ml-1.5 h-4 w-4" />
             </Button>
           </form>
 

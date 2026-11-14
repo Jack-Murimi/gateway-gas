@@ -10,23 +10,23 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className = '', variant = 'primary', size = 'md', isLoading = false, disabled, children, ...props }, ref) => {
     const baseStyles =
-      'inline-flex items-center justify-center font-bold rounded-2xl transition select-none focus:outline-none focus:ring-2 focus:ring-offset-2 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none';
+      'inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-colors duration-150 select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 active:translate-y-px disabled:opacity-50 disabled:pointer-events-none';
 
     const variants = {
-      primary: 'bg-orange-600 hover:bg-orange-700 text-white shadow-md focus:ring-orange-500 border border-orange-500',
-      secondary: 'bg-slate-900 hover:bg-slate-800 text-white shadow focus:ring-slate-900 border border-slate-800',
-      outline: 'bg-white hover:bg-slate-100 text-slate-800 border-2 border-slate-300 focus:ring-slate-400',
-      destructive: 'bg-red-600 hover:bg-red-700 text-white shadow-sm focus:ring-red-500',
-      success: 'bg-emerald-600 hover:bg-emerald-700 text-white shadow focus:ring-emerald-500',
-      ghost: 'bg-transparent hover:bg-slate-100 text-slate-700 focus:ring-slate-400',
+      primary: 'bg-orange-600 hover:bg-orange-700 text-white shadow-sm focus-visible:ring-orange-500 border border-orange-600',
+      secondary: 'bg-slate-900 hover:bg-slate-800 text-white shadow-sm focus-visible:ring-slate-900 border border-slate-900',
+      outline: 'bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 focus-visible:ring-slate-400',
+      destructive: 'bg-red-600 hover:bg-red-700 text-white shadow-sm focus-visible:ring-red-500 border border-red-600',
+      success: 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm focus-visible:ring-emerald-500 border border-emerald-600',
+      ghost: 'bg-transparent hover:bg-slate-100 text-slate-700 focus-visible:ring-slate-400',
     };
 
-    // Strict 48px minimum touch height for East African field operations
+    // Accessible touch targets
     const sizes = {
-      sm: 'min-h-[40px] px-3 py-1.5 text-sm',
-      md: 'min-h-[48px] px-5 py-2.5 text-base',
-      lg: 'min-h-[56px] px-6 py-3.5 text-lg tracking-wide',
-      icon: 'min-h-[48px] min-w-[48px] p-2',
+      sm: 'min-h-[36px] px-3 py-1.5 text-sm',
+      md: 'min-h-[44px] px-4 py-2 text-sm sm:text-base',
+      lg: 'min-h-[48px] px-5 py-2.5 text-base',
+      icon: 'min-h-[44px] min-w-[44px] p-2',
     };
 
     return (

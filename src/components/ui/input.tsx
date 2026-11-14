@@ -15,35 +15,35 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="w-full space-y-1.5 text-left">
         {label && (
-          <label htmlFor={inputId} className="block text-sm font-bold text-slate-800">
+          <label htmlFor={inputId} className="block text-sm font-medium text-slate-700">
             {label}
           </label>
         )}
         <div className="relative flex items-center">
           {leftIcon && (
-            <div className="absolute left-3.5 text-slate-500 pointer-events-none flex items-center">
+            <div className="absolute left-3 text-slate-400 pointer-events-none flex items-center">
               {leftIcon}
             </div>
           )}
           <input
             id={inputId}
             ref={ref}
-            className={`w-full min-h-[48px] text-base px-3.5 py-2.5 bg-white text-slate-900 placeholder:text-slate-400 rounded-xl border-2 transition focus:outline-none focus:ring-2 focus:ring-offset-1 ${
-              leftIcon ? 'pl-11' : ''
-            } ${rightIcon ? 'pr-11' : ''} ${
+            className={`w-full min-h-[44px] text-base px-3 py-2 bg-white text-slate-900 placeholder:text-slate-400 rounded-lg border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 ${
+              leftIcon ? 'pl-10' : ''
+            } ${rightIcon ? 'pr-10' : ''} ${
               error
-                ? 'border-red-500 focus:border-red-500 focus:ring-red-200'
-                : 'border-slate-300 focus:border-orange-600 focus:ring-orange-100'
+                ? 'border-red-400 focus:border-red-500 focus-visible:ring-red-200'
+                : 'border-slate-300 hover:border-slate-400 focus:border-orange-500 focus-visible:ring-orange-100'
             } ${className}`}
             {...props}
           />
           {rightIcon && (
-            <div className="absolute right-3.5 text-slate-500 flex items-center">
+            <div className="absolute right-3 text-slate-400 flex items-center">
               {rightIcon}
             </div>
           )}
         </div>
-        {error && <p className="text-xs font-bold text-red-600">{error}</p>}
+        {error && <p className="text-xs font-medium text-red-600">{error}</p>}
         {helperText && !error && <p className="text-xs text-slate-500">{helperText}</p>}
       </div>
     );

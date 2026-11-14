@@ -8,6 +8,22 @@ export function formatKES(amount: number): string {
 }
 
 /**
+ * Compact KES for chart axes/tooltips (e.g. 1.2K, 45K, 3.4M).
+ */
+export function formatKESCompact(amount: number): string {
+  if (isNaN(amount) || amount === null || amount === undefined) return '0';
+  const sign = amount < 0 ? '-' : '';
+  const abs = Math.abs(amount);
+  const format = (n: number, suffix: string) => {
+    const rounded = n >= 100 ? Math.round(n).toString() : n.toFixed(1).replace(/\.0$/, '');
+    return `${sign}${rounded}${suffix}`;
+  };
+  if (abs >= 1_000_000) return format(abs / 1_000_000, 'M');
+  if (abs >= 1_000) return format(abs / 1_000, 'K');
+  return `${sign}${Math.round(abs)}`;
+}
+
+/**
  * Standardize any Kenyan phone input into international E.164 (+254...)
  * Handles: 0712345678 -> +254712345678, 254712345678 -> +254712345678, 712345678 -> +254712345678
  */

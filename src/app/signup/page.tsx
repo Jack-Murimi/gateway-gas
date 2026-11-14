@@ -55,25 +55,23 @@ export default function SignupPage() {
   if (isSuccess) {
     return (
       <div className="min-h-[85vh] flex items-center justify-center px-4 py-8">
-        <div className="max-w-md w-full bg-white rounded-3xl border-2 border-slate-200 p-8 shadow-xl text-center space-y-6">
-          <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
-            <CheckCircle2 className="w-9 h-9" />
+        <div className="w-full max-w-md space-y-6 rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:p-8">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+            <CheckCircle2 className="h-7 w-7" />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-slate-900">Registration Submitted</h2>
-            <p className="text-sm text-slate-600 mt-2 leading-relaxed">
-              Your staff profile for <strong>{fullName}</strong> has been placed in the station approval queue.
+            <h2 className="text-xl font-semibold tracking-tight text-slate-900">Access request submitted</h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              The profile for <strong className="font-medium text-slate-900">{fullName}</strong> is pending review by an administrator or director.
             </p>
           </div>
-
-          <div className="p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-left space-y-1.5 text-xs">
-            <div className="font-bold text-slate-800">Next Steps:</div>
-            <div className="text-slate-600">1. A Station Director or Admin will review your profile.</div>
-            <div className="text-slate-600">2. Once approved, your operational permissions will unlock instantly.</div>
+          <div className="space-y-1.5 rounded-lg border border-slate-200 bg-slate-50 p-4 text-left text-sm text-slate-600">
+            <p className="font-medium text-slate-800">What happens next</p>
+            <p>1. An administrator reviews your request.</p>
+            <p>2. Once approved, your role permissions will be available at sign-in.</p>
           </div>
-
           <Button onClick={() => router.push('/pending')} size="lg" className="w-full">
-            View Approval Status
+            View approval status
           </Button>
         </div>
       </div>
@@ -82,37 +80,37 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center px-4 py-8">
-      <div className="max-w-md w-full space-y-6">
-        <div className="bg-white rounded-3xl shadow-xl border-2 border-slate-200 p-6 sm:p-8 space-y-6">
+      <div className="w-full max-w-md space-y-6">
+        <div className="space-y-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
           <div className="flex items-center justify-between">
             <Link
               href="/login"
-              className="inline-flex items-center gap-1.5 text-sm font-bold text-slate-500 hover:text-slate-900"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900"
             >
-              <ArrowLeft className="w-4 h-4" /> Back to Sign In
+              <ArrowLeft className="h-4 w-4" /> Back to sign in
             </Link>
-            <div className="w-8 h-8 rounded-xl bg-orange-600 flex items-center justify-center text-white">
-              <Flame className="w-4 h-4" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-600 text-white">
+              <Flame className="h-4 w-4" />
             </div>
           </div>
 
           <div>
-            <h1 className="text-2xl font-black text-slate-900">Request Station Access</h1>
-            <p className="text-sm font-medium text-slate-500 mt-1">
-              Gateway Gas Nairobi operational staff registration.
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Request access</h1>
+            <p className="mt-1 text-sm text-slate-600">
+              Create a staff profile for Gateway Gas operations. Access is granted after approval.
             </p>
           </div>
 
           {error && (
-            <div className="p-4 bg-red-50 border-2 border-red-300 rounded-2xl text-sm font-bold text-red-700 flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 shrink-0" />
+            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3.5 text-sm text-red-700">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
-              label="Full Legal Name"
+              label="Full name"
               required
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
@@ -120,7 +118,7 @@ export default function SignupPage() {
             />
 
             <Input
-              label="Work Email Address"
+              label="Work email"
               type="email"
               required
               value={email}
@@ -129,55 +127,55 @@ export default function SignupPage() {
             />
 
             <Input
-              label="M-Pesa / Mobile Phone Number"
+              label="Mobile phone"
               type="tel"
               required
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="e.g. 0712 345 678"
-              helperText="Formats automatically to +254 Kenyan standard"
+              helperText="Will be formatted to Kenyan (+254) format"
             />
 
             {/* Role Preference Hint */}
             <div className="space-y-1.5 text-left">
-              <label className="block text-sm font-bold text-slate-800">Operational Role Requested</label>
+              <label className="block text-sm font-medium text-slate-700">Requested role</label>
               <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
                   onClick={() => setRoleHint('sales_rep')}
-                  className={`min-h-[48px] p-2 rounded-xl border-2 flex flex-col items-center justify-center text-xs font-bold transition ${
+                  className={`min-h-[44px] rounded-lg border p-2 text-xs font-medium transition-colors flex flex-col items-center justify-center gap-1 ${
                     roleHint === 'sales_rep'
-                      ? 'border-orange-500 bg-orange-50 text-orange-950 font-black'
-                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      ? 'border-orange-500 bg-orange-50 text-orange-900'
+                      : 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
                   }`}
                 >
-                  <ShoppingCart className="w-4 h-4 mb-1" />
-                  <span>Cashier (POS)</span>
+                  <ShoppingCart className="h-4 w-4" />
+                  <span>Sales (POS)</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setRoleHint('rider')}
-                  className={`min-h-[48px] p-2 rounded-xl border-2 flex flex-col items-center justify-center text-xs font-bold transition ${
+                  className={`min-h-[44px] rounded-lg border p-2 text-xs font-medium transition-colors flex flex-col items-center justify-center gap-1 ${
                     roleHint === 'rider'
-                      ? 'border-orange-500 bg-orange-50 text-orange-950 font-black'
-                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      ? 'border-orange-500 bg-orange-50 text-orange-900'
+                      : 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
                   }`}
                 >
-                  <Bike className="w-4 h-4 mb-1" />
+                  <Bike className="h-4 w-4" />
                   <span>Rider</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setRoleHint('operator')}
-                  className={`min-h-[48px] p-2 rounded-xl border-2 flex flex-col items-center justify-center text-xs font-bold transition ${
+                  className={`min-h-[44px] rounded-lg border p-2 text-xs font-medium transition-colors flex flex-col items-center justify-center gap-1 ${
                     roleHint === 'operator'
-                      ? 'border-orange-500 bg-orange-50 text-orange-950 font-black'
-                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      ? 'border-orange-500 bg-orange-50 text-orange-900'
+                      : 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
                   }`}
                 >
-                  <Package className="w-4 h-4 mb-1" />
+                  <Package className="h-4 w-4" />
                   <span>Operator</span>
                 </button>
               </div>
@@ -186,22 +184,22 @@ export default function SignupPage() {
             {/* Motorbike Plate (shown progressively ONLY when rider selected) */}
             {roleHint === 'rider' && (
               <Input
-                label="Motorbike Number Plate"
+                label="Motorbike number plate"
                 required
                 value={vehiclePlate}
                 onChange={(e) => setVehiclePlate(e.target.value.toUpperCase())}
                 placeholder="e.g. KMDX 412M"
-                helperText="Required for customer dispatch SMS & GPS identification"
+                helperText="Used for dispatch and delivery identification"
               />
             )}
 
             {/* Branch Hub Choice */}
             <div className="space-y-1.5 text-left">
-              <label className="block text-sm font-bold text-slate-800">Primary Station / Branch</label>
+              <label className="block text-sm font-medium text-slate-700">Primary branch</label>
               <select
                 value={selectedBranchId}
                 onChange={(e) => setSelectedBranchId(e.target.value)}
-                className="w-full min-h-[48px] text-base px-3.5 py-2.5 bg-white text-slate-900 rounded-xl border-2 border-slate-300 font-bold focus:border-orange-600 focus:outline-none"
+                className="w-full min-h-[44px] rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 transition-colors hover:border-slate-400 focus:border-orange-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-100"
               >
                 {branches.map((b) => (
                   <option key={b.id} value={b.id}>
@@ -212,7 +210,7 @@ export default function SignupPage() {
             </div>
 
             <Input
-              label="Account Password"
+              label="Password"
               type="password"
               required
               value={password}
@@ -221,7 +219,7 @@ export default function SignupPage() {
             />
 
             <Button type="submit" isLoading={submitting} size="lg" className="w-full">
-              Submit Registration for Approval
+              Submit access request
             </Button>
           </form>
         </div>

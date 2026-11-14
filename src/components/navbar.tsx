@@ -96,15 +96,15 @@ export function Navbar() {
                 aria-label="Gateway Gas home"
                 className="flex shrink-0 items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-600 text-white shadow-sm sm:h-10 sm:w-10">
-                  <Flame className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-600 text-white sm:h-10 sm:w-10">
+                  <Flame className="h-5 w-5 sm:h-5 sm:w-5" aria-hidden="true" />
                 </span>
-                <span className="min-w-0">
-                  <span className="block whitespace-nowrap text-base font-black leading-tight tracking-tight text-slate-900 sm:text-lg">
-                    GATEWAY GAS
+                <span className="min-w-0 leading-tight">
+                  <span className="block whitespace-nowrap text-sm font-semibold tracking-tight text-slate-900 sm:text-base">
+                    Gateway Gas
                   </span>
-                  <span className="block text-[9px] font-bold uppercase leading-tight tracking-[0.16em] text-orange-700 sm:text-[10px]">
-                    Nairobi Station
+                  <span className="block text-[10px] font-medium uppercase tracking-[0.14em] text-slate-500">
+                    Operations
                   </span>
                 </span>
               </Link>

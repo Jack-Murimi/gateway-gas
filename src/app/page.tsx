@@ -25,6 +25,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatKES } from '@/lib/formatters';
+import { DashboardChartsPanel } from '@/components/charts/dashboard-charts-panel';
 
 const localDateKey = (value: string | Date) => {
   const date = value instanceof Date ? value : new Date(value);
@@ -47,12 +48,12 @@ const dateLabel = new Intl.DateTimeFormat('en-KE', {
 
 function StatusPill({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    paid: 'bg-emerald-50 text-emerald-700 ring-emerald-600/15',
-    pending: 'bg-amber-50 text-amber-700 ring-amber-600/15',
-    assigned: 'bg-blue-50 text-blue-700 ring-blue-600/15',
-    in_transit: 'bg-sky-50 text-sky-700 ring-sky-600/15',
-    delivered: 'bg-emerald-50 text-emerald-700 ring-emerald-600/15',
-    cancelled: 'bg-slate-100 text-slate-600 ring-slate-500/15',
+    paid: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+    pending: 'bg-amber-50 text-amber-700 ring-amber-600/20',
+    assigned: 'bg-sky-50 text-sky-700 ring-sky-600/20',
+    in_transit: 'bg-blue-50 text-blue-700 ring-blue-600/20',
+    delivered: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+    cancelled: 'bg-slate-100 text-slate-600 ring-slate-500/20',
   };
   const labels: Record<string, string> = {
     in_transit: 'In transit',
@@ -64,49 +65,55 @@ function StatusPill({ status }: { status: string }) {
   };
 
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${styles[status] || 'bg-slate-100 text-slate-600 ring-slate-500/15'}`}>
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1 ring-inset ${styles[status] || 'bg-slate-100 text-slate-600 ring-slate-500/20'}`}>
       {labels[status] || status.replace('_', ' ')}
     </span>
   );
 }
 
-function MetricCard({
+function Metric({
   label,
   value,
-  helper,
   icon: Icon,
   tone,
   href,
 }: {
   label: string;
   value: string | number;
-  helper: string;
   icon: React.ElementType;
   tone: 'orange' | 'green' | 'blue' | 'slate';
   href?: string;
 }) {
   const tones = {
-    orange: 'bg-orange-50 text-orange-700',
-    green: 'bg-emerald-50 text-emerald-700',
-    blue: 'bg-blue-50 text-blue-700',
-    slate: 'bg-slate-100 text-slate-700',
+    orange: 'text-orange-600 bg-orange-50',
+    green: 'text-emerald-600 bg-emerald-50',
+    blue: 'text-blue-600 bg-blue-50',
+    slate: 'text-slate-600 bg-slate-100',
   };
-  const content = (
-    <div className="flex min-h-[142px] flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 sm:p-5">
-      <div className="flex items-start justify-between gap-3">
-        <span className="text-sm font-medium text-slate-500">{label}</span>
-        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${tones[tone]}`}>
-          <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
+  const body = (
+    <div className="group relative overflow-hidden rounded-lg border border-slate-200 bg-white p-3.5 transition-colors hover:border-slate-300">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</span>
+        <span className={`flex h-7 w-7 items-center justify-center rounded-md ${tones[tone]}`}>
+          <Icon className="h-4 w-4" />
         </span>
       </div>
-      <div>
-        <div className="mt-3 text-2xl font-bold tracking-tight text-slate-950 sm:text-[28px]">{value}</div>
-        <p className="mt-1 text-xs text-slate-500">{helper}</p>
-      </div>
+      <div className="mt-2 text-xl font-semibold tracking-tight text-slate-950 tabular-nums">{value}</div>
     </div>
   );
+  return href ? <Link href={href} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 rounded-lg">{body}</Link> : body;
+}
 
-  return href ? <Link href={href} className="block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500">{content}</Link> : content;
+function Panel({ title, action, children, className = '' }: { title: string; action?: React.ReactNode; children: React.ReactNode; className?: string }) {
+  return (
+    <section className={`overflow-hidden rounded-lg border border-slate-200 bg-white ${className}`}>
+      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+        <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
 }
 
 export default function HomePage() {
@@ -114,32 +121,25 @@ export default function HomePage() {
 
   if (!currentUser) {
     return (
-      <div className="flex min-h-[85vh] items-center justify-center px-4 py-12">
-        <div className="w-full max-w-lg space-y-6 rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-xl sm:p-8">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-600 text-white shadow-sm">
-            <Flame className="h-8 w-8" />
+      <div className="flex min-h-[85vh] items-center justify-center px-4 py-10">
+        <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-6">
+          <div className="mb-5 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-600 text-white">
+              <Flame className="h-5 w-5" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold tracking-tight text-slate-950">Gateway Gas</h1>
+              <p className="text-xs text-slate-500">Operations portal</p>
+            </div>
           </div>
-          <div>
-            <span className="text-xs font-bold uppercase tracking-[0.16em] text-orange-700">Internal operations portal</span>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">Gateway Gas Nairobi</h1>
-            <p className="mt-2 text-sm leading-6 text-slate-500">
-              Multi-branch LPG sales, inventory, dispatch and delivery operations.
-            </p>
-          </div>
-          <div className="flex flex-wrap justify-center gap-2 text-xs font-medium text-slate-600">
-            {['Nextgen', 'Lavington', 'Jamhuri', 'Kileleshwa'].map((name) => (
-              <span key={name} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">{name}</span>
-            ))}
-          </div>
-          <div className="space-y-3 pt-1">
+          <div className="space-y-2">
             <Link href="/login" className="block">
-              <Button size="lg" className="w-full font-semibold">Sign in to Gateway <ArrowRight className="ml-2 h-4 w-4" /></Button>
+              <Button className="w-full">Sign in <ArrowRight className="ml-2 h-4 w-4" /></Button>
             </Link>
             <Link href="/signup" className="block">
-              <Button variant="outline" size="md" className="w-full">Request staff access</Button>
+              <Button variant="outline" className="w-full">Request access</Button>
             </Link>
           </div>
-          <p className="text-xs text-slate-400">For authorised Gateway staff only.</p>
         </div>
       </div>
     );
@@ -156,58 +156,47 @@ export default function HomePage() {
       .reduce((sum, order) => sum + order.total_kes, 0);
 
     return (
-      <main className="mx-auto max-w-5xl space-y-5 px-4 py-6 pb-24 sm:px-6 lg:px-8">
-        <section className="rounded-2xl bg-slate-950 p-5 text-white shadow-sm sm:p-7">
-          <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
+      <main className="mx-auto max-w-5xl space-y-4 px-4 py-5 pb-24 sm:px-6 lg:px-8">
+        <section className="relative overflow-hidden rounded-xl border border-slate-800 bg-slate-950 p-5 text-white">
+          <div className="absolute inset-y-0 right-0 w-1/2 bg-gradient-to-l from-orange-500/10 to-transparent" />
+          <div className="relative flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
-              <Badge variant="default">Sales desk</Badge>
-              <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">Good day, {currentUser.full_name.split(' ')[0]}</h1>
-              <p className="mt-1 text-sm text-slate-300">Your counter activity for today.</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Sales desk</p>
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight">{currentUser.full_name.split(' ')[0]}</h1>
+              <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-300">
+                <span>Paid today <strong className="text-white">{formatKES(mySalesToday)}</strong></span>
+                <span>Receipts <strong className="text-white">{myOrdersToday.length}</strong></span>
+              </div>
             </div>
-            <Link href="/sales" className="shrink-0">
-              <Button size="lg" className="min-h-12 w-full bg-orange-600 font-semibold hover:bg-orange-700 sm:w-auto">
-                <Plus className="mr-2 h-5 w-5" /> New sale
-              </Button>
-            </Link>
-          </div>
-          <div className="mt-6 grid grid-cols-2 gap-3 border-t border-white/10 pt-5">
-            <div>
-              <p className="text-xs font-medium text-slate-400">My sales today</p>
-              <p className="mt-1 text-2xl font-bold">{formatKES(mySalesToday)}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-slate-400">Receipts today</p>
-              <p className="mt-1 text-2xl font-bold">{myOrdersToday.length}</p>
-            </div>
+            <Link href="/sales"><Button className="bg-orange-600 hover:bg-orange-700"><Plus className="mr-1.5 h-4 w-4" /> New sale</Button></Link>
           </div>
         </section>
 
-        <Link href="/inventory" className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-orange-200">
-          <span className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50 text-orange-700"><Package className="h-5 w-5" /></span>
-            <span><span className="block text-sm font-semibold text-slate-900">Check branch stock</span><span className="mt-0.5 block text-xs text-slate-500">View full and empty cylinders</span></span>
-          </span>
-          <ChevronRight className="h-5 w-5 text-slate-400" />
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/inventory"><Button variant="outline" size="sm"><Package className="mr-1.5 h-4 w-4" />Stock</Button></Link>
+          <Link href="/reports"><Button variant="outline" size="sm"><ClipboardList className="mr-1.5 h-4 w-4" />Reports</Button></Link>
+        </div>
 
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4 sm:px-5">
-            <div><h2 className="font-semibold text-slate-900">Your recent sales</h2><p className="mt-0.5 text-xs text-slate-500">Transactions recorded today</p></div>
-            <Link href="/reports" className="text-xs font-semibold text-orange-700 hover:text-orange-800">View reports</Link>
-          </div>
+        <Panel title="Sales today">
           {recentMyOrders.length === 0 ? (
-            <div className="px-5 py-10 text-center"><ShoppingCart className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-2 text-sm font-medium text-slate-700">No sales recorded yet</p><p className="mt-1 text-xs text-slate-500">Your completed sales will appear here.</p></div>
+            <div className="px-4 py-10 text-center text-sm text-slate-500">No sales recorded yet.</div>
           ) : (
-            <div className="divide-y divide-slate-100">
+            <ul className="divide-y divide-slate-100">
               {recentMyOrders.map((order) => (
-                <div key={order.id} className="flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
-                  <div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-900">{order.customer_name}</p><p className="mt-0.5 text-xs text-slate-500">{order.order_number} · {timeLabel(order.created_at)}</p></div>
-                  <div className="shrink-0 text-right"><p className="text-sm font-semibold text-slate-900">{formatKES(order.total_kes)}</p><div className="mt-1"><StatusPill status={order.payment_status} /></div></div>
-                </div>
+                <li key={order.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-slate-900">{order.customer_name}</p>
+                    <p className="text-xs text-slate-500">{order.order_number} · {timeLabel(order.created_at)}</p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-sm font-medium text-slate-900 tabular-nums">{formatKES(order.total_kes)}</p>
+                    <div className="mt-1 flex justify-end"><StatusPill status={order.payment_status} /></div>
+                  </div>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
-        </section>
+        </Panel>
       </main>
     );
   }
@@ -221,33 +210,31 @@ export default function HomePage() {
     const completedToday = myDeliveries.filter((order) => order.delivery_status === 'delivered' && order.delivered_at && localDateKey(order.delivered_at) === todayKey).length;
 
     return (
-      <main className="mx-auto max-w-3xl space-y-5 px-4 py-6 pb-24 sm:px-6">
-        <section className="rounded-2xl bg-slate-950 p-5 text-white shadow-sm">
-          <Badge variant="warning">Rider console</Badge>
-          <h1 className="mt-3 text-2xl font-bold">{currentUser.full_name}</h1>
-          <p className="mt-1 text-sm text-slate-300">{currentUser.vehicle_plate || 'Delivery rider'} · Your delivery run-sheet</p>
-          <div className="mt-5 grid grid-cols-2 gap-3 border-t border-white/10 pt-4">
-            <div><p className="text-xs text-slate-400">Active deliveries</p><p className="mt-1 text-2xl font-bold">{activeJobs.length}</p></div>
-            <div><p className="text-xs text-slate-400">Completed today</p><p className="mt-1 text-2xl font-bold">{completedToday}</p></div>
-          </div>
+      <main className="mx-auto max-w-3xl space-y-4 px-4 py-5 pb-24 sm:px-6">
+        <section className="rounded-xl border border-slate-800 bg-slate-950 p-5 text-white">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Rider</p>
+          <h1 className="mt-1 text-xl font-semibold">{currentUser.full_name}</h1>
+          <p className="mt-1 text-sm text-slate-300">{currentUser.vehicle_plate || 'No vehicle'} · {activeJobs.length} active · {completedToday} done today</p>
         </section>
         {currentJob ? (
-          <section className="rounded-2xl border border-orange-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between gap-3"><p className="text-xs font-bold uppercase tracking-wide text-orange-700">Next delivery</p><StatusPill status={currentJob.delivery_status} /></div>
-            <h2 className="mt-3 text-xl font-bold text-slate-950">{currentJob.customer_name}</h2>
-            <p className="mt-1 text-sm text-slate-600">{currentJob.delivery_estate || 'Location not provided'} · {currentJob.delivery_address || 'Confirm address with customer'}</p>
-            {currentJob.customer_phone && <a href={`tel:${currentJob.customer_phone}`} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700"><Phone className="h-4 w-4" /> Call customer</a>}
-            <Link href="/rider" className="mt-3 block"><Button className="w-full">Open delivery run-sheet <ArrowRight className="ml-2 h-4 w-4" /></Button></Link>
+          <section className="rounded-lg border border-orange-200 bg-orange-50/30 p-4">
+            <div className="flex items-center justify-between gap-3"><span className="text-xs font-medium uppercase tracking-wide text-orange-700">Next delivery</span><StatusPill status={currentJob.delivery_status} /></div>
+            <h2 className="mt-2 text-lg font-semibold text-slate-950">{currentJob.customer_name}</h2>
+            <p className="mt-1 text-sm text-slate-600">{currentJob.delivery_estate || 'Location not provided'}{currentJob.delivery_address ? ` · ${currentJob.delivery_address}` : ''}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {currentJob.customer_phone && <a href={`tel:${currentJob.customer_phone}`} className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700"><Phone className="h-4 w-4" /> Call</a>}
+              <Link href="/rider"><Button size="sm">Open run-sheet <ArrowRight className="ml-1.5 h-4 w-4" /></Button></Link>
+            </div>
           </section>
         ) : (
-          <section className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center"><CheckCircle2 className="mx-auto h-9 w-9 text-emerald-600" /><h2 className="mt-3 font-semibold text-slate-900">You're all caught up</h2><p className="mt-1 text-sm text-slate-500">No active deliveries assigned to you.</p></section>
+          <section className="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-10 text-center text-sm text-slate-600"><CheckCircle2 className="mx-auto mb-2 h-7 w-7 text-emerald-600" />No active deliveries.</section>
         )}
       </main>
     );
   }
 
   if (currentUser.approval_status !== 'approved') {
-    return <main className="mx-auto max-w-xl px-4 py-16 text-center"><Clock3 className="mx-auto h-10 w-10 text-amber-500" /><h1 className="mt-4 text-xl font-bold text-slate-900">Account awaiting approval</h1><p className="mt-2 text-sm text-slate-500">Your account is not approved for operational access yet.</p></main>;
+    return <main className="mx-auto max-w-xl px-4 py-16 text-center"><Clock3 className="mx-auto h-8 w-8 text-amber-500" /><h1 className="mt-3 text-lg font-semibold text-slate-900">Account awaiting approval</h1></main>;
   }
 
   const paidSalesToday = todayOrders.filter((order) => order.payment_status === 'paid').reduce((sum, order) => sum + order.total_kes, 0);
@@ -270,153 +257,154 @@ export default function HomePage() {
   const activeBranches = branches.filter((branch) => branch.is_active);
   const recentOrders = [...orders].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 6);
   const firstName = currentUser.full_name.trim().split(/\s+/)[0] || 'there';
+  const attentionCount = (lowStock.length > 0 ? 1 : 0) + (isManager && pendingApprovals.length > 0 ? 1 : 0) + (unpaidOrdersToday.length > 0 ? 1 : 0);
 
   return (
-    <main className="mx-auto max-w-[1440px] space-y-6 px-4 py-6 pb-24 sm:px-6 lg:px-8">
-      <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+    <main className="mx-auto max-w-[1440px] space-y-4 px-4 py-5 pb-24 sm:px-6 lg:px-8">
+      <header className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-slate-500">{dateLabel}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{dateLabel}</p>
           <div className="mt-1 flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Good morning, {firstName}</h1>
-            <Badge variant={currentUser.role === 'admin' ? 'purple' : 'info'}>{currentUser.role.replace('_', ' ')}</Badge>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Overview</h1>
+            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium capitalize text-slate-700">{currentUser.role.replace('_', ' ')}</span>
           </div>
-          <p className="mt-1 text-sm text-slate-500">Here's what's happening across your branches today.</p>
+          <p className="mt-1 text-sm text-slate-600">Today’s operations across branches, dispatch, and inventory.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/sales"><Button className="min-h-10"><Plus className="mr-1.5 h-4 w-4" /> New sale</Button></Link>
-          <Link href="/operations"><Button variant="outline" className="min-h-10"><Send className="mr-1.5 h-4 w-4" /> Dispatch desk</Button></Link>
+          <Link href="/sales"><Button size="sm"><Plus className="mr-1.5 h-4 w-4" /> New sale</Button></Link>
+          <Link href="/operations"><Button variant="outline" size="sm"><Send className="mr-1.5 h-4 w-4" /> Dispatch</Button></Link>
+          <Link href="/inventory"><Button variant="outline" size="sm"><Package className="mr-1.5 h-4 w-4" /> Inventory</Button></Link>
         </div>
-      </section>
+      </header>
 
-      {(lowStock.length > 0 || (isManager && pendingApprovals.length > 0) || unpaidOrdersToday.length > 0) && (
-        <section aria-label="Items needing attention" className="space-y-2">
-          <div className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-amber-600" /><h2 className="text-sm font-semibold text-slate-900">Needs attention</h2></div>
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+      {attentionCount > 0 && (
+        <section className="rounded-lg border border-amber-200 bg-amber-50/40 p-3">
+          <div className="mb-2 flex items-center gap-2 text-amber-900">
+            <AlertTriangle className="h-4 w-4" />
+            <h2 className="text-sm font-semibold">Attention</h2>
+          </div>
+          <div className="grid gap-2 md:grid-cols-3">
             {lowStock.length > 0 && (
-              <Link href="/inventory" className="flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50/70 p-3.5 transition hover:bg-rose-50">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-rose-700"><Package className="h-4 w-4" /></span>
-                <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-rose-950">{lowStock.length} low-stock cylinder SKUs</span><span className="mt-0.5 block text-xs text-rose-800">Five or fewer full units · Review inventory</span></span>
-                <ChevronRight className="h-4 w-4 shrink-0 text-rose-500" />
+              <Link href="/inventory" className="flex items-center justify-between rounded-md border border-white/70 bg-white px-3 py-2 text-sm hover:border-rose-200">
+                <span className="flex items-center gap-2 text-slate-700"><Package className="h-4 w-4 text-rose-600" />Low stock</span>
+                <span className="font-semibold text-rose-700">{lowStock.length}</span>
               </Link>
             )}
             {isManager && pendingApprovals.length > 0 && (
-              <Link href="/staff" className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 transition hover:bg-amber-50">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-amber-700"><Users className="h-4 w-4" /></span>
-                <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-amber-950">{pendingApprovals.length} staff approval{pendingApprovals.length === 1 ? '' : 's'} pending</span><span className="mt-0.5 block text-xs text-amber-800">Review staff access requests</span></span>
-                <ChevronRight className="h-4 w-4 shrink-0 text-amber-600" />
+              <Link href="/staff" className="flex items-center justify-between rounded-md border border-white/70 bg-white px-3 py-2 text-sm hover:border-amber-200">
+                <span className="flex items-center gap-2 text-slate-700"><Users className="h-4 w-4 text-amber-600" />Staff approvals</span>
+                <span className="font-semibold text-amber-700">{pendingApprovals.length}</span>
               </Link>
             )}
             {unpaidOrdersToday.length > 0 && (
-              <Link href="/reports" className="flex items-center gap-3 rounded-xl border border-orange-200 bg-orange-50/70 p-3.5 transition hover:bg-orange-50">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-orange-700"><Wallet className="h-4 w-4" /></span>
-                <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-orange-950">{unpaidOrdersToday.length} unpaid order{unpaidOrdersToday.length === 1 ? '' : 's'} today</span><span className="mt-0.5 block text-xs text-orange-800">Check payment status before closing</span></span>
-                <ChevronRight className="h-4 w-4 shrink-0 text-orange-600" />
+              <Link href="/reports" className="flex items-center justify-between rounded-md border border-white/70 bg-white px-3 py-2 text-sm hover:border-orange-200">
+                <span className="flex items-center gap-2 text-slate-700"><Wallet className="h-4 w-4 text-orange-600" />Unpaid today</span>
+                <span className="font-semibold text-orange-700">{unpaidOrdersToday.length}</span>
               </Link>
             )}
           </div>
         </section>
       )}
 
-      <section>
-        <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-semibold text-slate-900">Today's overview</h2><span className="text-xs text-slate-400">All branches · {todayOrders.length} orders</span></div>
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-          <MetricCard label="Paid sales today" value={formatKES(paidSalesToday)} helper="Confirmed payments only" icon={TrendingUp} tone="green" href="/reports" />
-          <MetricCard label="Orders today" value={todayOrders.length} helper="All sales channels" icon={ClipboardList} tone="slate" href="/reports" />
-          <MetricCard label="Awaiting dispatch" value={awaitingDispatch.length} helper="Waiting for rider assignment" icon={Clock3} tone="orange" href="/operations" />
-          <MetricCard label="Active deliveries" value={activeDeliveries.length} helper="Assigned or on the way" icon={Bike} tone="blue" href="/operations" />
-        </div>
-      </section>
+      <DashboardChartsPanel />
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)]">
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4 sm:px-5">
-            <div><h2 className="font-semibold text-slate-900">Branch performance</h2><p className="mt-0.5 text-xs text-slate-500">Sales and cylinder position today</p></div>
-            <Link href="/inventory" className="inline-flex items-center gap-1 text-xs font-semibold text-orange-700 hover:text-orange-800">View stock <ChevronRight className="h-4 w-4" /></Link>
-          </div>
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,1fr)]">
+        <Panel title="Branches" action={<Link href="/inventory" className="text-xs font-medium text-orange-700 hover:text-orange-800">Inventory</Link>}>
           {activeBranches.length === 0 ? (
-            <div className="px-5 py-10 text-center text-sm text-slate-500">No active branches found.</div>
+            <div className="px-4 py-8 text-center text-sm text-slate-500">No active branches.</div>
           ) : (
-            <div className="divide-y divide-slate-100">
-              {activeBranches.map((branch) => {
-                const branchTodayOrders = todayOrders.filter((order) => order.branch_id === branch.id);
-                const branchPaidSales = branchTodayOrders.filter((order) => order.payment_status === 'paid').reduce((sum, order) => sum + order.total_kes, 0);
-                const branchInventory = inventory.filter((item) => item.branch_id === branch.id);
-                const fullUnits = branchInventory.reduce((sum, item) => sum + item.full_units, 0);
-                const emptyUnits = branchInventory.reduce((sum, item) => sum + item.empty_units, 0);
-                const branchLowStock = branchInventory.filter((item) => {
-                  const product = products.find((candidate) => candidate.id === item.product_id);
-                  return product?.category === 'cylinder' && item.full_units <= 5;
-                }).length;
-
-                return (
-                  <div key={branch.id} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600"><Building2 className="h-5 w-5" /></span>
-                      <div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-900">{branch.name}</p><p className="mt-0.5 text-xs text-slate-500">{branch.location_estate} · {branch.code}</p></div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-3 sm:min-w-[340px] sm:text-right">
-                      <div><p className="text-[11px] text-slate-500">Paid sales</p><p className="mt-0.5 text-sm font-semibold text-slate-900">{formatKES(branchPaidSales)}</p></div>
-                      <div><p className="text-[11px] text-slate-500">Full / empty</p><p className="mt-0.5 text-sm font-semibold text-slate-900">{fullUnits} / {emptyUnits}</p></div>
-                      <div><p className="text-[11px] text-slate-500">Low stock</p><p className={`mt-0.5 text-sm font-semibold ${branchLowStock > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>{branchLowStock || 'Clear'}</p></div>
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-4 py-2 font-medium">Branch</th>
+                    <th className="px-4 py-2 font-medium">Paid today</th>
+                    <th className="px-4 py-2 font-medium">Full / empty</th>
+                    <th className="px-4 py-2 font-medium">Low stock</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {activeBranches.map((branch) => {
+                    const branchTodayOrders = todayOrders.filter((order) => order.branch_id === branch.id);
+                    const branchPaidSales = branchTodayOrders.filter((order) => order.payment_status === 'paid').reduce((sum, order) => sum + order.total_kes, 0);
+                    const branchInventory = inventory.filter((item) => item.branch_id === branch.id);
+                    const fullUnits = branchInventory.reduce((sum, item) => sum + item.full_units, 0);
+                    const emptyUnits = branchInventory.reduce((sum, item) => sum + item.empty_units, 0);
+                    const branchLowStock = branchInventory.filter((item) => {
+                      const product = products.find((candidate) => candidate.id === item.product_id);
+                      return product?.category === 'cylinder' && item.full_units <= 5;
+                    }).length;
+                    return (
+                      <tr key={branch.id} className="hover:bg-slate-50/60">
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center gap-2.5">
+                            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-slate-600"><Building2 className="h-4 w-4" /></span>
+                            <div className="min-w-0"><p className="truncate font-medium text-slate-900">{branch.name}</p><p className="text-xs text-slate-500">{branch.location_estate} · {branch.code}</p></div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2.5 font-medium tabular-nums text-slate-900">{formatKES(branchPaidSales)}</td>
+                        <td className="px-4 py-2.5 tabular-nums text-slate-700">{fullUnits} / {emptyUnits}</td>
+                        <td className="px-4 py-2.5"><span className={`inline-flex min-w-[2rem] justify-center rounded px-2 py-0.5 text-xs font-medium ${branchLowStock > 0 ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>{branchLowStock || 'OK'}</span></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
-        </div>
+        </Panel>
 
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4 sm:px-5">
-            <div><h2 className="font-semibold text-slate-900">Stock alerts</h2><p className="mt-0.5 text-xs text-slate-500">Cylinder SKUs with five or fewer full units</p></div>
-            <Package className="h-5 w-5 text-slate-400" />
-          </div>
-          {lowStock.length === 0 ? (
-            <div className="px-5 py-9 text-center"><CheckCircle2 className="mx-auto h-8 w-8 text-emerald-600" /><p className="mt-2 text-sm font-medium text-slate-800">No low-stock alerts</p><p className="mt-1 text-xs text-slate-500">All tracked cylinder SKUs are above the alert threshold.</p></div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {lowStock.slice(0, 5).map((item) => (
-                <div key={item.id} className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
-                  <div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-900">{item.product?.brand} {item.product?.size_kg ? `${item.product.size_kg}kg` : item.product?.name}</p><p className="mt-0.5 truncate text-xs text-slate-500">{item.branch?.name || 'Unknown branch'}</p></div>
-                  <span className="shrink-0 rounded-lg bg-rose-50 px-2.5 py-1.5 text-xs font-bold text-rose-700">{item.full_units} full</span>
-                </div>
-              ))}
-              {lowStock.length > 5 && <p className="px-5 py-3 text-xs text-slate-500">And {lowStock.length - 5} more low-stock SKUs.</p>}
-            </div>
-          )}
-          <Link href="/inventory" className="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-sm font-semibold text-orange-700 hover:bg-slate-50 sm:px-5">Open inventory <ArrowRight className="h-4 w-4" /></Link>
+        <div className="space-y-4">
+          <Panel title="Stock alerts" action={<span className="text-xs text-slate-500">{lowStock.length}</span>}>
+            {lowStock.length === 0 ? (
+              <div className="px-4 py-8 text-center text-sm text-slate-600"><CheckCircle2 className="mx-auto mb-2 h-6 w-6 text-emerald-600" />No low-stock alerts.</div>
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {lowStock.slice(0, 6).map((item) => (
+                  <li key={item.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                    <div className="min-w-0"><p className="truncate text-sm font-medium text-slate-900">{item.product?.brand} {item.product?.size_kg ? `${item.product.size_kg}kg` : item.product?.name}</p><p className="truncate text-xs text-slate-500">{item.branch?.name || 'Unknown branch'}</p></div>
+                    <span className="shrink-0 rounded bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700 tabular-nums">{item.full_units} full</span>
+                  </li>
+                ))}
+                {lowStock.length > 6 && <li className="px-4 py-2 text-xs text-slate-500">+{lowStock.length - 6} more</li>}
+              </ul>
+            )}
+          </Panel>
+
+          <Panel title="Recent activity" action={<Link href="/reports" className="text-xs font-medium text-orange-700 hover:text-orange-800">Reports</Link>}>
+            {recentOrders.length === 0 ? (
+              <div className="px-4 py-8 text-center text-sm text-slate-500">No orders recorded.</div>
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {recentOrders.map((order) => {
+                  const branchName = branches.find((branch) => branch.id === order.branch_id)?.name || 'Unknown branch';
+                  return (
+                    <li key={order.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-slate-900">{order.customer_name}</p>
+                        <p className="truncate text-xs text-slate-500">{order.order_number} · {branchName} · {timeLabel(order.created_at)}</p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-sm font-medium text-slate-900 tabular-nums">{formatKES(order.total_kes)}</p>
+                        <div className="mt-1 flex justify-end gap-1"><StatusPill status={order.payment_status} /><StatusPill status={order.delivery_status} /></div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Panel>
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4 sm:px-5">
-          <div><h2 className="font-semibold text-slate-900">Recent activity</h2><p className="mt-0.5 text-xs text-slate-500">Latest orders recorded across branches</p></div>
-          <Link href="/reports" className="text-xs font-semibold text-orange-700 hover:text-orange-800">View reports</Link>
+      <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3 text-xs text-slate-500">
+        <span>Delivered today: <strong className="font-medium text-slate-700">{deliveredToday}</strong></span>
+        <div className="flex flex-wrap gap-3">
+          <Link href="/sales" className="inline-flex items-center gap-1 font-medium text-slate-700 hover:text-orange-700"><ShoppingCart className="h-3.5 w-3.5" /> Sale</Link>
+          <Link href="/operations" className="inline-flex items-center gap-1 font-medium text-slate-700 hover:text-orange-700"><Send className="h-3.5 w-3.5" /> Dispatch</Link>
+          <Link href="/inventory" className="inline-flex items-center gap-1 font-medium text-slate-700 hover:text-orange-700"><Package className="h-3.5 w-3.5" /> Inventory</Link>
         </div>
-        {recentOrders.length === 0 ? (
-          <div className="px-5 py-10 text-center"><ClipboardList className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-2 text-sm text-slate-500">No orders have been recorded yet.</p></div>
-        ) : (
-          <div className="divide-y divide-slate-100">
-            {recentOrders.map((order) => {
-              const branchName = branches.find((branch) => branch.id === order.branch_id)?.name || 'Unknown branch';
-              return (
-                <div key={order.id} className="flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
-                  <div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-900">{order.customer_name}</p><p className="mt-0.5 truncate text-xs text-slate-500">{order.order_number} · {branchName} · {timeLabel(order.created_at)}</p></div>
-                  <div className="shrink-0 text-right"><p className="text-sm font-semibold text-slate-900">{formatKES(order.total_kes)}</p><div className="mt-1 flex justify-end gap-1.5"><StatusPill status={order.payment_status} /><StatusPill status={order.delivery_status} /></div></div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Link href="/sales" className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:border-orange-200 hover:bg-orange-50/30"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-50 text-orange-700"><ShoppingCart className="h-4 w-4" /></span><span className="flex-1"><span className="block text-sm font-semibold text-slate-900">Record a sale</span><span className="block text-xs text-slate-500">Open the POS</span></span><ChevronRight className="h-4 w-4 text-slate-400" /></Link>
-        <Link href="/operations" className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:border-orange-200 hover:bg-orange-50/30"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-700"><Send className="h-4 w-4" /></span><span className="flex-1"><span className="block text-sm font-semibold text-slate-900">Manage dispatch</span><span className="block text-xs text-slate-500">Assign and track riders</span></span><ChevronRight className="h-4 w-4 text-slate-400" /></Link>
-        <Link href="/inventory" className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:border-orange-200 hover:bg-orange-50/30"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700"><Package className="h-4 w-4" /></span><span className="flex-1"><span className="block text-sm font-semibold text-slate-900">Check inventory</span><span className="block text-xs text-slate-500">Full and empty stock</span></span><ChevronRight className="h-4 w-4 text-slate-400" /></Link>
-      </div>
-
-      <p className="text-center text-[11px] text-slate-400">Delivered today: {deliveredToday} · Data reflects records currently available in the portal.</p>
+      </footer>
     </main>
   );
 }

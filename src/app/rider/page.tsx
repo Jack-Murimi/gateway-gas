@@ -299,7 +299,7 @@ export default function RiderPage() {
         <div className="space-y-3">
           <div className="bg-white p-4 rounded-3xl border-2 border-slate-200 text-left space-y-1">
             <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
-              <Trophy className="w-5 h-5 text-amber-500" /> Nairobi Station Rider Rankings
+              <Trophy className="w-5 h-5 text-amber-500" /> Rider rankings
             </h2>
             <p className="text-xs text-slate-500">
               Rankings calculated strictly on completed delivery speed and volume. Zero financial data.

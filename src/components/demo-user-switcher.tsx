@@ -82,56 +82,56 @@ export function DemoUserSwitcher() {
 
   return (
     <>
-      {/* 1. VISIBLE DEMO MODE RIBBON (Never mistaken for production) */}
-      <div className="relative z-40 bg-amber-400 text-amber-950 px-3 py-1.5 text-xs font-black uppercase tracking-wider flex items-center justify-between shadow-sm select-none">
-        <div className="flex items-center gap-1.5 mx-auto sm:mx-0">
-          <AlertTriangle className="w-4 h-4 fill-amber-950 text-amber-400 shrink-0" />
-          <span>DEMO MODE ACTIVE</span>
-          <span className="hidden sm:inline font-bold lowercase text-amber-900">• sandbox mock data</span>
+      {/* 1. DEMO MODE BANNER */}
+      <div className="relative z-40 flex items-center justify-between bg-amber-100 px-3 py-1.5 text-xs text-amber-900 border-b border-amber-200 select-none">
+        <div className="mx-auto flex items-center gap-1.5 sm:mx-0">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+          <span className="font-semibold tracking-wide">Demo environment</span>
+          <span className="hidden text-amber-800 sm:inline">· Sample data, no live records</span>
         </div>
-        <div className="hidden sm:flex items-center gap-2">
-          <span className="text-xs font-bold text-amber-950">
-            Active: {currentUser ? `${currentUser.full_name} (${currentUser.role})` : 'Not signed in'}
+        <div className="hidden items-center gap-2 sm:flex">
+          <span className="text-xs text-amber-900/90">
+            Active: {currentUser ? `${currentUser.full_name} (${currentUser.role.replace('_', ' ')})` : 'Not signed in'}
           </span>
           <button
             onClick={() => setIsOpen(true)}
-            className="px-2.5 py-0.5 rounded-lg bg-amber-950 text-amber-200 text-xs font-black hover:bg-black transition"
+            className="rounded-md border border-amber-300 bg-white px-2.5 py-1 text-xs font-medium text-amber-900 hover:bg-amber-50 transition-colors"
           >
-            Switch User
+            Switch user
           </button>
         </div>
       </div>
 
-      {/* 2. FLOATING BOTTOM-LEFT BUTTON (Above mobile bottom nav) */}
-      <div className="fixed bottom-16 sm:bottom-6 left-3 sm:left-4 z-40">
+      {/* 2. FLOATING DEMO SWITCHER */}
+      <div className="fixed bottom-16 left-3 z-40 sm:bottom-6 sm:left-4">
         {isCollapsed ? (
           <button
             onClick={() => setIsCollapsed(false)}
-            title="Expand demo switcher"
-            className="w-10 h-10 rounded-full bg-slate-900 text-white shadow-xl flex items-center justify-center hover:scale-105 transition border-2 border-amber-400"
+            title="Open demo switcher"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-amber-300 shadow-lg hover:bg-slate-800 transition-colors"
           >
-            <Users className="w-4 h-4 text-amber-400" />
+            <Users className="h-4 w-4" />
           </button>
         ) : (
-          <div className="flex items-center bg-slate-900 text-white rounded-full shadow-2xl border-2 border-amber-400 p-1 pl-3 gap-2">
+          <div className="flex items-center gap-1 rounded-full border border-slate-700 bg-slate-900/95 p-1 pl-3 text-white shadow-lg backdrop-blur">
             <button
               onClick={() => setIsOpen(true)}
-              className="flex items-center gap-1.5 text-xs font-bold text-amber-300 hover:text-white transition py-1"
+              className="flex items-center gap-1.5 py-1 text-xs font-medium text-slate-100 hover:text-white transition-colors"
             >
-              <Users className="w-4 h-4 text-amber-400 shrink-0" />
-              <span>Switch user</span>
+              <Users className="h-4 w-4 shrink-0 text-amber-300" />
+              <span>Demo users</span>
               {currentUser && (
-                <span className="max-w-[80px] sm:max-w-[120px] truncate text-[11px] text-slate-300 font-medium">
-                  ({currentUser.role.replace('_', ' ')})
+                <span className="max-w-[90px] truncate text-[11px] text-slate-400 sm:max-w-[120px]">
+                  {currentUser.role.replace('_', ' ')}
                 </span>
               )}
             </button>
             <button
               onClick={() => setIsCollapsed(true)}
               title="Minimize"
-              className="w-6 h-6 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center"
+              className="flex h-6 w-6 items-center justify-center rounded-full text-slate-400 hover:bg-slate-800 hover:text-white"
             >
-              <ChevronDown className="w-3.5 h-3.5" />
+              <ChevronDown className="h-3.5 w-3.5" />
             </button>
           </div>
         )}

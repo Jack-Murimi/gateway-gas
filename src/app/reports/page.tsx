@@ -147,7 +147,7 @@ export default function ReportsPage() {
     try {
       const report = await createShiftReport({
         branch_id: selectedBranchId,
-        branch_name: activeBranch?.name || 'Nairobi Station',
+        branch_name: activeBranch?.name || 'All branches',
         operator_id: currentUser.id,
         operator_name: currentUser.full_name,
         shift_date: selectedDate,

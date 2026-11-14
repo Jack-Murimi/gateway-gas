@@ -13,65 +13,65 @@ export default function PendingPage() {
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center px-4 py-12">
-      <div className="max-w-md w-full bg-white rounded-3xl shadow-xl border-2 border-slate-200 p-6 sm:p-8 text-center space-y-6">
-        <div className="w-14 h-14 rounded-2xl bg-orange-600 flex items-center justify-center text-white mx-auto shadow-md">
-          <Flame className="w-7 h-7" />
+      <div className="w-full max-w-md space-y-6 rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:p-8">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-orange-600 text-white">
+          <Flame className="h-6 w-6" />
         </div>
 
         <div>
-          <span className="font-black text-xl tracking-tight text-slate-900 block leading-tight">
-            GATEWAY GAS
+          <span className="block text-lg font-semibold tracking-tight text-slate-900 leading-tight">
+            Gateway Gas
           </span>
-          <span className="text-xs font-bold uppercase tracking-wider text-orange-600">
-            Operations Access Queue
+          <span className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
+            Access review
           </span>
         </div>
 
-        <div className="pt-2">
+        <div className="pt-1">
           {isRejected ? (
             <div className="space-y-3">
-              <div className="w-14 h-14 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
-                <XCircle className="w-7 h-7" />
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600">
+                <XCircle className="h-6 w-6" />
               </div>
-              <h1 className="text-xl font-black text-slate-900">Access Request Declined</h1>
-              <p className="text-sm font-medium text-slate-600 leading-relaxed">
-                Your staff registration has been declined by station administration. If this was unexpected, please contact your Nairobi branch manager.
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900">Access request declined</h1>
+              <p className="text-sm leading-relaxed text-slate-600">
+                Your registration was not approved. Contact an administrator if you believe this is a mistake.
               </p>
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="w-14 h-14 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto">
-                <Clock className="w-7 h-7" />
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-amber-600">
+                <Clock className="h-6 w-6" />
               </div>
-              <h1 className="text-xl font-black text-slate-900">Profile Awaiting Review</h1>
-              <p className="text-sm font-medium text-slate-600 leading-relaxed">
-                Your staff account is currently in the station approval queue. An Admin or Director will verify your identity and unlock your role.
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900">Awaiting approval</h1>
+              <p className="text-sm leading-relaxed text-slate-600">
+                Your account is pending review. An administrator or director will approve access and assign your role.
               </p>
             </div>
           )}
         </div>
 
         {currentUser && (
-          <div className="p-4 bg-slate-50 rounded-2xl border-2 border-slate-200 text-left space-y-1">
-            <div className="font-black text-sm text-slate-900">{currentUser.full_name}</div>
-            <div className="text-xs font-bold text-slate-500">{currentUser.email}</div>
-            <div className="pt-1">
+          <div className="space-y-1 rounded-lg border border-slate-200 bg-slate-50 p-4 text-left">
+            <div className="text-sm font-medium text-slate-900">{currentUser.full_name}</div>
+            <div className="text-xs text-slate-500">{currentUser.email}</div>
+            <div className="pt-1.5">
               <Badge variant={isRejected ? 'danger' : 'warning'}>
-                Status: {currentUser.approval_status}
+                {currentUser.approval_status}
               </Badge>
             </div>
           </div>
         )}
 
         {IS_DEMO_MODE && (
-          <div className="text-xs font-bold text-amber-900 bg-amber-50 border-2 border-amber-200 rounded-2xl p-3 text-left">
-            <strong>QA Demo Tip:</strong> Tap &quot;Switch User&quot; button in bottom-left corner to switch to Admin, Cashier, or Rider instantly.
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-left text-xs text-amber-900">
+            <strong className="font-medium">Demo tip:</strong> Use the demo user switcher to try approved roles instantly.
           </div>
         )}
 
-        <div className="pt-2">
+        <div className="pt-1">
           <Button onClick={logout} variant="secondary" size="lg" className="w-full">
-            <LogOut className="w-5 h-5 mr-2" /> Sign Out from Station
+            <LogOut className="mr-1.5 h-4 w-4" /> Sign out
           </Button>
         </div>
       </div>
