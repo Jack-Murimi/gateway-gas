@@ -96,13 +96,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const fetchLiveData = useCallback(async () => {
     try {
       const supabase = createClient();
-      const [branchesRes, productsRes, inventoryRes, ordersRes, staffRes, customersRes] = await Promise.all([
+      const [branchesRes, productsRes, inventoryRes, ordersRes, staffRes] = await Promise.all([
         supabase.from('branches').select('*').eq('is_active', true).order('code'),
         supabase.from('products').select('*').eq('is_active', true).order('category').order('name'),
         supabase.from('branch_inventory').select('*'),
-        supabase.from('orders').select('*, items:order_items(*)').order('created_at', { ascending: false }),
+        supabase.from('orders').select('*, items:order_items(*)').order('created_at', { ascending: false }).limit(200),
         supabase.from('profiles').select('*').order('created_at', { ascending: true }),
-        supabase.from('customers').select('*, phones:customer_phones(*), locations:customer_locations(*)').order('created_at', { ascending: false }),
       ]);
 
       if (!branchesRes.error && branchesRes.data) setBranches(branchesRes.data as Branch[]);
@@ -110,8 +109,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (!inventoryRes.error && inventoryRes.data) setInventory(inventoryRes.data as BranchInventory[]);
       if (!ordersRes.error && ordersRes.data) setOrders(ordersRes.data as Order[]);
       if (!staffRes.error && staffRes.data) setStaffList(staffRes.data as StaffProfile[]);
-      if (!customersRes.error && customersRes.data) setCustomers(customersRes.data as Customer[]);
-      // orders/customers may fail if related tables differ; keep empty in that case
+
+      // Optional: customers (table/relations may differ); load separately so core data isn't blocked.
+      try {
+        const customersRes = await supabase
+          .from('customers')
+          .select('*, phones:customer_phones(*), locations:customer_locations(*)')
+          .order('created_at', { ascending: false })
+          .limit(200);
+        if (!customersRes.error && customersRes.data) setCustomers(customersRes.data as Customer[]);
+      } catch {
+        // ignore if customers schema differs
+      }
     } catch (e) {
       console.error('Failed to load live data', e);
     }
@@ -120,16 +129,33 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // Initialize session and load live data
   useEffect(() => {
     let mounted = true;
+
+    const withTimeout = async <T,>(promise: PromiseLike<T>, ms: number): Promise<T | null> => {
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      try {
+        return await Promise.race([
+          Promise.resolve(promise),
+          new Promise<null>((resolve) => {
+            timeoutId = setTimeout(() => resolve(null), ms);
+          }),
+        ]);
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+      }
+    };
+
     (async () => {
       try {
         const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
+        const sessionRes = await withTimeout(supabase.auth.getSession(), 4000);
+        const session = sessionRes && 'data' in sessionRes ? sessionRes.data.session : null;
+
         if (session?.user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
+          const profileRes = await withTimeout(
+            supabase.from('profiles').select('*').eq('id', session.user.id).single(),
+            4000
+          );
+          const profile = profileRes && 'data' in (profileRes as any) ? (profileRes as any).data : null;
           if (mounted && profile) {
             const u: StaffProfile = {
               id: profile.id,
@@ -146,15 +172,22 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           }
         } else {
           clearDemoSessionCookies();
+          if (mounted) setCurrentUser(null);
         }
-
-        await fetchLiveData();
       } catch (e) {
         console.error('Store init error', e);
       } finally {
+        // Unblock UI quickly; load data in background.
         if (mounted) setIsLoaded(true);
       }
+
+      try {
+        await withTimeout(fetchLiveData(), 8000);
+      } catch (e) {
+        console.error('Background data load error', e);
+      }
     })();
+
     return () => { mounted = false; };
   }, [fetchLiveData]);
 
