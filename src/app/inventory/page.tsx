@@ -39,7 +39,7 @@ type ProductCost = {
   product_id: string;
   refill_cost_kes: number | null;
   complete_cost_kes: number | null;
-  accessory_cost_kes: number | null;
+  unit_cost_kes: number | null;
 };
 
 function CostControl({ value, label, onSave }: {
@@ -104,7 +104,7 @@ export default function InventoryPage() {
     }
     const supabase = createClient();
     void supabase.from('product_costs')
-      .select('product_id, refill_cost_kes, complete_cost_kes, accessory_cost_kes')
+      .select('product_id, refill_cost_kes, complete_cost_kes, unit_cost_kes')
       .then(({ data, error }) => {
         if (!active) return;
         if (error) {
@@ -118,7 +118,7 @@ export default function InventoryPage() {
             product_id: row.product_id,
             refill_cost_kes: row.refill_cost_kes === null ? null : Number(row.refill_cost_kes),
             complete_cost_kes: row.complete_cost_kes === null ? null : Number(row.complete_cost_kes),
-            accessory_cost_kes: row.accessory_cost_kes === null ? null : Number(row.accessory_cost_kes),
+            unit_cost_kes: row.unit_cost_kes === null ? null : Number(row.unit_cost_kes),
           };
         });
         setProductCosts(next);
@@ -126,14 +126,14 @@ export default function InventoryPage() {
     return () => { active = false; };
   }, [canViewCost, showError]);
 
-  const saveProductCost = async (product: Product, field: 'refill_cost_kes' | 'complete_cost_kes' | 'accessory_cost_kes', value: number) => {
+  const saveProductCost = async (product: Product, field: 'refill_cost_kes' | 'complete_cost_kes' | 'unit_cost_kes', value: number) => {
     if (!canViewCost || !currentUser) return;
     const current = productCosts[product.id];
     const payload: ProductCost & { updated_by: string; updated_at: string } = {
       product_id: product.id,
       refill_cost_kes: current?.refill_cost_kes ?? null,
       complete_cost_kes: current?.complete_cost_kes ?? null,
-      accessory_cost_kes: current?.accessory_cost_kes ?? null,
+      unit_cost_kes: current?.unit_cost_kes ?? null,
       [field]: value,
       updated_by: currentUser.id,
       updated_at: new Date().toISOString(),
@@ -141,7 +141,7 @@ export default function InventoryPage() {
     const supabase = createClient();
     const { data, error } = await supabase.from('product_costs')
       .upsert(payload, { onConflict: 'product_id' })
-      .select('product_id, refill_cost_kes, complete_cost_kes, accessory_cost_kes')
+      .select('product_id, refill_cost_kes, complete_cost_kes, unit_cost_kes')
       .single();
     if (error || !data) {
       showError(error?.message || 'Could not save cost price.');
@@ -153,7 +153,7 @@ export default function InventoryPage() {
         product_id: data.product_id,
         refill_cost_kes: data.refill_cost_kes === null ? null : Number(data.refill_cost_kes),
         complete_cost_kes: data.complete_cost_kes === null ? null : Number(data.complete_cost_kes),
-        accessory_cost_kes: data.accessory_cost_kes === null ? null : Number(data.accessory_cost_kes),
+        unit_cost_kes: data.unit_cost_kes === null ? null : Number(data.unit_cost_kes),
       },
     }));
     showSuccess('Product cost price saved.');
@@ -296,7 +296,7 @@ export default function InventoryPage() {
                   {p.category === 'cylinder' ? <div className="space-y-0.5">
                     <div className="flex items-center justify-end gap-1.5"><span className="text-[10px] text-slate-400">Refill</span><CostControl value={productCosts[p.id]?.refill_cost_kes ?? null} label={p.name + ' refill cost'} onSave={n => void saveProductCost(p, 'refill_cost_kes', n)} /></div>
                     <div className="flex items-center justify-end gap-1.5"><span className="text-[10px] text-slate-400">New</span><CostControl value={productCosts[p.id]?.complete_cost_kes ?? null} label={p.name + ' complete cost'} onSave={n => void saveProductCost(p, 'complete_cost_kes', n)} /></div>
-                  </div> : <CostControl value={productCosts[p.id]?.accessory_cost_kes ?? null} label={p.name + ' unit cost'} onSave={n => void saveProductCost(p, 'accessory_cost_kes', n)} />}
+                  </div> : <CostControl value={productCosts[p.id]?.unit_cost_kes ?? null} label={p.name + ' unit cost'} onSave={n => void saveProductCost(p, 'unit_cost_kes', n)} />}
                 </td>}
                 <td className="px-3 py-3 text-xs text-slate-600">{selling}</td>
                 <td className="px-3 py-3">
