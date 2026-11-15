@@ -218,50 +218,100 @@ export default function InventoryPage() {
       </Link>
     </header>
 
-    <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <div className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search products or brands…" aria-label="Search products"
-            className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-9 text-sm outline-none transition focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100" />
-          {search && <button type="button" onClick={() => setSearch('')} aria-label="Clear search" className="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-md text-slate-400 hover:bg-slate-200"><X className="h-4 w-4" /></button>}
+    <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+      <details className="group">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-4 py-3 hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
+          <span className="flex min-w-0 items-center gap-2">
+            <SlidersHorizontal className="h-4 w-4 shrink-0 text-orange-600" />
+            <span className="text-sm font-semibold text-slate-800">Filters</span>
+            <span className="truncate text-xs text-slate-500">{rows.length} products shown</span>
+          </span>
+          <span className="flex shrink-0 items-center gap-2 text-xs font-semibold text-slate-500"><span className="group-open:hidden">Show</span><span className="hidden group-open:inline">Hide</span><span className="transition-transform group-open:rotate-180">⌄</span></span>
+        </summary>
+        <div className="space-y-3 border-t border-slate-100 p-3">
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="relative min-w-0">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search products or brands…" aria-label="Search products"
+                className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-9 text-sm outline-none transition focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100" />
+              {search && <button type="button" onClick={() => setSearch('')} aria-label="Clear search" className="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-md text-slate-400 hover:bg-slate-200"><X className="h-4 w-4" /></button>}
+            </div>
+            <label className="flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-500">
+              <Building2 className="h-4 w-4" /><span className="sr-only">Branch</span>
+              <select value={branchId} onChange={e => setBranchId(e.target.value)} aria-label="Filter by branch" className="w-full bg-transparent text-sm font-semibold text-slate-800 outline-none sm:max-w-[190px]">
+                <option value="all">All branches</option>{branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </label>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex h-9 items-center gap-2 rounded-lg bg-slate-50 px-2.5 text-xs font-medium text-slate-500 ring-1 ring-slate-200">
+              <select value={category} onChange={e => setCategory(e.target.value as Category)} aria-label="Filter by category" className="bg-transparent text-xs font-semibold text-slate-700 outline-none">
+                <option value="all">All products</option><option value="cylinder">Gas</option><option value="water">Water</option><option value="accessory">Accessories</option>
+              </select>
+            </label>
+            <select value={brand} onChange={e => setBrand(e.target.value)} aria-label="Filter by brand" className="h-9 rounded-lg bg-slate-50 px-2.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 outline-none">
+              <option value="all">All brands</option>{brands.map(b => <option key={b} value={b}>{b}</option>)}
+            </select>
+            <button type="button" onClick={() => setLowOnly(v => !v)} aria-pressed={lowOnly}
+              className={`h-9 rounded-lg px-3 text-xs font-semibold ring-1 transition ${lowOnly ? 'bg-amber-50 text-amber-800 ring-amber-300' : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50'}`}>
+              Low / out of stock
+            </button>
+            <select value={sort} onChange={e => setSort(e.target.value)} aria-label="Sort stock" className="h-9 rounded-lg bg-slate-50 px-2.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 outline-none">
+              <option value="name">Name A–Z</option><option value="stock-low">Lowest stock</option><option value="stock-high">Highest stock</option>
+            </select>
+            {(search || category !== 'all' || brand !== 'all' || lowOnly || sort !== 'name') && <button type="button" onClick={clearFilters} className="h-9 px-2 text-xs font-semibold text-orange-700 hover:underline">Clear filters</button>}
+          </div>
         </div>
-        <label className="flex h-10 shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-500">
-          <Building2 className="h-4 w-4" />
-          <span className="sr-only">Branch</span>
-          <select value={branchId} onChange={e => setBranchId(e.target.value)} aria-label="Filter by branch" className="max-w-[190px] bg-transparent text-sm font-semibold text-slate-800 outline-none">
-            <option value="all">All branches</option>
-            {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-        </label>
-      </div>
-
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <label className="flex h-9 items-center gap-2 rounded-lg bg-slate-50 px-2.5 text-xs font-medium text-slate-500 ring-1 ring-slate-200">
-          <SlidersHorizontal className="h-3.5 w-3.5" />
-          <select value={category} onChange={e => setCategory(e.target.value as Category)} aria-label="Filter by category" className="bg-transparent text-xs font-semibold text-slate-700 outline-none">
-            <option value="all">All products</option><option value="cylinder">Gas</option><option value="water">Water</option><option value="accessory">Accessories</option>
-          </select>
-        </label>
-        <select value={brand} onChange={e => setBrand(e.target.value)} aria-label="Filter by brand" className="h-9 rounded-lg bg-slate-50 px-2.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 outline-none">
-          <option value="all">All brands</option>{brands.map(b => <option key={b} value={b}>{b}</option>)}
-        </select>
-        <button type="button" onClick={() => setLowOnly(v => !v)} aria-pressed={lowOnly}
-          className={`h-9 rounded-lg px-3 text-xs font-semibold ring-1 transition ${lowOnly ? 'bg-amber-50 text-amber-800 ring-amber-300' : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50'}`}>
-          Low / out of stock
-        </button>
-        <select value={sort} onChange={e => setSort(e.target.value)} aria-label="Sort stock" className="h-9 rounded-lg bg-slate-50 px-2.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 outline-none">
-          <option value="name">Name A–Z</option><option value="stock-low">Lowest stock</option><option value="stock-high">Highest stock</option>
-        </select>
-        {(search || category !== 'all' || brand !== 'all' || lowOnly || sort !== 'name') && <button type="button" onClick={clearFilters} className="h-9 px-2 text-xs font-semibold text-orange-700 hover:underline">Clear filters</button>}
-      </div>
+      </details>
     </section>
 
     {canViewCost && <p className="text-xs text-slate-500">Cost prices are private to Admin and Director. Select a cost to enter or update it.</p>}
     {branchId === 'all' && <p className="text-xs text-slate-500">Showing combined stock across all branches. Select a branch to make stock adjustments.</p>}
     {branchId !== 'all' && activeBranch && <p className="text-xs text-slate-500">Showing stock at <strong className="text-slate-700">{activeBranch.name}</strong>{canEdit ? ' · Tap a quantity to edit it.' : ' · View only.'}</p>}
 
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <section className="space-y-3 md:hidden">
+      {rows.map(({ product: p, stock, status }) => {
+        const returnable = hasEmptyState(p);
+        const meta = p.category === 'cylinder' ? { Icon: Flame, color: 'bg-orange-50 text-orange-700' } : p.category === 'water' ? { Icon: Droplets, color: 'bg-sky-50 text-sky-700' } : { Icon: Package, color: 'bg-violet-50 text-violet-700' };
+        const Icon = meta.Icon;
+        const current = branchId === 'all' ? ZERO : stockMap.get(keyOf(branchId, p.id)) ?? ZERO;
+        const editable = branchId !== 'all' && canEdit;
+        const total = stock.full + (returnable ? stock.empty : 0);
+        const statusStyle = status === 'In stock' ? 'bg-emerald-50 text-emerald-700' : status === 'Low stock' ? 'bg-amber-50 text-amber-800' : 'bg-rose-50 text-rose-700';
+        return <article key={p.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${meta.color}`}><Icon className="h-5 w-5" /></span>
+              <span className="min-w-0"><span className="block break-words text-sm font-semibold text-slate-900">{p.name}</span><span className="block text-xs text-slate-500">{p.brand}{p.size_kg ? ` · ${p.size_kg}kg` : ''}</span></span>
+            </div>
+            <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold ${statusStyle}`}>{status}</span>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-2.5 text-xs">
+            <div><p className="text-[10px] uppercase tracking-wide text-slate-500">Selling price</p>
+              {p.category === 'cylinder' ? <div className="mt-1 space-y-0.5"><p>Refill <strong className="text-slate-900">{formatKES(p.refill_price_kes)}</strong></p><p>New <strong className="text-slate-900">{formatKES(p.complete_price_kes)}</strong></p></div> : <strong className="mt-1 block text-slate-900">{formatKES(p.accessory_price_kes || p.complete_price_kes)}</strong>}
+            </div>
+            <div className="text-right"><p className="text-[10px] uppercase tracking-wide text-slate-500">Total stock</p><strong className="mt-1 block text-lg tabular-nums text-slate-900">{total.toLocaleString()}</strong></div>
+          </div>
+          {canViewCost && <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <span className="text-xs font-medium text-slate-500">Cost price</span>
+            {p.category === 'cylinder' ? <div className="flex flex-wrap justify-end gap-3"><span className="text-xs text-slate-500">Refill <CostControl value={productCosts[p.id]?.refill_cost_kes ?? null} label={p.name + ' refill cost'} onSave={n => void saveProductCost(p, 'refill_cost_kes', n)} /></span><span className="text-xs text-slate-500">New <CostControl value={productCosts[p.id]?.complete_cost_kes ?? null} label={p.name + ' complete cost'} onSave={n => void saveProductCost(p, 'complete_cost_kes', n)} /></span></div> : <CostControl value={productCosts[p.id]?.unit_cost_kes ?? null} label={p.name + ' unit cost'} onSave={n => void saveProductCost(p, 'unit_cost_kes', n)} />}
+          </div>}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-slate-500">Remaining stock</span>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="inline-flex items-center gap-1 text-xs text-slate-500">Filled <CountControl value={stock.full} disabled={!editable} label={`${p.name} filled stock`} onSave={n => updateCount(p.id, 'full', n)} /></span>
+              {returnable && <span className="inline-flex items-center gap-1 text-xs text-slate-500">Empty <CountControl value={stock.empty} disabled={!editable} label={`${p.name} empty stock`} onSave={n => updateCount(p.id, 'empty', n)} /></span>}
+            </div>
+          </div>
+          <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2 text-xs text-slate-500"><span>{activeBranch?.name ?? 'All branches'}</span><span>{branchId === 'all' ? 'Combined branches' : editable ? 'Tap quantity to edit' : 'View only'}</span></div>
+        </article>;
+      })}
+      {rows.length === 0 && <div className="rounded-xl border border-slate-200 bg-white px-4 py-12 text-center"><p className="font-semibold text-slate-800">No matching products</p><p className="mt-1 text-xs text-slate-500">Try changing your search or filters.</p></div>}
+      {rows.length > 0 && <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800"><span>Total stock</span><span className="tabular-nums">{rows.reduce((sum, row) => sum + row.stock.full + (hasEmptyState(row.product) ? row.stock.empty : 0), 0).toLocaleString()}</span></div>}
+      <div className="flex items-center justify-between px-1 text-xs text-slate-500"><span>{rows.length} products</span><span>{branchId === 'all' ? 'All branches combined' : activeBranch?.code}</span></div>
+    </section>
+
+    <section className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm md:block">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[850px] border-collapse text-left text-sm">
           <thead>
