@@ -10,7 +10,7 @@ import { useToast } from '@/components/ui/toast';
 import { formatKES } from '@/lib/formatters';
 import { createClient } from '@/lib/supabase/client';
 
-type Tab = 'overview' | 'suppliers' | 'invoices' | 'new-invoice' | 'payments';
+type Tab = 'overview' | 'suppliers' | 'invoices' | 'new-invoice' | 'payments' | 'adjustments';
 type Supplier = {
   id: string; supplier_code: string; name: string; contact_person: string | null;
   phone: string | null; email: string | null; kra_pin: string | null; address: string | null;
@@ -31,8 +31,10 @@ type Allocation = { id: string; invoice_id: string | null; amount_kes: number; i
 type SupplierPayment = {
   id: string; supplier_id: string; payment_date: string; amount_kes: number;
   payment_method: string; reference: string | null; notes: string | null;
-  supplier?: { name: string } | null; allocations?: Allocation[];
+  supplier?: { name: string } | null; allocations?: Allocation[]; reversal?: PaymentReversal | null;
 };
+type SupplierCreditNote = { id: string; supplier_id: string; invoice_id: string; credit_note_number: string; credit_note_date: string; amount_kes: number; reason: string; supplier?: { name: string } | null; invoice?: { invoice_number: string } | null };
+type PaymentReversal = { id: string; supplier_id: string; payment_id: string; reversal_date: string; reason: string };
 type InvoiceLineDraft = {
   key: string; product_id: string; description: string; quantity: string;
   unit_cost_kes: string; track_stock: boolean;
@@ -67,6 +69,10 @@ export default function PurchasesPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [payments, setPayments] = useState<SupplierPayment[]>([]);
+  const [creditNotes, setCreditNotes] = useState<SupplierCreditNote[]>([]);
+  const [reversalTarget, setReversalTarget] = useState<SupplierPayment | null>(null);
+  const [reversalForm, setReversalForm] = useState({ reversal_date: today(), reason: '' });
+  const [creditForm, setCreditForm] = useState({ invoice_id: '', credit_note_number: '', credit_note_date: today(), amount_kes: '', reason: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [supplierSearch, setSupplierSearch] = useState('');
@@ -94,7 +100,7 @@ export default function PurchasesPage() {
     if (!currentUser || !canUse(currentUser.role)) return;
     setLoading(true);
     const supabase = createClient();
-    const [s, i, p] = await Promise.all([
+    const [s, i, p, c] = await Promise.all([
       supabase.from('suppliers').select('*').order('name'),
       supabase.from('supplier_invoices')
         .select('*, supplier:suppliers(name,supplier_code), branch:branches(name), items:supplier_invoice_items(*)')
@@ -102,6 +108,7 @@ export default function PurchasesPage() {
       supabase.from('supplier_payments')
         .select('*, supplier:suppliers(name), allocations:supplier_payment_allocations(*, invoice:supplier_invoices(invoice_number))')
         .order('payment_date', { ascending: false }).limit(500),
+      supabase.from('supplier_credit_notes').select('*, supplier:suppliers(name), invoice:supplier_invoices(invoice_number)').order('credit_note_date', { ascending: false }).limit(500),
     ]);
     if (s.error) showError(`Could not load suppliers: ${s.error.message}`);
     else setSuppliers((s.data || []).map((row: any) => ({ ...row, opening_balance_kes: Number(row.opening_balance_kes || 0) })));
@@ -109,6 +116,8 @@ export default function PurchasesPage() {
     else setInvoices((i.data || []).map((row: any) => ({ ...row, subtotal_kes: Number(row.subtotal_kes), tax_kes: Number(row.tax_kes), total_kes: Number(row.total_kes), items: (row.items || []).map((line: any) => ({ ...line, quantity: Number(line.quantity), unit_cost_kes: Number(line.unit_cost_kes), line_total_kes: Number(line.line_total_kes) })) })));
     if (p.error) showError(`Could not load supplier payments: ${p.error.message}`);
     else setPayments((p.data || []).map((row: any) => ({ ...row, amount_kes: Number(row.amount_kes), allocations: (row.allocations || []).map((a: any) => ({ ...a, amount_kes: Number(a.amount_kes) })) })));
+    if (c.error) showError(`Could not load supplier credit notes: ${c.error.message}`);
+    else setCreditNotes((c.data || []).map((row: any) => ({ ...row, amount_kes: Number(row.amount_kes) })));
     setLoading(false);
   }, [currentUser, showError]);
 
@@ -116,11 +125,16 @@ export default function PurchasesPage() {
 
   const invoicePaid = useMemo(() => {
     const map = new Map<string, number>();
-    payments.forEach(payment => (payment.allocations || []).forEach(a => {
+    payments.filter(payment => !payment.reversal).forEach(payment => (payment.allocations || []).forEach(a => {
       if (a.invoice_id) map.set(a.invoice_id, (map.get(a.invoice_id) || 0) + a.amount_kes);
     }));
     return map;
   }, [payments]);
+  const invoiceCredited = useMemo(() => {
+    const map = new Map<string, number>();
+    creditNotes.forEach(note => map.set(note.invoice_id, (map.get(note.invoice_id) || 0) + note.amount_kes));
+    return map;
+  }, [creditNotes]);
   const openingPaid = useMemo(() => {
     const map = new Map<string, number>();
     payments.forEach(payment => (payment.allocations || []).forEach(a => {
@@ -131,11 +145,11 @@ export default function PurchasesPage() {
   const supplierBalances = useMemo(() => {
     const map = new Map<string, number>();
     suppliers.forEach(s => map.set(s.id, Math.max(0, s.opening_balance_kes - (openingPaid.get(s.id) || 0))));
-    invoices.filter(i => i.status === 'posted').forEach(i => map.set(i.supplier_id, (map.get(i.supplier_id) || 0) + Math.max(0, i.total_kes - (invoicePaid.get(i.id) || 0))));
+    invoices.filter(i => i.status === 'posted').forEach(i => map.set(i.supplier_id, (map.get(i.supplier_id) || 0) + Math.max(0, i.total_kes - (invoicePaid.get(i.id) || 0) - (invoiceCredited.get(i.id) || 0))));
     return map;
-  }, [suppliers, invoices, invoicePaid, openingPaid]);
+  }, [suppliers, invoices, invoicePaid, openingPaid, invoiceCredited]);
   const totalPayable = Array.from(supplierBalances.values()).reduce((a, b) => a + b, 0);
-  const outstandingInvoices = invoices.filter(i => i.status === 'posted' && i.total_kes - (invoicePaid.get(i.id) || 0) > 0.009);
+  const outstandingInvoices = invoices.filter(i => i.status === 'posted' && i.total_kes - (invoicePaid.get(i.id) || 0) - (invoiceCredited.get(i.id) || 0) > 0.009);
   const selectedSupplier = suppliers.find(s => s.id === paymentForm.supplier_id);
   const supplierOpenInvoices = outstandingInvoices.filter(i => i.supplier_id === paymentForm.supplier_id);
   const openingRemaining = selectedSupplier ? Math.max(0, selectedSupplier.opening_balance_kes - (openingPaid.get(selectedSupplier.id) || 0)) : 0;
