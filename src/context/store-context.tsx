@@ -110,16 +110,25 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (!ordersRes.error && ordersRes.data) setOrders(ordersRes.data as Order[]);
       if (!staffRes.error && staffRes.data) setStaffList(staffRes.data as StaffProfile[]);
 
-      // Optional: customers (table/relations may differ); load separately so core data isn't blocked.
+      // Load customers in pages. The address book can contain several thousand records,
+      // so a single small limit silently hides most customers from POS search.
       try {
-        const customersRes = await supabase
-          .from('customers')
-          .select('*, phones:customer_phones(*), locations:customer_locations(*)')
-          .order('created_at', { ascending: false })
-          .limit(200);
-        if (!customersRes.error && customersRes.data) setCustomers(customersRes.data as Customer[]);
-      } catch {
-        // ignore if customers schema differs
+        const allCustomers: Customer[] = [];
+        const pageSize = 1000;
+        for (let from = 0; ; from += pageSize) {
+          const { data, error } = await supabase
+            .from('customers')
+            .select('*, phones:customer_phones(*), locations:customer_locations(*)')
+            .order('created_at', { ascending: false })
+            .range(from, from + pageSize - 1);
+          if (error) throw error;
+          const page = (data || []) as Customer[];
+          allCustomers.push(...page);
+          if (page.length < pageSize) break;
+        }
+        setCustomers(allCustomers);
+      } catch (error) {
+        console.error('Failed to load customers', error);
       }
     } catch (e) {
       console.error('Failed to load live data', e);
