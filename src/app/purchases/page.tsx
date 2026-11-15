@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
 import {
   ArrowDownLeft, ArrowUpRight, Building2, CalendarDays, Check, ChevronDown,
   CircleDollarSign, FileText, Plus, Search, Truck, Wallet, X,
@@ -64,7 +63,6 @@ function dateLabel(value?: string | null) {
 export default function PurchasesPage() {
   const { currentUser, branches, products } = useStore();
   const { showError, showSuccess } = useToast();
-  const searchParams = useSearchParams();
   const [tab, setTab] = useState<Tab>('overview');
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -115,10 +113,6 @@ export default function PurchasesPage() {
   }, [currentUser, showError]);
 
   useEffect(() => { void loadData(); }, [loadData]);
-  useEffect(() => {
-    const requested = searchParams.get('tab');
-    if (requested && ['overview', 'suppliers', 'invoices', 'new-invoice', 'payments'].includes(requested)) setTab(requested as Tab);
-  }, [searchParams]);
 
   const invoicePaid = useMemo(() => {
     const map = new Map<string, number>();
