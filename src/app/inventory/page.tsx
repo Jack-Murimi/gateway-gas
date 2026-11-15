@@ -274,7 +274,6 @@ export default function InventoryPage() {
         const returnable = hasEmptyState(p);
         const meta = p.category === 'cylinder' ? { Icon: Flame, color: 'bg-orange-50 text-orange-700' } : p.category === 'water' ? { Icon: Droplets, color: 'bg-sky-50 text-sky-700' } : { Icon: Package, color: 'bg-violet-50 text-violet-700' };
         const Icon = meta.Icon;
-        const current = branchId === 'all' ? ZERO : stockMap.get(keyOf(branchId, p.id)) ?? ZERO;
         const editable = branchId !== 'all' && canEdit;
         const total = stock.full + (returnable ? stock.empty : 0);
         const statusStyle = status === 'In stock' ? 'bg-emerald-50 text-emerald-700' : status === 'Low stock' ? 'bg-amber-50 text-amber-800' : 'bg-rose-50 text-rose-700';
