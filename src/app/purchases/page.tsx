@@ -310,14 +310,15 @@ export default function PurchasesPage() {
     return <main className="mx-auto max-w-xl px-4 py-16 text-center"><h1 className="text-lg font-semibold text-slate-900">Purchases access restricted</h1><p className="mt-2 text-sm text-slate-500">This section is available to approved administrators, directors and operators.</p></main>;
   }
 
-  const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
+  const allTabs: { id: Tab; label: string; icon: React.ElementType }[] = [
     { id: 'overview', label: 'Overview', icon: CircleDollarSign },
     { id: 'suppliers', label: 'Suppliers', icon: Building2 },
     { id: 'invoices', label: 'Invoices', icon: FileText },
     { id: 'new-invoice', label: 'Post invoice', icon: Plus },
     { id: 'payments', label: 'Pay suppliers', icon: Wallet },
     { id: 'adjustments', label: 'Credit notes', icon: ArrowDownLeft },
-  ].filter(item => item.id !== 'adjustments' || currentUser.role === 'admin' || currentUser.role === 'director');
+  ];
+  const tabs = allTabs.filter(item => item.id !== 'adjustments' || currentUser.role === 'admin' || currentUser.role === 'director');
 
   return (
     <main className="mx-auto max-w-[1440px] space-y-5 px-4 py-5 pb-28 sm:px-6 lg:px-8">
