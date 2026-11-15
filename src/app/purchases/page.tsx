@@ -317,7 +317,7 @@ export default function PurchasesPage() {
     { id: 'new-invoice', label: 'Post invoice', icon: Plus },
     { id: 'payments', label: 'Pay suppliers', icon: Wallet },
     { id: 'adjustments', label: 'Credit notes', icon: ArrowDownLeft },
-  ];
+  ].filter(item => item.id !== 'adjustments' || currentUser.role === 'admin' || currentUser.role === 'director');
 
   return (
     <main className="mx-auto max-w-[1440px] space-y-5 px-4 py-5 pb-28 sm:px-6 lg:px-8">
