@@ -106,7 +106,7 @@ export default function PurchasesPage() {
         .select('*, supplier:suppliers(name,supplier_code), branch:branches(name), items:supplier_invoice_items(*)')
         .order('invoice_date', { ascending: false }).limit(500),
       supabase.from('supplier_payments')
-        .select('*, supplier:suppliers(name), allocations:supplier_payment_allocations(*, invoice:supplier_invoices(invoice_number))')
+        .select('*, supplier:suppliers(name), allocations:supplier_payment_allocations(*, invoice:supplier_invoices(invoice_number)), reversal:supplier_payment_reversals(*)')
         .order('payment_date', { ascending: false }).limit(500),
       supabase.from('supplier_credit_notes').select('*, supplier:suppliers(name), invoice:supplier_invoices(invoice_number)').order('credit_note_date', { ascending: false }).limit(500),
     ]);
@@ -237,6 +237,34 @@ export default function PurchasesPage() {
     setTab('invoices');
   };
 
+  const postCreditNote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!creditForm.invoice_id || !creditForm.credit_note_number.trim() || !creditForm.reason.trim() || Number(creditForm.amount_kes) <= 0) return showError('Complete the invoice, credit note number, amount and reason.');
+    const invoice = invoices.find(i => i.id === creditForm.invoice_id);
+    const remaining = invoice ? invoice.total_kes - (invoicePaid.get(invoice.id) || 0) - (invoiceCredited.get(invoice.id) || 0) : 0;
+    if (Number(creditForm.amount_kes) > remaining + 0.009) return showError('Credit note cannot exceed the unpaid invoice balance.');
+    setSaving(true);
+    const { error } = await createClient().rpc('post_supplier_credit_note', { p_credit: { invoice_id: creditForm.invoice_id, credit_note_number: creditForm.credit_note_number.trim(), credit_note_date: creditForm.credit_note_date, amount_kes: Number(creditForm.amount_kes), reason: creditForm.reason.trim() } });
+    setSaving(false);
+    if (error) return showError(error.message);
+    showSuccess('Supplier credit note posted.');
+    setCreditForm({ invoice_id: '', credit_note_number: '', credit_note_date: today(), amount_kes: '', reason: '' });
+    await loadData();
+  };
+
+  const reversePayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reversalTarget || reversalForm.reason.trim().length < 5) return showError('Enter a clear reason for reversing this payment.');
+    setSaving(true);
+    const { error } = await createClient().rpc('reverse_supplier_payment', { p_payment_id: reversalTarget.id, p_reversal_date: reversalForm.reversal_date, p_reason: reversalForm.reason.trim() });
+    setSaving(false);
+    if (error) return showError(error.message);
+    showSuccess('Supplier payment reversed. Its allocations no longer reduce supplier balances.');
+    setReversalTarget(null);
+    setReversalForm({ reversal_date: today(), reason: '' });
+    await loadData();
+  };
+
   const paymentTotal = allocations.reduce((sum, a) => sum + Math.max(0, Number(a.amount_kes || 0)), 0);
   const postPayment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -288,6 +316,7 @@ export default function PurchasesPage() {
     { id: 'invoices', label: 'Invoices', icon: FileText },
     { id: 'new-invoice', label: 'Post invoice', icon: Plus },
     { id: 'payments', label: 'Pay suppliers', icon: Wallet },
+    { id: 'adjustments', label: 'Credit notes', icon: ArrowDownLeft },
   ];
 
   return (
@@ -356,7 +385,7 @@ export default function PurchasesPage() {
       {!loading && tab === 'invoices' && <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <div className="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-[1fr_180px_220px]"><div><h2 className="text-sm font-semibold text-slate-900">Supplier invoices</h2><p className="text-xs text-slate-500">Posted purchase invoices and remaining balances</p></div><Field label="Invoice date"><input type="date" className={inputClass} value={invoiceDay} onChange={e=>setInvoiceDay(e.target.value)} /></Field><Field label="Supplier"><select className={inputClass} value={invoiceSupplierFilter} onChange={e=>setInvoiceSupplierFilter(e.target.value)}><option value="all">All suppliers</option>{suppliers.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></Field></div>
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3"><div className="relative w-full max-w-xs"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input className={`${inputClass} pl-9`} placeholder="Search invoice or supplier…" value={invoiceSearch} onChange={e=>setInvoiceSearch(e.target.value)} /></div><div className="text-sm text-slate-600">{dailyInvoices.length} invoices · <strong className="text-slate-900">{money(dailyTotal)}</strong> on selected day</div></div>
-        <div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3 font-semibold">Invoice</th><th className="px-4 py-3 font-semibold">Supplier</th><th className="px-4 py-3 font-semibold">Branch</th><th className="px-4 py-3 font-semibold">Date</th><th className="px-4 py-3 text-right font-semibold">Total</th><th className="px-4 py-3 text-right font-semibold">Paid</th><th className="px-4 py-3 text-right font-semibold">Balance</th></tr></thead><tbody className="divide-y divide-slate-100">{filteredInvoices.filter(i=>i.invoice_date===invoiceDay&&(invoiceSupplierFilter==='all'||i.supplier_id===invoiceSupplierFilter)).map(i=>{const paid=invoicePaid.get(i.id)||0;return <tr key={i.id} className="hover:bg-slate-50/70"><td className="px-4 py-3"><p className="font-semibold text-slate-900">{i.invoice_number}</p><p className="text-xs text-slate-500">{i.items?.length||0} line items</p></td><td className="px-4 py-3 text-slate-700">{i.supplier?.name||'—'}</td><td className="px-4 py-3 text-slate-700">{i.branch?.name||'—'}</td><td className="px-4 py-3 text-slate-600">{dateLabel(i.invoice_date)}</td><td className="px-4 py-3 text-right tabular-nums">{money(i.total_kes)}</td><td className="px-4 py-3 text-right tabular-nums text-emerald-700">{money(paid)}</td><td className="px-4 py-3 text-right font-semibold tabular-nums">{money(Math.max(0,i.total_kes-paid))}</td></tr>;})}</tbody></table></div>
+        <div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3 font-semibold">Invoice</th><th className="px-4 py-3 font-semibold">Supplier</th><th className="px-4 py-3 font-semibold">Branch</th><th className="px-4 py-3 font-semibold">Date</th><th className="px-4 py-3 text-right font-semibold">Total</th><th className="px-4 py-3 text-right font-semibold">Paid</th><th className="px-4 py-3 text-right font-semibold">Credited</th><th className="px-4 py-3 text-right font-semibold">Balance</th></tr></thead><tbody className="divide-y divide-slate-100">{filteredInvoices.filter(i=>i.invoice_date===invoiceDay&&(invoiceSupplierFilter==='all'||i.supplier_id===invoiceSupplierFilter)).map(i=>{const paid=invoicePaid.get(i.id)||0;const credited=invoiceCredited.get(i.id)||0;return <tr key={i.id} className="hover:bg-slate-50/70"><td className="px-4 py-3"><p className="font-semibold text-slate-900">{i.invoice_number}</p><p className="text-xs text-slate-500">{i.items?.length||0} line items</p></td><td className="px-4 py-3 text-slate-700">{i.supplier?.name||'—'}</td><td className="px-4 py-3 text-slate-700">{i.branch?.name||'—'}</td><td className="px-4 py-3 text-slate-600">{dateLabel(i.invoice_date)}</td><td className="px-4 py-3 text-right tabular-nums">{money(i.total_kes)}</td><td className="px-4 py-3 text-right tabular-nums text-emerald-700">{money(paid)}</td><td className="px-4 py-3 text-right tabular-nums text-orange-700">{money(credited)}</td><td className="px-4 py-3 text-right font-semibold tabular-nums">{money(Math.max(0,i.total_kes-paid-credited))}</td></tr>;})}</tbody></table></div>
         {filteredInvoices.filter(i=>i.invoice_date===invoiceDay&&(invoiceSupplierFilter==='all'||i.supplier_id===invoiceSupplierFilter)).length===0&&<p className="px-4 py-12 text-center text-sm text-slate-500">No supplier invoices found for the selected filters.</p>}
       </section>}
 
