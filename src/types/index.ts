@@ -34,7 +34,8 @@ export interface CustomerLocation {
   id: string; customer_id: string; estate: string; specific_address?: string | null; is_default: boolean;
 }
 export interface Customer {
-  id: string; name: string; created_at: string; phones: CustomerPhone[]; locations: CustomerLocation[];
+  id: string; name: string; created_at: string; is_active?: boolean; updated_at?: string | null;
+  phones: CustomerPhone[]; locations: CustomerLocation[];
 }
 export interface Order {
   id: string; order_number: string; receipt_number?: string | null; branch_id: string;

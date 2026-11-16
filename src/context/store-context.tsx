@@ -67,9 +67,11 @@ interface StoreContextType {
   approveStaff: (staffId: string, role: UserRole) => void;
   rejectStaff: (staffId: string) => void;
   createOrder: (params: CreateOrderParams) => Promise<Order>;
-  createCustomer: (name: string, phone: string, estate: string, specificAddress?: string) => Customer;
-  addCustomerPhone: (customerId: string, phone: string) => void;
-  addCustomerLocation: (customerId: string, estate: string, specificAddress?: string) => void;
+  createCustomer: (name: string, phone: string, estate: string, specificAddress?: string) => Promise<Customer>;
+  updateCustomer: (customerId: string, name: string) => Promise<void>;
+  setCustomerActive: (customerId: string, isActive: boolean) => Promise<void>;
+  addCustomerPhone: (customerId: string, phone: string, makePrimary?: boolean) => Promise<void>;
+  addCustomerLocation: (customerId: string, estate: string, specificAddress?: string, makeDefault?: boolean) => Promise<void>;
   assignRider: (orderId: string, riderId: string) => void;
   updateDeliveryStatus: (orderId: string, status: DeliveryStatus, comment?: string) => void;
   updateRiderComment: (orderId: string, comment: string) => void;
@@ -362,13 +364,66 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return (refreshed.data || { ...inserted, items: withOrderId }) as Order;
   };
 
-  const createCustomer = (_name: string, _phone: string, _estate: string, _specificAddress?: string): Customer => {
-    // Live customer creation can be added when customer tables/API are finalized.
-    throw new Error('Customer records are managed in the live system. Create via supported flow.');
+  const createCustomer = async (name: string, phone: string, estate: string, specificAddress?: string): Promise<Customer> => {
+    const supabase = createClient();
+    const trimmedName = name.trim() || null;
+    const trimmedPhone = phone.trim();
+    const trimmedEstate = estate.trim();
+    if (!trimmedPhone || !trimmedEstate) throw new Error('Phone number and location are required.');
+    const { data: customer, error } = await supabase
+      .from('customers')
+      .insert({ name: trimmedName, is_active: true })
+      .select('id,name,created_at,is_active,updated_at')
+      .single();
+    if (error || !customer) throw error || new Error('Failed to create customer');
+    const [{ error: phoneError }, { error: locError }] = await Promise.all([
+      supabase.from('customer_phones').insert({ customer_id: customer.id, phone_number: trimmedPhone, is_primary: true }),
+      supabase.from('customer_locations').insert({ customer_id: customer.id, estate: trimmedEstate, specific_address: specificAddress?.trim() || null, is_default: true }),
+    ]);
+    if (phoneError) throw phoneError;
+    if (locError) throw locError;
+    const created: Customer = {
+      ...(customer as any),
+      phones: [{ id: crypto.randomUUID(), customer_id: customer.id, phone_number: trimmedPhone, is_primary: true }],
+      locations: [{ id: crypto.randomUUID(), customer_id: customer.id, estate: trimmedEstate, specific_address: specificAddress?.trim() || null, is_default: true }],
+    };
+    await fetchLiveData();
+    return created;
   };
 
-  const addCustomerPhone = (_customerId: string, _phone: string) => {};
-  const addCustomerLocation = (_customerId: string, _estate: string, _specificAddress?: string) => {};
+  const updateCustomer = async (customerId: string, name: string) => {
+    const supabase = createClient();
+    const { error } = await supabase.from('customers').update({ name: name.trim() || null, updated_at: new Date().toISOString() }).eq('id', customerId);
+    if (error) throw error;
+    await fetchLiveData();
+  };
+
+  const setCustomerActive = async (customerId: string, isActive: boolean) => {
+    const supabase = createClient();
+    const { error } = await supabase.from('customers').update({ is_active: isActive, updated_at: new Date().toISOString() }).eq('id', customerId);
+    if (error) throw error;
+    await fetchLiveData();
+  };
+
+  const addCustomerPhone = async (customerId: string, phone: string, makePrimary = false) => {
+    const supabase = createClient();
+    const trimmed = phone.trim();
+    if (!trimmed) throw new Error('Phone number is required.');
+    if (makePrimary) await supabase.from('customer_phones').update({ is_primary: false }).eq('customer_id', customerId);
+    const { error } = await supabase.from('customer_phones').insert({ customer_id: customerId, phone_number: trimmed, is_primary: makePrimary });
+    if (error) throw error;
+    await fetchLiveData();
+  };
+
+  const addCustomerLocation = async (customerId: string, estate: string, specificAddress?: string, makeDefault = false) => {
+    const supabase = createClient();
+    const trimmed = estate.trim();
+    if (!trimmed) throw new Error('Location is required.');
+    if (makeDefault) await supabase.from('customer_locations').update({ is_default: false }).eq('customer_id', customerId);
+    const { error } = await supabase.from('customer_locations').insert({ customer_id: customerId, estate: trimmed, specific_address: specificAddress?.trim() || null, is_default: makeDefault });
+    if (error) throw error;
+    await fetchLiveData();
+  };
 
   const assignRider = (orderId: string, riderId: string) => {
     (async () => {
@@ -490,6 +545,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         rejectStaff,
         createOrder,
         createCustomer,
+        updateCustomer,
+        setCustomerActive,
         addCustomerPhone,
         addCustomerLocation,
         assignRider,

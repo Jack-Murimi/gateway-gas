@@ -52,7 +52,7 @@ interface PosWorkspaceProps {
   customers: Customer[];
   staffList: StaffProfile[];
   currentUser: StaffProfile;
-  createCustomer: (name: string, phone: string, estate: string, address?: string) => Customer;
+  createCustomer: (name: string, phone: string, estate: string, address?: string) => Promise<Customer>;
   onSubmit: (sale: PosSaleSubmission) => Promise<void>;
   isSubmitting: boolean;
   completedOrderNumber: string | null;
@@ -176,16 +176,20 @@ export function PosWorkspace({
   const updateLine = (id: string, patch: Partial<PosLine>) => setCart(prev => prev.map(line => line.id === id ? { ...line, ...patch } : line));
   const removeLine = (id: string) => setCart(prev => prev.filter(line => line.id !== id));
 
-  const saveNewCustomer = () => {
+  const saveNewCustomer = async () => {
     if (!newCustomerName.trim() || !newCustomerPhone.trim()) return;
-    const created = createCustomer(newCustomerName.trim(), newCustomerPhone.trim(), newCustomerEstate.trim() || 'Nairobi', newCustomerAddress.trim());
-    setCustomer(created);
-    setPhone(newCustomerPhone.trim());
-    setEstate(newCustomerEstate.trim() || 'Nairobi');
-    setAddress(newCustomerAddress.trim());
-    setCustomerQuery('');
-    setShowNewCustomer(false);
-    setNewCustomerName(''); setNewCustomerPhone(''); setNewCustomerEstate(''); setNewCustomerAddress('');
+    try {
+      const created = await createCustomer(newCustomerName.trim(), newCustomerPhone.trim(), newCustomerEstate.trim() || 'Nairobi', newCustomerAddress.trim());
+      setCustomer(created);
+      setPhone(newCustomerPhone.trim());
+      setEstate(newCustomerEstate.trim() || 'Nairobi');
+      setAddress(newCustomerAddress.trim());
+      setCustomerQuery('');
+      setShowNewCustomer(false);
+      setNewCustomerName(''); setNewCustomerPhone(''); setNewCustomerEstate(''); setNewCustomerAddress('');
+    } catch (e) {
+      setFormError(e instanceof Error ? e.message : 'Failed to create customer.');
+    }
   };
 
   const validateSale = (requireCustomer = false) => {
@@ -308,7 +312,7 @@ export function PosWorkspace({
             </div>
           </div>
         </div>
-        {showNewCustomer && <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4"><input className={fieldClass} placeholder="Customer name *" value={newCustomerName} onChange={e=>setNewCustomerName(e.target.value)} /><input className={fieldClass} placeholder="Phone *" value={newCustomerPhone} onChange={e=>setNewCustomerPhone(e.target.value)} /><input className={fieldClass} placeholder="Estate" value={newCustomerEstate} onChange={e=>setNewCustomerEstate(e.target.value)} /><input className={fieldClass} placeholder="Address" value={newCustomerAddress} onChange={e=>setNewCustomerAddress(e.target.value)} /><div className="flex gap-2 sm:col-span-2 lg:col-span-4"><Button type="button" size="sm" onClick={saveNewCustomer} disabled={!newCustomerName.trim() || !newCustomerPhone.trim()}>Save</Button><Button type="button" size="sm" variant="ghost" onClick={()=>setShowNewCustomer(false)}>Cancel</Button></div></div>}
+        {showNewCustomer && <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4"><input className={fieldClass} placeholder="Customer name *" value={newCustomerName} onChange={e=>setNewCustomerName(e.target.value)} /><input className={fieldClass} placeholder="Phone *" value={newCustomerPhone} onChange={e=>setNewCustomerPhone(e.target.value)} /><input className={fieldClass} placeholder="Estate" value={newCustomerEstate} onChange={e=>setNewCustomerEstate(e.target.value)} /><input className={fieldClass} placeholder="Address" value={newCustomerAddress} onChange={e=>setNewCustomerAddress(e.target.value)} /><div className="flex gap-2 sm:col-span-2 lg:col-span-4"><Button type="button" size="sm" onClick={() => { void saveNewCustomer(); }} disabled={!newCustomerName.trim() || !newCustomerPhone.trim()}>Save</Button><Button type="button" size="sm" variant="ghost" onClick={()=>setShowNewCustomer(false)}>Cancel</Button></div></div>}
         {isDelivery && <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2"><div><label className={labelClass}>Delivery phone *</label><input className={fieldClass} value={phone} onChange={e=>setPhone(e.target.value)} placeholder="Phone" /></div><div><label className={labelClass}>Estate / area *</label><input className={fieldClass} value={estate} onChange={e=>setEstate(e.target.value)} placeholder="Estate" /></div><div className="sm:col-span-2"><label className={labelClass}>Delivery address</label><input className={fieldClass} value={address} onChange={e=>setAddress(e.target.value)} placeholder="Address / instructions" /></div></div>}
       </section>
 

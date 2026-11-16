@@ -28,7 +28,7 @@ interface PosCustomerStepProps {
   onChangePhone: (p: string) => void;
   selectedAddress: string;
   onChangeAddress: (a: string) => void;
-  onCreateCustomer: (name: string, phone: string, estate: string, address?: string) => Customer;
+  onCreateCustomer: (name: string, phone: string, estate: string, address?: string) => Promise<Customer>;
 }
 
 export function PosCustomerStep({
@@ -65,19 +65,22 @@ export function PosCustomerStep({
       })
     : [];
 
-  const handleSaveNewCustomer = (e: React.FormEvent) => {
+  const handleSaveNewCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim() || !newPhone.trim()) return;
-
-    const created = onCreateCustomer(newName.trim(), newPhone.trim(), newEstate.trim() || 'Nairobi', newAddress.trim());
-    onSelectCustomer(created);
-    onChangePhone(newPhone.trim());
-    onChangeAddress(`${newEstate.trim()} ${newAddress.trim()}`.trim());
-    setShowNewCustModal(false);
-    setNewName('');
-    setNewPhone('');
-    setNewEstate('');
-    setNewAddress('');
+    try {
+      const created = await onCreateCustomer(newName.trim(), newPhone.trim(), newEstate.trim() || 'Nairobi', newAddress.trim());
+      onSelectCustomer(created);
+      onChangePhone(newPhone.trim());
+      onChangeAddress(`${newEstate.trim()} ${newAddress.trim()}`.trim());
+      setShowNewCustModal(false);
+      setNewName('');
+      setNewPhone('');
+      setNewEstate('');
+      setNewAddress('');
+    } catch {
+      // keep modal open; creation errors surface via store/caller in other flows
+    }
   };
 
   return (

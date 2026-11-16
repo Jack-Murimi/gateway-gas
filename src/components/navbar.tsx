@@ -67,6 +67,7 @@ export function Navbar() {
     { href: '/', label: t.navOverview, icon: LayoutDashboard, roles: ['admin', 'director', 'operator'] },
     { href: '/sales', label: t.navPOS, icon: ShoppingCart, roles: ['admin', 'director', 'operator', 'sales_rep'] },
     { href: '/inventory', label: t.navStock, icon: Package, roles: ['admin', 'director', 'operator', 'sales_rep'] },
+    { href: '/customers', label: 'Customers', icon: Users, roles: ['admin', 'director', 'operator'] },
     { href: '/purchases', label: 'Purchases', icon: Receipt, roles: ['admin', 'director', 'operator'] },
     { href: '/operations', label: t.navDispatch, icon: Send, roles: ['admin', 'director', 'operator'] },
     { href: '/reports', label: t.navReports, icon: FileText, roles: ['admin', 'director', 'operator', 'sales_rep'] },
