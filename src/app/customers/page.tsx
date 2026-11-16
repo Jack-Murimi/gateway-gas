@@ -19,9 +19,11 @@ function Field({ label, children, className = '' }: { label: string; children: R
 type StatusFilter = 'all' | 'active' | 'inactive';
 
 export default function CustomersPage() {
-  const { currentUser, customers, orders, createCustomer, updateCustomer, setCustomerActive, addCustomerPhone, addCustomerLocation } = useStore();
+  const { currentUser, customers, customersLoading, customersError, refreshCustomers, orders, createCustomer, updateCustomer, setCustomerActive, addCustomerPhone, addCustomerLocation } = useStore();
   const { showError, showSuccess } = useToast();
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const pageSize = 100;
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
@@ -67,6 +69,12 @@ export default function CustomersPage() {
         return an.localeCompare(bn);
       });
   }, [customers, search, statusFilter, balances]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
+
+  useEffect(() => { setPage(1); }, [search, statusFilter]);
+  useEffect(() => { if (page > pageCount) setPage(pageCount); }, [page, pageCount]);
 
   const activeCount = customers.filter((c) => c.is_active !== false).length;
   const totalOutstanding = Array.from(balances.values()).reduce((a, b) => a + b, 0);
@@ -183,7 +191,7 @@ export default function CustomersPage() {
       <section className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(340px,1fr)]">
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
           <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div><h2 className="text-sm font-semibold text-slate-900">Customer directory</h2><p className="text-xs text-slate-500">{filtered.length} shown · {customers.length} total</p></div>
+            <div><h2 className="text-sm font-semibold text-slate-900">Customer directory</h2><p className="text-xs text-slate-500">{filtered.length.toLocaleString()} matching · {customers.length.toLocaleString()} loaded</p></div>
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
               <select className={`${inputClass} sm:w-40`} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}>
                 <option value="all">All statuses</option>
@@ -193,11 +201,13 @@ export default function CustomersPage() {
               <div className="relative w-full sm:w-72"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input className={`${inputClass} pl-9`} placeholder="Search name, phone, location…" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
             </div>
           </div>
+          {customersError && <div className="mx-4 mt-4 flex flex-col gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 sm:flex-row sm:items-center sm:justify-between"><span>Customer loading failed: {customersError}</span><button type="button" className={secondaryClass} disabled={customersLoading} onClick={() => void refreshCustomers()}>{customersLoading ? 'Retrying…' : 'Retry loading'}</button></div>}
+          {customersLoading && <div className="px-4 py-3 text-xs text-slate-500">Loading the complete customer directory…</div>}
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
               <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3 font-semibold">Customer</th><th className="px-4 py-3 font-semibold">Phone(s)</th><th className="px-4 py-3 font-semibold">Location(s)</th><th className="px-4 py-3 text-right font-semibold">Balance</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3"></th></tr></thead>
               <tbody className="divide-y divide-slate-100">
-                {filtered.map((c) => {
+                {pageRows.map((c) => {
                   const phones = c.phones || [];
                   const locs = c.locations || [];
                   const primaryPhone = phones.find(p => p.is_primary)?.phone_number || phones[0]?.phone_number || '—';
@@ -211,6 +221,7 @@ export default function CustomersPage() {
               </tbody>
             </table>
           </div>
+          {filtered.length > 0 && <div className="flex flex-col gap-3 border-t border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-slate-500">Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filtered.length)} of {filtered.length.toLocaleString()} customers</p><div className="flex items-center gap-2"><button type="button" className={secondaryClass} disabled={page <= 1} onClick={() => setPage((v) => Math.max(1, v - 1))}>Previous</button><span className="min-w-20 text-center text-xs text-slate-600">Page {page} of {pageCount}</span><button type="button" className={secondaryClass} disabled={page >= pageCount} onClick={() => setPage((v) => Math.min(pageCount, v + 1))}>Next</button></div></div>}
           {filtered.length === 0 && <p className="px-4 py-10 text-center text-sm text-slate-500">No customers match your search or filter.</p>}
         </section>
 
