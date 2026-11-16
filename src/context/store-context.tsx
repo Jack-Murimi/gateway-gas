@@ -123,7 +123,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Failed to load customers', error);
       setCustomersError(error instanceof Error ? error.message : 'Could not load the complete customer directory.');
-      throw error;
     } finally {
       setCustomersLoading(false);
     }
