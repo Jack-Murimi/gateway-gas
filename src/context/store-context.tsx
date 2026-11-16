@@ -61,6 +61,9 @@ interface StoreContextType {
   inventory: BranchInventory[];
   orders: Order[];
   customers: Customer[];
+  customersLoading: boolean;
+  customersError: string | null;
+  refreshCustomers: () => Promise<void>;
   leaderboard: RiderLeaderboardEntry[];
   shiftReports: ShiftZReport[];
   signupStaff: (email: string, password: string, full_name: string, phone: string, vehicle_plate?: string) => Promise<{ success: boolean; message: string }>;
@@ -92,8 +95,39 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [inventory, setInventory] = useState<BranchInventory[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customersLoading, setCustomersLoading] = useState(false);
+  const [customersError, setCustomersError] = useState<string | null>(null);
   const [shiftReports, setShiftReports] = useState<ShiftZReport[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+
+  const refreshCustomers = useCallback(async () => {
+    setCustomersLoading(true);
+    setCustomersError(null);
+    try {
+      const supabase = createClient();
+      const allCustomers: Customer[] = [];
+      const pageSize = 500;
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await supabase
+          .from('customers')
+          .select('*, phones:customer_phones(*), locations:customer_locations(*)')
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: false })
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        const page = (data || []) as Customer[];
+        allCustomers.push(...page);
+        if (page.length < pageSize) break;
+      }
+      setCustomers(allCustomers);
+    } catch (error) {
+      console.error('Failed to load customers', error);
+      setCustomersError(error instanceof Error ? error.message : 'Could not load the complete customer directory.');
+      throw error;
+    } finally {
+      setCustomersLoading(false);
+    }
+  }, []);
 
   const fetchLiveData = useCallback(async () => {
     try {
@@ -112,30 +146,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (!ordersRes.error && ordersRes.data) setOrders(ordersRes.data as Order[]);
       if (!staffRes.error && staffRes.data) setStaffList(staffRes.data as StaffProfile[]);
 
-      // Load customers in pages. The address book can contain several thousand records,
-      // so a single small limit silently hides most customers from POS search.
-      try {
-        const allCustomers: Customer[] = [];
-        const pageSize = 1000;
-        for (let from = 0; ; from += pageSize) {
-          const { data, error } = await supabase
-            .from('customers')
-            .select('*, phones:customer_phones(*), locations:customer_locations(*)')
-            .order('created_at', { ascending: false })
-            .range(from, from + pageSize - 1);
-          if (error) throw error;
-          const page = (data || []) as Customer[];
-          allCustomers.push(...page);
-          if (page.length < pageSize) break;
-        }
-        setCustomers(allCustomers);
-      } catch (error) {
-        console.error('Failed to load customers', error);
-      }
+      await refreshCustomers();
     } catch (e) {
       console.error('Failed to load live data', e);
     }
-  }, []);
+  }, [refreshCustomers]);
 
   // Initialize session and load live data
   useEffect(() => {
@@ -538,6 +553,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         inventory,
         orders,
         customers,
+        customersLoading,
+        customersError,
+        refreshCustomers,
         leaderboard,
         shiftReports,
         signupStaff,
