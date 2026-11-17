@@ -7,6 +7,7 @@ import {
 import type { Branch, BranchInventory, Customer, OrderType, PaymentMethod, PaymentStatus, Product, StaffProfile } from '@/types';
 import { Button } from '@/components/ui/button';
 import { formatKES, hasEmptyState } from '@/lib/formatters';
+import { rankCustomerSearch } from '@/lib/customer-cache';
 
 export interface PosLine {
   id: string;
@@ -112,10 +113,7 @@ export function PosWorkspace({
   const selectedRiders = activeRiders.filter(r => riderIds.includes(r.id));
   const vehicleOptions = Array.from(new Set(selectedRiders.map(r => r.vehicle_plate).filter((v): v is string => Boolean(v))));
   const activeBranch = branches.find(b => b.id === branchId);
-  const matchingCustomers = customerQuery.trim()
-    ? customers.filter(c => c.name.toLowerCase().includes(customerQuery.toLowerCase()) ||
-        c.phones.some(p => p.phone_number.toLowerCase().includes(customerQuery.toLowerCase()))).slice(0, 8)
-    : [];
+  const matchingCustomers = customerQuery.trim() ? rankCustomerSearch(customers, customerQuery).slice(0, 8) : [];
   const matchingProducts = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
@@ -306,7 +304,7 @@ export function PosWorkspace({
                 <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input className={fieldClass + ' pl-8 pr-8'} value={customer ? customer.name : customerQuery} onChange={e => { setCustomer(null); setCustomerQuery(e.target.value); setCustomerMenuOpen(true); }} onFocus={() => setCustomerMenuOpen(true)} placeholder="Search customer (optional)" />
                 {(customer || customerQuery) && <button type="button" onClick={() => { setCustomer(null); setCustomerQuery(''); setPhone(''); setEstate(''); setAddress(''); }} className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button>}
-                {customerMenuOpen && customerQuery.trim() && !customer && <div className="absolute z-30 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg">{matchingCustomers.length ? matchingCustomers.map(c => <button type="button" key={c.id} onClick={() => { setCustomer(c); setPhone(c.phones[0]?.phone_number || ''); const loc=c.locations.find(l=>l.is_default) || c.locations[0]; setEstate(loc?.estate || ''); setAddress(loc?.specific_address || ''); setCustomerQuery(''); setCustomerMenuOpen(false); }} className="block w-full border-b border-slate-100 px-2.5 py-2 text-left hover:bg-orange-50"><span className="block text-sm font-medium text-slate-900">{c.name}</span><span className="text-xs text-slate-500">{c.phones.map(p=>p.phone_number).join(' · ')}</span></button>) : <div className="p-2.5 text-xs text-slate-500">No customer found.</div>}</div>}
+                {customerMenuOpen && customerQuery.trim() && !customer && <div className="absolute z-30 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg">{matchingCustomers.length ? matchingCustomers.map(c => <button type="button" key={c.id} onClick={() => { setCustomer(c); setPhone(c.phones[0]?.phone_number || ''); const loc=c.locations.find(l=>l.is_default) || c.locations[0]; setEstate(loc?.estate || ''); setAddress(loc?.specific_address || ''); setCustomerQuery(''); setCustomerMenuOpen(false); }} className="block min-h-11 w-full border-b border-slate-100 px-2.5 py-2 text-left hover:bg-orange-50"><span className="block truncate text-sm font-medium text-slate-900">{c.name?.trim() || c.phones[0]?.phone_number || 'No name saved'}</span><span className="text-xs text-slate-500">{c.phones.map(p=>p.phone_number).join(' · ')}</span></button>) : <div className="p-2.5 text-xs text-slate-500">No customer found.</div>}<button type="button" onClick={() => { setShowNewCustomer(true); setNewCustomerName(/[a-z]/i.test(customerQuery) ? customerQuery.trim() : ''); setNewCustomerPhone(/^\\+?[0-9\\s()-]+$/.test(customerQuery.trim()) ? customerQuery.trim() : ''); setCustomerMenuOpen(false); }} className="flex min-h-11 w-full items-center gap-2 px-2.5 py-2 text-left text-sm font-semibold text-orange-700 hover:bg-orange-50"><Plus className="h-4 w-4" />+ New customer</button></div>}
               </div>
               <Button type="button" variant="outline" size="sm" onClick={() => setShowNewCustomer(v => !v)}><Plus className="mr-1 h-4 w-4" />Add</Button>
             </div>
