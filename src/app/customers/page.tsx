@@ -203,11 +203,12 @@ export default function CustomersPage() {
               const primary = phones.find(p => p.is_primary)?.phone_number || phones[0]?.phone_number || '';
               const loc = c.locations?.find(l => l.is_default) || c.locations?.[0];
               const location = loc ? [loc.estate, loc.specific_address].filter(Boolean).join(', ') : '';
-              const title = c.name?.trim() || primary || t.customerNoName;
+              const usableName = c.name?.trim() && /[a-z]/i.test(c.name) && !/^\\+?[0-9\\s().-]+$/.test(c.name.trim()) ? c.name.trim() : '';
+              const title = usableName || primary || t.customerNoName;
               const bal = balances[c.id] || 0;
               return <div key={c.id} ref={virtualizer.measureElement} data-index={item.index} className="absolute left-0 top-0 w-full pb-2" style={{ transform: `translateY(${item.start}px)` }}>
-                <button type="button" role="listitem" onClick={() => openDetails(c)} className="flex min-h-[80px] w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:border-orange-200 active:bg-orange-50/40 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-orange-900 dark:active:bg-orange-950/20">
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-orange-50 text-sm font-bold text-orange-700 dark:bg-orange-950/50 dark:text-orange-300">{c.name?.trim() ? initials(c.name) : <UserRound className="h-5 w-5" />}</span>
+                <div role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetails(c); } }} onClick={() => openDetails(c)} className="flex min-h-[80px] w-full cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:border-orange-200 active:bg-orange-50/40 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-orange-900 dark:active:bg-orange-950/20">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-orange-50 text-sm font-bold text-orange-700 dark:bg-orange-950/50 dark:text-orange-300">{usableName ? initials(usableName) : <UserRound className="h-5 w-5" />}</span>
                   <span className="min-w-0 flex-1">
                     <span className="flex min-w-0 items-center gap-2"><span className="truncate text-sm font-semibold text-slate-900 dark:text-white">{title}</span>{!c.name?.trim() && <span className="shrink-0 text-[10px] text-slate-400">{t.customerNoNameSaved}</span>}</span>
                     <span className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300"><Phone className="h-3 w-3 shrink-0 text-slate-400" /><span className="truncate">{primary || '—'}</span>{phones.length > 1 && <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">+{phones.length - 1}</span>}</span>
