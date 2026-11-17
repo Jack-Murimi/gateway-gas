@@ -109,8 +109,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setCustomersError(null);
     try {
       const supabase = createClient();
-      const { data: authData } = await supabase.auth.getUser();
-      const userId = authData.user?.id;
+      const { data: authData } = await supabase.auth.getSession();
+      const userId = authData.session?.user?.id;
       if (!userId) throw new Error('Sign in to load customer accounts.');
       try {
         await prepareCustomerCache(userId);
@@ -118,6 +118,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (cached.length) setCustomers(cached);
         setCustomerCacheAvailable(true);
         setCustomersLoading(cached.length === 0);
+        if (!navigator.onLine) {
+          if (!cached.length) setCustomersError('Connect to the internet for the first customer download.');
+          return;
+        }
         await syncCustomerCache(supabase, (done, total, initial) => {
           setCustomerSyncProgress({ done, total, initial });
         });
