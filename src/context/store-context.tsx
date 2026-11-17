@@ -560,17 +560,22 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     setCurrentUser(null);
     clearDemoSessionCookies();
-    void clearCustomerCache();
     setCustomers([]);
     try {
       localStorage.removeItem('gwg_user');
       localStorage.removeItem('gwg_demo_user_id');
     } catch {}
-    try {
-      const supabase = createClient();
-      void supabase.auth.signOut();
-    } catch {}
-    if (typeof window !== 'undefined') window.location.href = '/login';
+    void (async () => {
+      try {
+        await clearCustomerCache();
+        const supabase = createClient();
+        await supabase.auth.signOut();
+      } catch (error) {
+        console.error('Logout cleanup failed', error);
+      } finally {
+        if (typeof window !== 'undefined') window.location.href = '/login';
+      }
+    })();
   };
 
   const leaderboard: RiderLeaderboardEntry[] = staffList
