@@ -24,7 +24,7 @@ class GatewayCache extends Dexie {
   constructor() {
     super('gateway-operations-cache');
     this.version(1).stores({ customers: 'id, name, status, updated_at, deleted', metadata: 'key' });
-    this.version(2).stores({ customers: 'id, name, status, updated_at, deleted, *phoneDigits, *searchTokens', metadata: 'key' })
+    this.version(2).stores({ customers: 'id, name, status, updated_at, deleted', metadata: 'key' })
       .upgrade(async tx => {
         await tx.table('customers').toCollection().modify((row: CachedCustomer & { phoneDigits?: string[]; searchTokens?: string[] }) => {
           row.phoneDigits = (row.phones || []).map(p => p.phone_number.replace(/\\D/g, ''));
@@ -80,9 +80,7 @@ export async function prepareCustomerCache(userId: string) {
   }
 }
 export async function readCachedCustomers() {
-  const rows = await customerDb.customers.where('deleted').equals(0).toArray().catch(async () =>
-    (await customerDb.customers.toArray()).filter(r => !r.deleted)
-  );
+  const rows = (await customerDb.customers.toArray()).filter(row => !row.deleted);
   return rows.map(fromCachedCustomer);
 }
 export async function upsertCachedCustomer(row: any) {
