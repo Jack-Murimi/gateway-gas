@@ -210,7 +210,7 @@ export default function CustomersPage() {
                 <div role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetails(c); } }} onClick={() => openDetails(c)} className="flex min-h-[80px] w-full cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:border-orange-200 active:bg-orange-50/40 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-orange-900 dark:active:bg-orange-950/20">
                   <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-orange-50 text-sm font-bold text-orange-700 dark:bg-orange-950/50 dark:text-orange-300">{usableName ? initials(usableName) : <UserRound className="h-5 w-5" />}</span>
                   <span className="min-w-0 flex-1">
-                    <span className="flex min-w-0 items-center gap-2"><span className="truncate text-sm font-semibold text-slate-900 dark:text-white">{title}</span>{!c.name?.trim() && <span className="shrink-0 text-[10px] text-slate-400">{t.customerNoNameSaved}</span>}</span>
+                    <span className="flex min-w-0 items-center gap-2"><span className="truncate text-sm font-semibold text-slate-900 dark:text-white">{title}</span>{!usableName && <span className="shrink-0 text-[10px] text-slate-400">{t.customerNoNameSaved}</span>}</span>
                     <span className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300"><Phone className="h-3 w-3 shrink-0 text-slate-400" /><span className="truncate">{primary || '—'}</span>{phones.length > 1 && <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">+{phones.length - 1}</span>}</span>
                     {location && !sameAsIdentity(location, c.name || '', primary) && <span className="mt-1 flex min-w-0 items-center gap-1 text-xs text-slate-500 dark:text-slate-400"><MapPin className="h-3 w-3 shrink-0" /><span className="truncate">{location}</span></span>}
                   </span>
@@ -218,7 +218,7 @@ export default function CustomersPage() {
                     <a href={primary ? `tel:${primary}` : undefined} onClick={e => { e.stopPropagation(); if (!primary) e.preventDefault(); }} aria-label={t.customerCall} className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"><Phone className="h-4 w-4" /></a>
                     {bal > 0 && <span className="max-w-[92px] truncate rounded-full bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">{formatKES(bal)}</span>}
                   </span>
-                </button>
+                </div>
               </div>;
             })}
           </div>
