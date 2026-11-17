@@ -76,8 +76,12 @@ interface StoreContextType {
   createCustomer: (name: string, phone: string, estate: string, specificAddress?: string) => Promise<Customer>;
   updateCustomer: (customerId: string, name: string) => Promise<void>;
   setCustomerActive: (customerId: string, isActive: boolean) => Promise<void>;
-  addCustomerPhone: (customerId: string, phone: string, makePrimary?: boolean) => Promise<void>;
+  addCustomerPhone: (customerId: string, phone: string, makePrimary?: boolean, label?: string) => Promise<void>;
+  updateCustomerPhone: (customerId: string, phoneId: string, updates: { label?: string | null; is_primary?: boolean }) => Promise<void>;
+  removeCustomerPhone: (customerId: string, phoneId: string) => Promise<void>;
   addCustomerLocation: (customerId: string, estate: string, specificAddress?: string, makeDefault?: boolean) => Promise<void>;
+  updateCustomerLocation: (customerId: string, locationId: string, updates: { estate?: string; specific_address?: string | null; is_default?: boolean }) => Promise<void>;
+  removeCustomerLocation: (customerId: string, locationId: string) => Promise<void>;
   assignRider: (orderId: string, riderId: string) => void;
   updateDeliveryStatus: (orderId: string, status: DeliveryStatus, comment?: string) => void;
   updateRiderComment: (orderId: string, comment: string) => void;
@@ -463,14 +467,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     await refreshCustomers();
   };
 
-  const addCustomerPhone = async (customerId: string, phone: string, makePrimary = false) => {
+  const addCustomerPhone = async (customerId: string, phone: string, makePrimary = false, label?: string) => {
     const supabase = createClient();
     const trimmed = phone.trim();
     if (!trimmed) throw new Error('Phone number is required.');
     if (makePrimary) await supabase.from('customer_phones').update({ is_primary: false }).eq('customer_id', customerId);
-    const { error } = await supabase.from('customer_phones').insert({ customer_id: customerId, phone_number: trimmed, is_primary: makePrimary });
+    const { error } = await supabase.from('customer_phones').insert({ customer_id: customerId, phone_number: trimmed, is_primary: makePrimary, label: label?.trim() || null });
     if (error) throw error;
-    const newPhone: CustomerPhone = { id: crypto.randomUUID(), customer_id: customerId, phone_number: trimmed, is_primary: makePrimary };
+    const newPhone: CustomerPhone = { id: crypto.randomUUID(), customer_id: customerId, phone_number: trimmed, is_primary: makePrimary, label: label?.trim() || null };
     const now = new Date().toISOString();
     const current = customers.find(customer => customer.id === customerId);
     if (current) {
@@ -495,6 +499,100 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const nextLocations = [...(makeDefault ? current.locations.map(l => ({ ...l, is_default: false })) : current.locations), newLocation];
       await patchCachedCustomer(customerId, { locations: nextLocations, updated_at: now });
       setCustomers(prev => prev.map(customer => customer.id === customerId ? { ...customer, locations: nextLocations, updated_at: now } : customer));
+    }
+    await refreshCustomers();
+  };
+
+  const updateCustomerPhone = async (customerId: string, phoneId: string, updates: { label?: string | null; is_primary?: boolean }) => {
+    const supabase = createClient();
+    const patch: Record<string, unknown> = {};
+    if ('label' in updates) patch.label = updates.label ?? null;
+    if (updates.is_primary) {
+      await supabase.from('customer_phones').update({ is_primary: false }).eq('customer_id', customerId);
+      patch.is_primary = true;
+    }
+    if (Object.keys(patch).length > 0) {
+      const { error } = await supabase.from('customer_phones').update(patch).eq('id', phoneId);
+      if (error) throw error;
+    }
+    const now = new Date().toISOString();
+    const current = customers.find(c => c.id === customerId);
+    if (current) {
+      const nextPhones = current.phones.map(p => {
+        if (updates.is_primary) p = { ...p, is_primary: p.id === phoneId };
+        if (p.id === phoneId && 'label' in updates) p = { ...p, label: updates.label };
+        return p;
+      });
+      await patchCachedCustomer(customerId, { phones: nextPhones, updated_at: now });
+      setCustomers(prev => prev.map(c => c.id === customerId ? { ...c, phones: nextPhones, updated_at: now } : c));
+    }
+    await refreshCustomers();
+  };
+
+  const removeCustomerPhone = async (customerId: string, phoneId: string) => {
+    const supabase = createClient();
+    const current = customers.find(c => c.id === customerId);
+    if (current && current.phones.length <= 1) throw new Error('Cannot remove the only phone number.');
+    const { error } = await supabase.from('customer_phones').delete().eq('id', phoneId);
+    if (error) throw error;
+    const now = new Date().toISOString();
+    if (current) {
+      let nextPhones = current.phones.filter(p => p.id !== phoneId);
+      if (nextPhones.length > 0 && !nextPhones.some(p => p.is_primary)) {
+        nextPhones = [{ ...nextPhones[0], is_primary: true }, ...nextPhones.slice(1)];
+        await supabase.from('customer_phones').update({ is_primary: true }).eq('id', nextPhones[0].id);
+      }
+      await patchCachedCustomer(customerId, { phones: nextPhones, updated_at: now });
+      setCustomers(prev => prev.map(c => c.id === customerId ? { ...c, phones: nextPhones, updated_at: now } : c));
+    }
+    await refreshCustomers();
+  };
+
+  const updateCustomerLocation = async (customerId: string, locationId: string, updates: { estate?: string; specific_address?: string | null; is_default?: boolean }) => {
+    const supabase = createClient();
+    const patch: Record<string, unknown> = {};
+    if (updates.estate !== undefined) patch.estate = updates.estate.trim();
+    if ('specific_address' in updates) patch.specific_address = updates.specific_address?.trim() || null;
+    if (updates.is_default) {
+      await supabase.from('customer_locations').update({ is_default: false }).eq('customer_id', customerId);
+      patch.is_default = true;
+    }
+    if (Object.keys(patch).length > 0) {
+      const { error } = await supabase.from('customer_locations').update(patch).eq('id', locationId);
+      if (error) throw error;
+    }
+    const now = new Date().toISOString();
+    const current = customers.find(c => c.id === customerId);
+    if (current) {
+      const nextLocations = current.locations.map(l => {
+        if (updates.is_default) l = { ...l, is_default: l.id === locationId };
+        if (l.id === locationId) {
+          if (updates.estate !== undefined) l = { ...l, estate: updates.estate.trim() };
+          if ('specific_address' in updates) l = { ...l, specific_address: updates.specific_address?.trim() || null };
+        }
+        return l;
+      });
+      await patchCachedCustomer(customerId, { locations: nextLocations, updated_at: now });
+      setCustomers(prev => prev.map(c => c.id === customerId ? { ...c, locations: nextLocations, updated_at: now } : c));
+    }
+    await refreshCustomers();
+  };
+
+  const removeCustomerLocation = async (customerId: string, locationId: string) => {
+    const supabase = createClient();
+    const current = customers.find(c => c.id === customerId);
+    if (current && current.locations.length <= 1) throw new Error('Cannot remove the only location.');
+    const { error } = await supabase.from('customer_locations').delete().eq('id', locationId);
+    if (error) throw error;
+    const now = new Date().toISOString();
+    if (current) {
+      let nextLocations = current.locations.filter(l => l.id !== locationId);
+      if (nextLocations.length > 0 && !nextLocations.some(l => l.is_default)) {
+        nextLocations = [{ ...nextLocations[0], is_default: true }, ...nextLocations.slice(1)];
+        await supabase.from('customer_locations').update({ is_default: true }).eq('id', nextLocations[0].id);
+      }
+      await patchCachedCustomer(customerId, { locations: nextLocations, updated_at: now });
+      setCustomers(prev => prev.map(c => c.id === customerId ? { ...c, locations: nextLocations, updated_at: now } : c));
     }
     await refreshCustomers();
   };
@@ -634,7 +732,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         updateCustomer,
         setCustomerActive,
         addCustomerPhone,
+        updateCustomerPhone,
+        removeCustomerPhone,
         addCustomerLocation,
+        updateCustomerLocation,
+        removeCustomerLocation,
         assignRider,
         updateDeliveryStatus,
         updateRiderComment,

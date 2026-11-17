@@ -31,6 +31,7 @@ export default function CustomersPage() {
     selected, selectedId, mode, setMode, panelOpen,
     closePanel, openDetails, openExisting, beginAdd,
     saving, handleSubmit, handleAddPhone, handleAddLocation, handleToggleActive,
+    handleUpdatePhone, handleRemovePhone, handleUpdateLocation, handleRemoveLocation,
     findDuplicate,
     virtualizer, listParent, searchRef,
     isDesktop,
@@ -104,6 +105,10 @@ export default function CustomersPage() {
         onAddPhone={handleAddPhone}
         onAddLocation={handleAddLocation}
         onToggleActive={handleToggleActive}
+        onUpdatePhone={handleUpdatePhone}
+        onRemovePhone={handleRemovePhone}
+        onUpdateLocation={handleUpdateLocation}
+        onRemoveLocation={handleRemoveLocation}
         findDuplicate={findDuplicate}
         onOpenExisting={openExisting}
         t={t}

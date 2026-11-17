@@ -30,20 +30,20 @@ class GatewayCache extends Dexie {
 }
 export const customerDb = new GatewayCache();
 
-const digits = (value: string) => value.replace(/\\D/g, '');
+const digits = (value: string) => value.replace(/\D/g, '');
 export const normalizePhone = (value: string) => {
   let d = digits(value);
   if (d.startsWith('254')) d = d.slice(3);
   if (d.startsWith('0')) d = d.slice(1);
   return d;
 };
-const tokens = (value: string) => value.toLowerCase().trim().split(/\\s+/).filter(Boolean);
+const tokens = (value: string) => value.toLowerCase().trim().split(/\s+/).filter(Boolean);
 
 export function toCachedCustomer(row: any): CachedCustomer {
   return {
     id: row.id,
     name: row.name ?? null,
-    phones: (row.phones || []).map((p: any) => ({ id: p.id, customer_id: row.id, phone_number: p.phone_number, is_primary: !!p.is_primary })),
+    phones: (row.phones || []).map((p: any) => ({ id: p.id, customer_id: row.id, phone_number: p.phone_number, is_primary: !!p.is_primary, label: p.label ?? null })),
     locations: (row.locations || []).map((l: any) => ({ id: l.id, customer_id: row.id, estate: l.estate, specific_address: l.specific_address ?? null, is_default: !!l.is_default })),
     status: row.is_active === false ? 'inactive' : 'active',
     created_at: row.created_at || row.updated_at,
@@ -137,10 +137,11 @@ export function rankCustomerSearch(customers: Customer[], rawQuery: string) {
     const phones = customer.phones.map(p => normalizePhone(p.phone_number));
     const name = (customer.name || '').toLowerCase();
     const locationText = customer.locations.map(l => `${l.estate} ${l.specific_address || ''}`).join(' ').toLowerCase();
-    const allText = `${name} ${locationText}`;
+    const allText = `${name} ${locationText} ${phones.join(' ')}`;
     let score = 99;
     if (queryDigits && phones.some(p => p === queryDigits || p.startsWith(queryDigits))) score = 0;
     else if (queryDigits && phones.some(p => p.endsWith(queryDigits))) score = 1;
+    else if (queryDigits && phones.some(p => p.includes(queryDigits))) score = 1.5;
     else if (name.startsWith(query)) score = 2;
     else if (words.every(word => allText.includes(word))) score = 3;
     else score = 99;

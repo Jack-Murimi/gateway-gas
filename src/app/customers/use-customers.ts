@@ -38,7 +38,11 @@ export function useCustomers() {
     updateCustomer,
     setCustomerActive,
     addCustomerPhone,
+    updateCustomerPhone,
+    removeCustomerPhone,
     addCustomerLocation,
+    updateCustomerLocation,
+    removeCustomerLocation,
   } = useStore();
   const { showError, showSuccess } = useToast();
 
@@ -286,11 +290,11 @@ export function useCustomers() {
     }
   };
 
-  const handleAddPhone = async (phone: string) => {
+  const handleAddPhone = async (phone: string, label?: string) => {
     if (!selected || !phone.trim()) return false;
     setSaving(true);
     try {
-      await addCustomerPhone(selected.id, phone.trim());
+      await addCustomerPhone(selected.id, phone.trim(), false, label);
       await refreshCustomers();
       showSuccess(t.customerPhoneAdded);
       return true;
@@ -334,6 +338,58 @@ export function useCustomers() {
     }
   };
 
+  const handleUpdatePhone = async (phoneId: string, updates: { label?: string | null; is_primary?: boolean }) => {
+    if (!selected) return;
+    setSaving(true);
+    try {
+      await updateCustomerPhone(selected.id, phoneId, updates);
+      await refreshCustomers();
+    } catch (error) {
+      showError(error instanceof Error ? error.message : t.customerSaveFailed);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemovePhone = async (phoneId: string) => {
+    if (!selected) return;
+    setSaving(true);
+    try {
+      await removeCustomerPhone(selected.id, phoneId);
+      await refreshCustomers();
+    } catch (error) {
+      showError(error instanceof Error ? error.message : t.customerSaveFailed);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUpdateLocation = async (locationId: string, updates: { estate?: string; specific_address?: string | null; is_default?: boolean }) => {
+    if (!selected) return;
+    setSaving(true);
+    try {
+      await updateCustomerLocation(selected.id, locationId, updates);
+      await refreshCustomers();
+    } catch (error) {
+      showError(error instanceof Error ? error.message : t.customerSaveFailed);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveLocation = async (locationId: string) => {
+    if (!selected) return;
+    setSaving(true);
+    try {
+      await removeCustomerLocation(selected.id, locationId);
+      await refreshCustomers();
+    } catch (error) {
+      showError(error instanceof Error ? error.message : t.customerSaveFailed);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return {
     // auth
     currentUser,
@@ -351,6 +407,7 @@ export function useCustomers() {
     closePanel, openDetails, openExisting, beginAdd,
     // mutations
     saving, handleSubmit, handleAddPhone, handleAddLocation, handleToggleActive,
+    handleUpdatePhone, handleRemovePhone, handleUpdateLocation, handleRemoveLocation,
     findDuplicate,
     // virtualizer
     virtualizer, listParent, searchRef,

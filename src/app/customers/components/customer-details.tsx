@@ -1,14 +1,14 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUpRight, Check, Copy, MapPin, Pencil, Phone, Plus, WifiOff } from 'lucide-react';
+import { ArrowUpRight, Check, Copy, MapPin, Pencil, Phone, Plus, Star, Trash2, WifiOff, X } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { formatKES } from '@/lib/formatters';
 import type { Customer } from '@/types';
 import type { T, FindDuplicate } from '../constants';
 import { baseInput, primaryBtn, secondaryBtn, iconBtn } from '../constants';
 import { usableNameOf, primaryPhoneOf, formatLocation } from '../helpers';
-import { Avatar, Section, DuplicateNotice } from './ui';
+import { Avatar, Section, Field, DuplicateNotice } from './ui';
 
 export function CustomerDetails({
   customer,
@@ -20,6 +20,10 @@ export function CustomerDetails({
   onAddPhone,
   onAddLocation,
   onToggleActive,
+  onUpdatePhone,
+  onRemovePhone,
+  onUpdateLocation,
+  onRemoveLocation,
   findDuplicate,
   onOpenExisting,
   t,
@@ -30,9 +34,13 @@ export function CustomerDetails({
   saving: boolean;
   onEdit: () => void;
   onStartSale: () => void;
-  onAddPhone: (phone: string) => Promise<boolean>;
+  onAddPhone: (phone: string, label?: string) => Promise<boolean>;
   onAddLocation: (estate: string, address: string) => Promise<boolean>;
   onToggleActive: () => Promise<void>;
+  onUpdatePhone: (phoneId: string, updates: { label?: string | null; is_primary?: boolean }) => Promise<void>;
+  onRemovePhone: (phoneId: string) => Promise<void>;
+  onUpdateLocation: (locationId: string, updates: { estate?: string; specific_address?: string | null; is_default?: boolean }) => Promise<void>;
+  onRemoveLocation: (locationId: string) => Promise<void>;
   findDuplicate: FindDuplicate;
   onOpenExisting: (c: Customer) => void;
   t: T;
@@ -48,12 +56,27 @@ export function CustomerDetails({
   );
   const locations = customer.locations || [];
 
+  /* ── Add phone state ── */
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [phoneValue, setPhoneValue] = useState('');
+  const [phoneLabel, setPhoneLabel] = useState('');
+
+  /* ── Edit phone label state ── */
+  const [editingPhoneId, setEditingPhoneId] = useState<string | null>(null);
+  const [editPhoneLabel, setEditPhoneLabel] = useState('');
+
+  /* ── Add location state ── */
   const [locOpen, setLocOpen] = useState(false);
   const [estate, setEstate] = useState('');
   const [address, setAddress] = useState('');
+
+  /* ── Edit location state ── */
+  const [editingLocId, setEditingLocId] = useState<string | null>(null);
+  const [editEstate, setEditEstate] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+
   const [confirmOff, setConfirmOff] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<{ type: 'phone' | 'location'; id: string } | null>(null);
   const [copied, setCopied] = useState('');
   const copyTimer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(copyTimer.current), []);
@@ -69,7 +92,7 @@ export function CustomerDetails({
     }
   };
 
-  const addAction = (onClick: () => void) => (
+  const addBtn = (onClick: () => void) => (
     <button
       type="button"
       onClick={onClick}
@@ -80,12 +103,39 @@ export function CustomerDetails({
     </button>
   );
 
+  const confirmRemoveDialog = confirmRemove && (
+    <div role="alertdialog" aria-label={t.uxConfirmRemove} className="mt-2 space-y-2 rounded-xl bg-red-50 p-3 ring-1 ring-red-200">
+      <p className="text-sm font-semibold text-red-900">{t.uxConfirmRemove}</p>
+      <div className="flex gap-2">
+        <button type="button" className={`${secondaryBtn} flex-1`} onClick={() => setConfirmRemove(null)}>
+          {t.uxCancel}
+        </button>
+        <button
+          type="button"
+          disabled={saving}
+          onClick={async () => {
+            try {
+              if (confirmRemove.type === 'phone') await onRemovePhone(confirmRemove.id);
+              else await onRemoveLocation(confirmRemove.id);
+            } catch (error) {
+              showError(error instanceof Error ? error.message : t.customerSaveFailed);
+            }
+            setConfirmRemove(null);
+          }}
+          className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+        >
+          {t.uxConfirm}
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-5">
       {/* Identity */}
       <div className="flex items-center gap-3">
         <Avatar customer={customer} size="lg" />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="break-words text-lg font-bold leading-tight text-slate-950">
             {name || primary || t.customerNoName}
           </p>
@@ -99,6 +149,9 @@ export function CustomerDetails({
             )}
           </p>
         </div>
+        <button type="button" className={iconBtn} onClick={onEdit} title={t.customerEdit}>
+          <Pencil className="h-4 w-4" />
+        </button>
       </div>
 
       {inactive && (
@@ -155,39 +208,110 @@ export function CustomerDetails({
         </button>
       </div>
 
-      {/* Phones */}
-      <Section title={t.customerPhones} action={!phoneOpen && addAction(() => setPhoneOpen(true))}>
+      {/* ── Phones ── */}
+      <Section title={t.customerPhones} action={!phoneOpen && addBtn(() => setPhoneOpen(true))}>
         {phones.length === 0 ? (
           <p className="py-2 text-sm text-slate-400">—</p>
         ) : (
           <ul>
-            {phones.map(p => (
-              <li key={p.id} className="flex min-h-12 items-center gap-1 border-b border-slate-100 last:border-0">
-                <a
-                  href={`tel:${p.phone_number}`}
-                  className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-sm font-medium text-slate-800 hover:text-orange-700"
-                >
-                  <Phone className="h-4 w-4 shrink-0 text-slate-400" />
-                  <span className="truncate tabular-nums">{p.phone_number}</span>
-                  {p.is_primary && (
-                    <span className="shrink-0 rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-semibold text-orange-700">
-                      {t.customerPrimary}
+            {phones.map(p => {
+              const isEditing = editingPhoneId === p.id;
+              return (
+                <li key={p.id} className="border-b border-slate-100 py-2 last:border-0">
+                  <div className="flex min-h-12 items-center gap-1">
+                    <a
+                      href={`tel:${p.phone_number}`}
+                      className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-sm font-medium text-slate-800 hover:text-orange-700"
+                    >
+                      <Phone className="h-4 w-4 shrink-0 text-slate-400" />
+                      <span className="min-w-0">
+                        <span className="block truncate tabular-nums">{p.phone_number}</span>
+                        {p.label && (
+                          <span className="block truncate text-[11px] font-normal text-slate-500">{p.label}</span>
+                        )}
+                      </span>
+                    </a>
+                    <span className="flex shrink-0 items-center gap-0.5">
+                      {p.is_primary ? (
+                        <span className="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-semibold text-orange-700">
+                          {t.customerPrimary}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="rounded-full px-2 py-0.5 text-[10px] font-medium text-slate-400 hover:bg-orange-50 hover:text-orange-700"
+                          title={t.uxSetPrimary}
+                          onClick={() => void onUpdatePhone(p.id, { is_primary: true })}
+                          disabled={saving}
+                        >
+                          <Star className="inline h-3 w-3" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className={iconBtn + ' h-8 w-8'}
+                        onClick={() => {
+                          if (isEditing) { setEditingPhoneId(null); }
+                          else { setEditingPhoneId(p.id); setEditPhoneLabel(p.label || ''); }
+                        }}
+                        title={t.uxEditLabel}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        className={iconBtn + ' h-8 w-8'}
+                        onClick={() => void copy(p.id, p.phone_number)}
+                        aria-label={t.customerCopy}
+                      >
+                        {copied === p.id ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                      </button>
+                      {phones.length > 1 && (
+                        <button
+                          type="button"
+                          className={iconBtn + ' h-8 w-8 text-red-400 hover:bg-red-50 hover:text-red-600'}
+                          onClick={() => setConfirmRemove({ type: 'phone', id: p.id })}
+                          title={t.uxRemove}
+                          disabled={saving}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </span>
+                    <span role="status" className="sr-only">
+                      {copied === p.id ? t.uxCopied : ''}
+                    </span>
+                  </div>
+                  {/* Inline label editor */}
+                  {isEditing && (
+                    <form
+                      className="mt-1.5 flex gap-2 pl-6"
+                      onSubmit={async e => {
+                        e.preventDefault();
+                        await onUpdatePhone(p.id, { label: editPhoneLabel.trim() || null });
+                        setEditingPhoneId(null);
+                      }}
+                    >
+                      <input
+                        className={baseInput + ' !min-h-9 text-xs'}
+                        autoFocus
+                        value={editPhoneLabel}
+                        onChange={e => setEditPhoneLabel(e.target.value)}
+                        placeholder={t.uxLabelPlaceholder}
+                      />
+                      <button type="submit" className={`${primaryBtn} !min-h-9 !px-3 !text-xs`} disabled={saving}>
+                        {t.customerSave}
+                      </button>
+                      <button type="button" className={`${secondaryBtn} !min-h-9 !px-3 !text-xs`} onClick={() => setEditingPhoneId(null)}>
+                        <X className="h-3 w-3" />
+                      </button>
+                    </form>
                   )}
-                </a>
-                <button
-                  type="button"
-                  className={iconBtn}
-                  onClick={() => void copy(p.id, p.phone_number)}
-                  aria-label={t.customerCopy}
-                >
-                  {copied === p.id ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
-                </button>
-                <span role="status" className="sr-only">
-                  {copied === p.id ? t.uxCopied : ''}
-                </span>
-              </li>
-            ))}
+                  {/* Confirm remove for this phone */}
+                  {confirmRemove?.type === 'phone' && confirmRemove.id === p.id && confirmRemoveDialog}
+                </li>
+              );
+            })}
           </ul>
         )}
         {phoneOpen && (
@@ -196,8 +320,9 @@ export function CustomerDetails({
             onSubmit={async e => {
               e.preventDefault();
               if (!phoneValue.trim()) return;
-              if (await onAddPhone(phoneValue)) {
+              if (await onAddPhone(phoneValue, phoneLabel.trim() || undefined)) {
                 setPhoneValue('');
+                setPhoneLabel('');
                 setPhoneOpen(false);
               }
             }}
@@ -213,6 +338,14 @@ export function CustomerDetails({
               placeholder={t.customerPhone}
               aria-label={t.customerAddPhone}
             />
+            <input
+              className={baseInput}
+              autoComplete="off"
+              value={phoneLabel}
+              onChange={e => setPhoneLabel(e.target.value)}
+              placeholder={t.uxLabelPlaceholder}
+              aria-label={t.uxEditLabel}
+            />
             <DuplicateNotice customer={findDuplicate(phoneValue, customer.id)} onOpen={onOpenExisting} t={t} />
             <div className="flex gap-2">
               <button
@@ -221,6 +354,7 @@ export function CustomerDetails({
                 onClick={() => {
                   setPhoneOpen(false);
                   setPhoneValue('');
+                  setPhoneLabel('');
                 }}
               >
                 {t.uxCancel}
@@ -233,25 +367,101 @@ export function CustomerDetails({
         )}
       </Section>
 
-      {/* Locations */}
-      <Section title={t.customerLocations} action={!locOpen && addAction(() => setLocOpen(true))}>
+      {/* ── Locations ── */}
+      <Section title={t.customerLocations} action={!locOpen && addBtn(() => setLocOpen(true))}>
         {locations.length === 0 ? (
           <p className="py-2 text-sm text-slate-400">—</p>
         ) : (
           <ul>
-            {locations.map(l => (
-              <li key={l.id} className="flex min-h-12 items-center gap-2 border-b border-slate-100 py-2 last:border-0">
-                <MapPin className="h-4 w-4 shrink-0 text-slate-400" />
-                <span className="min-w-0 flex-1 break-words text-sm text-slate-700">
-                  {formatLocation(l) || '—'}
-                </span>
-                {l.is_default && (
-                  <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-                    {t.uxDefault}
-                  </span>
-                )}
-              </li>
-            ))}
+            {locations.map(l => {
+              const isEditing = editingLocId === l.id;
+              return (
+                <li key={l.id} className="border-b border-slate-100 py-2 last:border-0">
+                  <div className="flex min-h-12 items-center gap-2">
+                    <MapPin className="h-4 w-4 shrink-0 text-slate-400" />
+                    <span className="min-w-0 flex-1 break-words text-sm text-slate-700">
+                      {formatLocation(l) || '—'}
+                    </span>
+                    <span className="flex shrink-0 items-center gap-0.5">
+                      {l.is_default ? (
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                          {t.uxDefault}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="rounded-full px-2 py-0.5 text-[10px] font-medium text-slate-400 hover:bg-orange-50 hover:text-orange-700"
+                          title={t.uxSetDefault}
+                          onClick={() => void onUpdateLocation(l.id, { is_default: true })}
+                          disabled={saving}
+                        >
+                          <Star className="inline h-3 w-3" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className={iconBtn + ' h-8 w-8'}
+                        onClick={() => {
+                          if (isEditing) { setEditingLocId(null); }
+                          else { setEditingLocId(l.id); setEditEstate(l.estate || ''); setEditAddress(l.specific_address || ''); }
+                        }}
+                        title={t.customerEdit}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      {locations.length > 1 && (
+                        <button
+                          type="button"
+                          className={iconBtn + ' h-8 w-8 text-red-400 hover:bg-red-50 hover:text-red-600'}
+                          onClick={() => setConfirmRemove({ type: 'location', id: l.id })}
+                          title={t.uxRemove}
+                          disabled={saving}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </span>
+                  </div>
+                  {/* Inline location editor */}
+                  {isEditing && (
+                    <form
+                      className="mt-1.5 space-y-2 pl-6"
+                      onSubmit={async e => {
+                        e.preventDefault();
+                        if (!editEstate.trim()) return;
+                        await onUpdateLocation(l.id, { estate: editEstate, specific_address: editAddress || null });
+                        setEditingLocId(null);
+                      }}
+                    >
+                      <input
+                        className={baseInput + ' !min-h-9 text-xs'}
+                        autoFocus
+                        value={editEstate}
+                        onChange={e => setEditEstate(e.target.value)}
+                        placeholder={t.customerLocation}
+                        list="customer-estates"
+                      />
+                      <input
+                        className={baseInput + ' !min-h-9 text-xs'}
+                        value={editAddress}
+                        onChange={e => setEditAddress(e.target.value)}
+                        placeholder={t.customerAddress}
+                      />
+                      <div className="flex gap-2">
+                        <button type="button" className={`${secondaryBtn} !min-h-9 flex-1 !px-3 !text-xs`} onClick={() => setEditingLocId(null)}>
+                          {t.uxCancel}
+                        </button>
+                        <button type="submit" className={`${primaryBtn} !min-h-9 flex-1 !px-3 !text-xs`} disabled={saving || !editEstate.trim()}>
+                          {t.customerSave}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                  {/* Confirm remove for this location */}
+                  {confirmRemove?.type === 'location' && confirmRemove.id === l.id && confirmRemoveDialog}
+                </li>
+              );
+            })}
           </ul>
         )}
         {locOpen && (

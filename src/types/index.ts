@@ -29,7 +29,7 @@ export interface OrderItem {
   outgoing_brand: string; incoming_brand?: string | null; cylinder_size_kg?: number | null;
   quantity: number; unit_price_kes: number; subtotal_kes: number; branch_id?: string | null;
 }
-export interface CustomerPhone { id: string; customer_id: string; phone_number: string; is_primary: boolean; }
+export interface CustomerPhone { id: string; customer_id: string; phone_number: string; is_primary: boolean; label?: string | null; }
 export interface CustomerLocation {
   id: string; customer_id: string; estate: string; specific_address?: string | null; is_default: boolean;
 }
