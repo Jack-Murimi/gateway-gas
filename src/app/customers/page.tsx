@@ -225,6 +225,11 @@ export default function CustomersPage() {
         </div>
       )}
 
+      <details className="mt-5 text-[11px] text-slate-400">
+        <summary className="cursor-pointer select-none">{t.customerRepair}</summary>
+        <button type="button" className="mt-2 rounded-lg border border-slate-200 px-3 py-2 font-semibold text-slate-600 dark:border-slate-700 dark:text-slate-300" onClick={() => { if (window.confirm(t.customerRedownload + '?')) void refreshCustomers(true); }}>{t.customerRedownload}</button>
+      </details>
+
       {(selected || adding) && <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/45 p-0 sm:items-center sm:p-4" onClick={() => { setSelected(null); setAdding(false); setEditing(false); }}>
         <section role="dialog" aria-modal="true" aria-label={adding ? t.customerAdd : selected?.name || t.customerDetails} onClick={e => e.stopPropagation()} className="max-h-[88dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+20px)] shadow-2xl dark:bg-slate-900 sm:rounded-3xl">
           <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-200 sm:hidden" />
