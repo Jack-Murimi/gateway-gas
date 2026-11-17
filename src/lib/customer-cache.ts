@@ -154,3 +154,9 @@ export function rankCustomerSearch(customers: Customer[], rawQuery: string) {
     return { customer, score };
   }).filter(x => x.score < 99).sort((a,b) => a.score - b.score || (a.customer.name || '').localeCompare(b.customer.name || '')).map(x => x.customer);
 }
+
+export async function patchCachedCustomer(id: string, patch: Partial<CachedCustomer>) {
+  const current = await customerDb.customers.get(id);
+  if (!current) return;
+  await customerDb.customers.put({ ...current, ...patch });
+}
