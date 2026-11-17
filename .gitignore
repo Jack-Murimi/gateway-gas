@@ -31,3 +31,19 @@ node_modules
 *.tsbuildinfo
 next-env.d.ts
 .env*
+
+# Scratch / temp files
+_batch_*
+_tmp_*
+*.csv
+
+# Import data artifacts
+scripts/contacts_batch_*.json
+scripts/contacts_clean.json
+scripts/import_group_*.sql
+scripts/batch_*.sql
+scripts/batches25/
+scripts/import5/
+
+# Supabase
+supabase/.temp/
