@@ -5,6 +5,9 @@
 :root {
   --background: #f8fafc;
   --foreground: #0f172a;
+  /* Pin the app to light: stop browsers from auto-darkening native controls
+     (scrollbars, form fields, autofill) when the OS is in dark mode. */
+  color-scheme: light;
 }
 
 html {

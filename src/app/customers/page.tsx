@@ -13,9 +13,9 @@ import { translations, type Locale } from '@/lib/i18n';
 import type { Customer } from '@/types';
 
 type Filter = 'all' | 'balance' | 'noName' | 'multiPhone';
-const baseInput = 'min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-orange-950';
+const baseInput = 'min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-100';
 const actionBtn = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50';
-const secondaryBtn = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800';
+const secondaryBtn = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50';
 
 function initials(name: string) {
   return name.trim().split(/\\s+/).filter(Boolean).slice(0, 2).map(part => part[0]?.toUpperCase()).join('');
@@ -35,11 +35,11 @@ function DetailPanel({
   if (adding || editing) {
     return (
       <form onSubmit={save} className="space-y-3">
-        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">{t.customerName}<input className={baseInput + ' mt-1'} value={form.name} onChange={e => setForm(v => ({ ...v, name: e.target.value }))} /></label>
+        <label className="block text-xs font-semibold text-slate-600">{t.customerName}<input className={baseInput + ' mt-1'} value={form.name} onChange={e => setForm(v => ({ ...v, name: e.target.value }))} /></label>
         {adding && <>
-          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">{t.customerPhone}<input className={baseInput + ' mt-1'} required value={form.phone} onChange={e => setForm(v => ({ ...v, phone: e.target.value }))} /></label>
-          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">{t.customerLocation}<input className={baseInput + ' mt-1'} required value={form.estate} onChange={e => setForm(v => ({ ...v, estate: e.target.value }))} /></label>
-          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">{t.customerAddress}<input className={baseInput + ' mt-1'} value={form.address} onChange={e => setForm(v => ({ ...v, address: e.target.value }))} /></label>
+          <label className="block text-xs font-semibold text-slate-600">{t.customerPhone}<input className={baseInput + ' mt-1'} required value={form.phone} onChange={e => setForm(v => ({ ...v, phone: e.target.value }))} /></label>
+          <label className="block text-xs font-semibold text-slate-600">{t.customerLocation}<input className={baseInput + ' mt-1'} required value={form.estate} onChange={e => setForm(v => ({ ...v, estate: e.target.value }))} /></label>
+          <label className="block text-xs font-semibold text-slate-600">{t.customerAddress}<input className={baseInput + ' mt-1'} value={form.address} onChange={e => setForm(v => ({ ...v, address: e.target.value }))} /></label>
         </>}
         <button type="submit" className={actionBtn + ' w-full'} disabled={saving}>{saving ? t.customerSaving : t.customerSave}</button>
       </form>
@@ -49,10 +49,10 @@ function DetailPanel({
   if (!selected) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 dark:bg-slate-800">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100">
           <Users className="h-7 w-7 text-slate-400" />
         </div>
-        <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Select a customer to view details</p>
+        <p className="text-sm font-medium text-slate-500">Select a customer to view details</p>
       </div>
     );
   }
@@ -60,13 +60,13 @@ function DetailPanel({
   return (
     <>
       <div className="space-y-4">
-        <div><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{t.customerPhones}</p>{selected.phones.map(p => <div key={p.id} className="flex min-h-12 items-center justify-between gap-2 border-b border-slate-100 py-1 dark:border-slate-800"><a className="flex min-h-10 flex-1 items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-100" href={`tel:${p.phone_number}`}><Phone className="h-4 w-4 text-slate-400" />{p.phone_number}{p.is_primary ? <span className="text-[10px] text-slate-400">{t.customerPrimary}</span> : null}</a><button type="button" className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={async () => { await navigator.clipboard.writeText(p.phone_number); setCopied(p.id); window.setTimeout(() => setCopied(''), 1200); }} aria-label={t.customerCopy}><Copy className="h-4 w-4" />{copied === p.id ? <Check className="h-3 w-3" /> : null}</button></div>)}{selected.phones.length === 0 && <p className="text-sm text-slate-500">—</p>}</div>
-        <div><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{t.customerLocations}</p>{selected.locations.map(l => <p key={l.id} className="flex min-h-10 items-center gap-2 border-b border-slate-100 py-2 text-sm text-slate-700 dark:border-slate-800 dark:text-slate-200"><MapPin className="h-4 w-4 shrink-0 text-slate-400" />{[l.estate, l.specific_address].filter(Boolean).join(', ')}</p>)}</div>
-        <div className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-800"><p className="text-xs text-slate-500">{t.customerOutstanding}</p><p className="mt-1 text-lg font-bold text-slate-900 dark:text-white">{formatKES(balances[selected.id] || 0)}</p></div>
+        <div><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{t.customerPhones}</p>{selected.phones.map(p => <div key={p.id} className="flex min-h-12 items-center justify-between gap-2 border-b border-slate-100 py-1"><a className="flex min-h-10 flex-1 items-center gap-2 text-sm font-medium text-slate-800" href={`tel:${p.phone_number}`}><Phone className="h-4 w-4 text-slate-400" />{p.phone_number}{p.is_primary ? <span className="text-[10px] text-slate-400">{t.customerPrimary}</span> : null}</a><button type="button" className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" onClick={async () => { await navigator.clipboard.writeText(p.phone_number); setCopied(p.id); window.setTimeout(() => setCopied(''), 1200); }} aria-label={t.customerCopy}><Copy className="h-4 w-4" />{copied === p.id ? <Check className="h-3 w-3" /> : null}</button></div>)}{selected.phones.length === 0 && <p className="text-sm text-slate-500">—</p>}</div>
+        <div><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{t.customerLocations}</p>{selected.locations.map(l => <p key={l.id} className="flex min-h-10 items-center gap-2 border-b border-slate-100 py-2 text-sm text-slate-700"><MapPin className="h-4 w-4 shrink-0 text-slate-400" />{[l.estate, l.specific_address].filter(Boolean).join(', ')}</p>)}</div>
+        <div className="rounded-2xl bg-slate-50 p-3"><p className="text-xs text-slate-500">{t.customerOutstanding}</p><p className="mt-1 text-lg font-bold text-slate-900">{formatKES(balances[selected.id] || 0)}</p></div>
         <div className="grid grid-cols-2 gap-2"><button type="button" className={secondaryBtn} onClick={beginEdit}>{t.customerEdit}</button><button type="button" className={actionBtn} onClick={() => router.push(`/sales?customerId=${selected.id}`)}><ArrowUpRight className="h-4 w-4" />{t.customerStartSale}</button></div>
         <button type="button" className="w-full py-2 text-xs font-semibold text-slate-500" onClick={async () => { setSaving(true); try { await setCustomerActive(selected.id, selected.is_active === false); setSelected(null); } catch (error) { showError(error instanceof Error ? error.message : t.customerSaveFailed); } finally { setSaving(false); } }}>{selected.is_active === false ? t.customerActivate : t.customerDeactivate}</button>
       </div>
-      <div className="mt-4 border-t border-slate-100 pt-3 dark:border-slate-800">
+      <div className="mt-4 border-t border-slate-100 pt-3">
         <p className="mb-2 text-xs font-semibold text-slate-500">{t.customerAddPhone}</p>
         <div className="flex gap-2"><input className={baseInput} value={extraPhone} onChange={e => setExtraPhone(e.target.value)} placeholder={t.customerPhone} /><button type="button" className={secondaryBtn} disabled={saving || !extraPhone.trim()} onClick={() => void addPhone()}>{t.customerAdd}</button></div>
         <p className="mb-2 mt-4 text-xs font-semibold text-slate-500">{t.customerAddLocation}</p>
@@ -97,19 +97,19 @@ function CustomerRow({ c, balances, t, openDetails, isSelected }: { c: Customer;
       onClick={() => openDetails(c)}
       className={`flex min-h-[80px] w-full cursor-pointer items-center gap-3 rounded-2xl border p-3 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition lg:min-h-[64px] lg:rounded-xl lg:p-2.5 ${
         isSelected
-          ? 'border-orange-300 bg-orange-50/60 ring-1 ring-orange-200 dark:border-orange-800 dark:bg-orange-950/30 dark:ring-orange-900'
-          : 'border-slate-200 bg-white hover:border-orange-200 active:bg-orange-50/40 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-orange-900 dark:active:bg-orange-950/20'
+          ? 'border-orange-300 bg-orange-50/60 ring-1 ring-orange-200'
+          : 'border-slate-200 bg-white hover:border-orange-200 active:bg-orange-50/40'
       }`}
     >
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-orange-50 text-sm font-bold text-orange-700 dark:bg-orange-950/50 dark:text-orange-300 lg:h-9 lg:w-9 lg:text-xs">{usableName ? initials(usableName) : <UserRound className="h-5 w-5 lg:h-4 lg:w-4" />}</span>
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-orange-50 text-sm font-bold text-orange-700 lg:h-9 lg:w-9 lg:text-xs">{usableName ? initials(usableName) : <UserRound className="h-5 w-5 lg:h-4 lg:w-4" />}</span>
       <span className="min-w-0 flex-1">
-        <span className="flex min-w-0 items-center gap-2"><span className="truncate text-sm font-semibold text-slate-900 dark:text-white">{title}</span>{!usableName && <span className="shrink-0 text-[10px] text-slate-400">{t.customerNoNameSaved}</span>}</span>
-        <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300"><Phone className="h-3 w-3 shrink-0 text-slate-400" /><span className="truncate">{primary || '—'}</span>{phones.length > 1 && <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">+{phones.length - 1}</span>}</span>
-        {location && !sameAsIdentity(location, c.name || '', primary) && <span className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-slate-500 dark:text-slate-400"><MapPin className="h-3 w-3 shrink-0" /><span className="truncate">{location}</span></span>}
+        <span className="flex min-w-0 items-center gap-2"><span className="truncate text-sm font-semibold text-slate-900">{title}</span>{!usableName && <span className="shrink-0 text-[10px] text-slate-400">{t.customerNoNameSaved}</span>}</span>
+        <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-slate-600"><Phone className="h-3 w-3 shrink-0 text-slate-400" /><span className="truncate">{primary || '—'}</span>{phones.length > 1 && <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">+{phones.length - 1}</span>}</span>
+        {location && !sameAsIdentity(location, c.name || '', primary) && <span className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-slate-500"><MapPin className="h-3 w-3 shrink-0" /><span className="truncate">{location}</span></span>}
       </span>
       <span className="flex shrink-0 flex-col items-end gap-1.5">
-        <a href={primary ? `tel:${primary}` : undefined} onClick={e => { e.stopPropagation(); if (!primary) e.preventDefault(); }} aria-label={t.customerCall} className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 lg:h-8 lg:w-8"><Phone className="h-4 w-4 lg:h-3.5 lg:w-3.5" /></a>
-        {bal > 0 && <span className="max-w-[92px] truncate rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">{formatKES(bal)}</span>}
+        <a href={primary ? `tel:${primary}` : undefined} onClick={e => { e.stopPropagation(); if (!primary) e.preventDefault(); }} aria-label={t.customerCall} className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 lg:h-8 lg:w-8"><Phone className="h-4 w-4 lg:h-3.5 lg:w-3.5" /></a>
+        {bal > 0 && <span className="max-w-[92px] truncate rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800">{formatKES(bal)}</span>}
       </span>
     </div>
   );
@@ -258,25 +258,25 @@ export default function CustomersPage() {
   /* ─── Shared sub-sections ─── */
   const statsSection = (
     <section className="mb-3 grid grid-cols-2 gap-2 lg:mb-4 lg:grid-cols-4 lg:gap-3">
-      <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"><p className="text-xs text-slate-500 dark:text-slate-400">{t.customerTotal}</p><p className="mt-1 text-xl font-bold tabular-nums text-slate-950 dark:text-white">{customers.length.toLocaleString()}</p></div>
-      <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"><p className="text-xs text-slate-500 dark:text-slate-400">{t.customerOutstanding}</p><p className="mt-1 truncate text-xl font-bold tabular-nums text-slate-950 dark:text-white">{formatKES(totalBalance)}</p></div>
-      <div className="hidden rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 lg:block"><p className="text-xs text-slate-500 dark:text-slate-400">{t.customerWithBalance}</p><p className="mt-1 text-xl font-bold tabular-nums text-slate-950 dark:text-white">{withBalanceCount.toLocaleString()}</p></div>
-      <div className="hidden rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 lg:block"><p className="text-xs text-slate-500 dark:text-slate-400">{t.customerMatching}</p><p className="mt-1 text-xl font-bold tabular-nums text-slate-950 dark:text-white">{matching.length.toLocaleString()}</p></div>
+      <div className="rounded-2xl border border-slate-200 bg-white p-3"><p className="text-xs text-slate-500">{t.customerTotal}</p><p className="mt-1 text-xl font-bold tabular-nums text-slate-950">{customers.length.toLocaleString()}</p></div>
+      <div className="rounded-2xl border border-slate-200 bg-white p-3"><p className="text-xs text-slate-500">{t.customerOutstanding}</p><p className="mt-1 truncate text-xl font-bold tabular-nums text-slate-950">{formatKES(totalBalance)}</p></div>
+      <div className="hidden rounded-2xl border border-slate-200 bg-white p-3 lg:block"><p className="text-xs text-slate-500">{t.customerWithBalance}</p><p className="mt-1 text-xl font-bold tabular-nums text-slate-950">{withBalanceCount.toLocaleString()}</p></div>
+      <div className="hidden rounded-2xl border border-slate-200 bg-white p-3 lg:block"><p className="text-xs text-slate-500">{t.customerMatching}</p><p className="mt-1 text-xl font-bold tabular-nums text-slate-950">{matching.length.toLocaleString()}</p></div>
     </section>
   );
 
   const searchSection = (
-    <section className="sticky top-[56px] z-30 -mx-3 border-y border-slate-200 bg-slate-50/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:top-16 sm:mx-0 sm:rounded-2xl sm:border lg:static lg:mx-0 lg:rounded-2xl lg:border">
+    <section className="sticky top-[56px] z-30 -mx-3 border-y border-slate-200 bg-slate-50/95 px-3 py-2 backdrop-blur sm:top-16 sm:mx-0 sm:rounded-2xl sm:border lg:static lg:mx-0 lg:rounded-2xl lg:border">
       <div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input className={baseInput + ' pl-10 pr-10'} value={query} onChange={e => setQuery(e.target.value)} placeholder={t.customerSearch} aria-label={t.customerSearch} /><button type="button" onClick={() => setQuery('')} aria-label={t.customerClearSearch} className={`absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 ${query ? '' : 'invisible'}`}><X className="h-4 w-4" /></button></div>
       <div className="mt-2 flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {filters.map(item => <button key={item.id} type="button" onClick={() => setFilter(item.id)} className={`min-h-9 shrink-0 rounded-full border px-3 text-xs font-semibold transition ${filter === item.id ? 'border-orange-600 bg-orange-600 text-white' : 'border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'}`}>{item.label}{item.id === 'balance' && withBalanceCount > 0 ? ` · ${withBalanceCount}` : ''}</button>)}
-        <button type="button" onClick={() => { void refreshCustomers(); void loadBalances(); }} className="ml-auto inline-flex min-h-9 shrink-0 items-center gap-1 rounded-full px-3 text-xs font-semibold text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"><RefreshCw className="h-3.5 w-3.5" />{t.customerRefresh}</button>
+        {filters.map(item => <button key={item.id} type="button" onClick={() => setFilter(item.id)} className={`min-h-9 shrink-0 rounded-full border px-3 text-xs font-semibold transition ${filter === item.id ? 'border-orange-600 bg-orange-600 text-white' : 'border-slate-200 bg-white text-slate-600'}`}>{item.label}{item.id === 'balance' && withBalanceCount > 0 ? ` · ${withBalanceCount}` : ''}</button>)}
+        <button type="button" onClick={() => { void refreshCustomers(); void loadBalances(); }} className="ml-auto inline-flex min-h-9 shrink-0 items-center gap-1 rounded-full px-3 text-xs font-semibold text-slate-500 hover:bg-slate-100"><RefreshCw className="h-3.5 w-3.5" />{t.customerRefresh}</button>
       </div>
     </section>
   );
 
   const statusBar = (
-    <div className="flex items-center justify-between gap-3 py-3 text-xs text-slate-500 dark:text-slate-400">
+    <div className="flex items-center justify-between gap-3 py-3 text-xs text-slate-500">
       <span>{debounced || filter !== 'all' ? `${matching.length.toLocaleString()} ${t.customerMatching}` : `${t.customerShowing} ${customers.length.toLocaleString()} ${t.customerOf} ${customers.length.toLocaleString()}`}</span>
       <span className="shrink-0">{balanceOffline ? t.customerOfflineBalances : balanceUpdated ? t.customerUpdatedNow : ''}</span>
     </div>
@@ -284,16 +284,16 @@ export default function CustomersPage() {
 
   const alertBanners = (
     <>
-      {!customerCacheAvailable && <p className="mb-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">{t.customerCacheUnavailable}</p>}
-      {customerSyncProgress?.initial && <div className="mb-3 rounded-xl bg-orange-50 px-3 py-3 text-xs text-orange-800 dark:bg-orange-950/30 dark:text-orange-200"><div className="mb-2 flex justify-between"><span>{t.customerDownloading}</span><span>{customerSyncProgress.done.toLocaleString()} {t.customerOf} {customerSyncProgress.total.toLocaleString()}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-orange-100 dark:bg-orange-900"><div className="h-full rounded-full bg-orange-600" style={{ width: `${customerSyncProgress.total ? Math.min(100, customerSyncProgress.done / customerSyncProgress.total * 100) : 0}%` }} /></div></div>}
-      {customersError && <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200"><span>{t.customerLoadFailed}</span><button type="button" className="font-semibold underline" onClick={() => void refreshCustomers()}>{t.customerRetry}</button></div>}
+      {!customerCacheAvailable && <p className="mb-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">{t.customerCacheUnavailable}</p>}
+      {customerSyncProgress?.initial && <div className="mb-3 rounded-xl bg-orange-50 px-3 py-3 text-xs text-orange-800"><div className="mb-2 flex justify-between"><span>{t.customerDownloading}</span><span>{customerSyncProgress.done.toLocaleString()} {t.customerOf} {customerSyncProgress.total.toLocaleString()}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-orange-100"><div className="h-full rounded-full bg-orange-600" style={{ width: `${customerSyncProgress.total ? Math.min(100, customerSyncProgress.done / customerSyncProgress.total * 100) : 0}%` }} /></div></div>}
+      {customersError && <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"><span>{t.customerLoadFailed}</span><button type="button" className="font-semibold underline" onClick={() => void refreshCustomers()}>{t.customerRetry}</button></div>}
     </>
   );
 
   const listContent = customersLoading && customers.length === 0 ? (
-    <div className="space-y-2">{Array.from({ length: 7 }).map((_, i) => <div key={i} className="flex h-[84px] animate-pulse items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 lg:h-[64px] lg:rounded-xl"><div className="h-11 w-11 rounded-full bg-slate-200 dark:bg-slate-700 lg:h-9 lg:w-9" /><div className="flex-1 space-y-2"><div className="h-3 w-2/5 rounded bg-slate-200 dark:bg-slate-700" /><div className="h-3 w-3/5 rounded bg-slate-100 dark:bg-slate-800" /></div></div>)}</div>
+    <div className="space-y-2">{Array.from({ length: 7 }).map((_, i) => <div key={i} className="flex h-[84px] animate-pulse items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 lg:h-[64px] lg:rounded-xl"><div className="h-11 w-11 rounded-full bg-slate-200 lg:h-9 lg:w-9" /><div className="flex-1 space-y-2"><div className="h-3 w-2/5 rounded bg-slate-200" /><div className="h-3 w-3/5 rounded bg-slate-100" /></div></div>)}</div>
   ) : matching.length === 0 ? (
-    <div className="rounded-2xl border border-dashed border-slate-300 px-5 py-12 text-center dark:border-slate-700"><UserRound className="mx-auto h-8 w-8 text-slate-400" /><p className="mt-2 text-sm font-semibold text-slate-800 dark:text-slate-200">{t.customerEmpty}</p><p className="mt-1 text-xs text-slate-500">{t.customerEmptyHint}</p></div>
+    <div className="rounded-2xl border border-dashed border-slate-300 px-5 py-12 text-center"><UserRound className="mx-auto h-8 w-8 text-slate-400" /><p className="mt-2 text-sm font-semibold text-slate-800">{t.customerEmpty}</p><p className="mt-1 text-xs text-slate-500">{t.customerEmptyHint}</p></div>
   ) : (
     <div ref={listParent} className="h-[calc(100dvh-330px)] min-h-[320px] overflow-y-auto overscroll-contain lg:h-[calc(100dvh-290px)]" role="list" aria-label={t.customerDirectory}>
       <div style={{ height: virtualizer.getTotalSize(), width: '100%', position: 'relative' }}>
@@ -321,7 +321,7 @@ export default function CustomersPage() {
   return (
     <main className="mx-auto max-w-3xl px-3 pb-28 pt-4 sm:px-5 sm:pt-6 lg:max-w-[1440px] lg:px-7 lg:pb-8">
       <header className="mb-4 flex items-center justify-between gap-3">
-        <div className="min-w-0"><p className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t.customerAccounts}</p><h1 className="text-2xl font-bold tracking-tight text-slate-950 dark:text-white">{t.customerTitle}</h1></div>
+        <div className="min-w-0"><p className="text-xs font-semibold text-slate-500">{t.customerAccounts}</p><h1 className="text-2xl font-bold tracking-tight text-slate-950">{t.customerTitle}</h1></div>
         <button type="button" onClick={beginAdd} className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full bg-orange-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-orange-700"><Plus className="h-4 w-4" />{t.customerAdd}</button>
       </header>
 
@@ -337,15 +337,15 @@ export default function CustomersPage() {
           {listContent}
           <details className="mt-5 text-[11px] text-slate-400">
             <summary className="cursor-pointer select-none">{t.customerRepair}</summary>
-            <button type="button" className="mt-2 rounded-lg border border-slate-200 px-3 py-2 font-semibold text-slate-600 dark:border-slate-700 dark:text-slate-300" onClick={() => { if (window.confirm(t.customerRedownload + '?')) void refreshCustomers(true); }}>{t.customerRedownload}</button>
+            <button type="button" className="mt-2 rounded-lg border border-slate-200 px-3 py-2 font-semibold text-slate-600" onClick={() => { if (window.confirm(t.customerRedownload + '?')) void refreshCustomers(true); }}>{t.customerRedownload}</button>
           </details>
         </div>
 
         {/* Right: detail panel (always visible) */}
-        <aside className="sticky top-20 h-fit w-[380px] shrink-0 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 xl:w-[420px]" style={{ maxHeight: 'calc(100dvh - 100px)' }}>
+        <aside className="sticky top-20 h-fit w-[380px] shrink-0 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-sm xl:w-[420px]" style={{ maxHeight: 'calc(100dvh - 100px)' }}>
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-bold text-slate-950 dark:text-white">{detailTitle}</h2>
-            {(selected || adding) && <button type="button" onClick={() => { setSelected(null); setAdding(false); setEditing(false); }} className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"><X className="h-4 w-4" /></button>}
+            <h2 className="text-lg font-bold text-slate-950">{detailTitle}</h2>
+            {(selected || adding) && <button type="button" onClick={() => { setSelected(null); setAdding(false); setEditing(false); }} className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200"><X className="h-4 w-4" /></button>}
           </div>
           <DetailPanel {...detailPanelProps} />
         </aside>
@@ -360,14 +360,14 @@ export default function CustomersPage() {
 
         <details className="mt-5 text-[11px] text-slate-400">
           <summary className="cursor-pointer select-none">{t.customerRepair}</summary>
-          <button type="button" className="mt-2 rounded-lg border border-slate-200 px-3 py-2 font-semibold text-slate-600 dark:border-slate-700 dark:text-slate-300" onClick={() => { if (window.confirm(t.customerRedownload + '?')) void refreshCustomers(true); }}>{t.customerRedownload}</button>
+          <button type="button" className="mt-2 rounded-lg border border-slate-200 px-3 py-2 font-semibold text-slate-600" onClick={() => { if (window.confirm(t.customerRedownload + '?')) void refreshCustomers(true); }}>{t.customerRedownload}</button>
         </details>
 
         {/* Mobile bottom-sheet modal */}
         {(selected || adding) && <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/45 p-0 sm:items-center sm:p-4" onClick={() => { setSelected(null); setAdding(false); setEditing(false); }}>
-          <section role="dialog" aria-modal="true" aria-label={detailTitle} onClick={e => e.stopPropagation()} className="max-h-[88dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+20px)] shadow-2xl dark:bg-slate-900 sm:rounded-3xl">
+          <section role="dialog" aria-modal="true" aria-label={detailTitle} onClick={e => e.stopPropagation()} className="max-h-[88dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+20px)] shadow-2xl sm:rounded-3xl">
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-200 sm:hidden" />
-            <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-bold text-slate-950 dark:text-white">{detailTitle}</h2><button type="button" onClick={() => { setSelected(null); setAdding(false); setEditing(false); }} className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"><X className="h-5 w-5" /></button></div>
+            <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-bold text-slate-950">{detailTitle}</h2><button type="button" onClick={() => { setSelected(null); setAdding(false); setEditing(false); }} className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600"><X className="h-5 w-5" /></button></div>
             <DetailPanel {...detailPanelProps} />
           </section>
         </div>}
