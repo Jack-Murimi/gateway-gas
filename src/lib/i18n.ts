@@ -49,7 +49,7 @@ export const translations = {
     customerDeactivate: 'Deactivate customer', customerAddPhone: 'Add phone number', customerAddLocation: 'Add location',
     customerSaving: 'Saving…', customerSave: 'Save customer', customerAdded: 'Customer added.',
     customerSaved: 'Customer saved.', customerPhoneAdded: 'Phone number added.', customerLocationAdded: 'Location added.',
-    customerSaveFailed: 'Could not save customer.', customerPhoneLocationRequired: 'Phone number and location are required.',
+    customerSaveFailed: 'Could not save customer.', customerPhoneLocationRequired: 'Phone number and location are required.', customerRepair: 'Advanced cache repair', customerRedownload: 'Re-download everything',
   },
   sw: {
     portalTitle: 'Gateway Gas',
@@ -99,6 +99,6 @@ export const translations = {
     customerDeactivate: 'Zima mteja', customerAddPhone: 'Ongeza nambari ya simu', customerAddLocation: 'Ongeza eneo',
     customerSaving: 'Inahifadhi…', customerSave: 'Hifadhi mteja', customerAdded: 'Mteja ameongezwa.',
     customerSaved: 'Mteja amehifadhiwa.', customerPhoneAdded: 'Nambari ya simu imeongezwa.', customerLocationAdded: 'Eneo limeongezwa.',
-    customerSaveFailed: 'Imeshindwa kuhifadhi mteja.', customerPhoneLocationRequired: 'Nambari ya simu na eneo vinahitajika.',
+    customerSaveFailed: 'Imeshindwa kuhifadhi mteja.', customerPhoneLocationRequired: 'Nambari ya simu na eneo vinahitajika.', customerRepair: 'Matengenezo ya hifadhi', customerRedownload: 'Pakua kila kitu upya',
   },
 };
