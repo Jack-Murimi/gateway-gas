@@ -21,7 +21,7 @@ import {
 } from '@/types';
 import { createClient } from '@/lib/supabase/client';
 import { setDemoSessionCookies, clearDemoSessionCookies } from '@/lib/demo-mode';
-import { clearCustomerCache, prepareCustomerCache, readCachedCustomers, syncCustomerCache, upsertCachedCustomer } from '@/lib/customer-cache';
+import { clearCustomerCache, prepareCustomerCache, readCachedCustomers, syncCustomerCache, upsertCachedCustomer, patchCachedCustomer } from '@/lib/customer-cache';
 
 interface CreateOrderParams {
   branch_id: string;
@@ -64,7 +64,7 @@ interface StoreContextType {
   customers: Customer[];
   customersLoading: boolean;
   customersError: string | null;
-  refreshCustomers: () => Promise<void>;
+  refreshCustomers: (forceFull?: boolean) => Promise<void>;
   customerSyncProgress: { done: number; total: number; initial: boolean } | null;
   customerCacheAvailable: boolean;
   leaderboard: RiderLeaderboardEntry[];
@@ -105,7 +105,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [shiftReports, setShiftReports] = useState<ShiftZReport[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  const refreshCustomers = useCallback(async () => {
+  const refreshCustomers = useCallback(async (forceFull = false) => {
     setCustomersError(null);
     try {
       const supabase = createClient();
@@ -124,7 +124,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         }
         await syncCustomerCache(supabase, (done, total, initial) => {
           setCustomerSyncProgress({ done, total, initial });
-        });
+        }, forceFull);
         setCustomers(await readCachedCustomers());
         setCustomerSyncProgress(null);
       } catch (cacheError) {
@@ -447,6 +447,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const supabase = createClient();
     const { error } = await supabase.from('customers').update({ name: name.trim() || null, updated_at: new Date().toISOString() }).eq('id', customerId);
     if (error) throw error;
+    const now = new Date().toISOString();
+    await patchCachedCustomer(customerId, { name: name.trim() || null, updated_at: now });
+    setCustomers(prev => prev.map(customer => customer.id === customerId ? { ...customer, name: name.trim(), updated_at: now } : customer));
     await refreshCustomers();
   };
 
@@ -454,6 +457,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const supabase = createClient();
     const { error } = await supabase.from('customers').update({ is_active: isActive, updated_at: new Date().toISOString() }).eq('id', customerId);
     if (error) throw error;
+    const now = new Date().toISOString();
+    await patchCachedCustomer(customerId, { status: isActive ? 'active' : 'inactive', updated_at: now });
+    setCustomers(prev => prev.map(customer => customer.id === customerId ? { ...customer, is_active: isActive, updated_at: now } : customer));
     await refreshCustomers();
   };
 
@@ -464,6 +470,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (makePrimary) await supabase.from('customer_phones').update({ is_primary: false }).eq('customer_id', customerId);
     const { error } = await supabase.from('customer_phones').insert({ customer_id: customerId, phone_number: trimmed, is_primary: makePrimary });
     if (error) throw error;
+    const newPhone: CustomerPhone = { id: crypto.randomUUID(), customer_id: customerId, phone_number: trimmed, is_primary: makePrimary };
+    const now = new Date().toISOString();
+    const current = customers.find(customer => customer.id === customerId);
+    if (current) {
+      const nextPhones = [...(makePrimary ? current.phones.map(p => ({ ...p, is_primary: false })) : current.phones), newPhone];
+      await patchCachedCustomer(customerId, { phones: nextPhones, updated_at: now });
+      setCustomers(prev => prev.map(customer => customer.id === customerId ? { ...customer, phones: nextPhones, updated_at: now } : customer));
+    }
     await refreshCustomers();
   };
 
@@ -474,6 +488,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (makeDefault) await supabase.from('customer_locations').update({ is_default: false }).eq('customer_id', customerId);
     const { error } = await supabase.from('customer_locations').insert({ customer_id: customerId, estate: trimmed, specific_address: specificAddress?.trim() || null, is_default: makeDefault });
     if (error) throw error;
+    const newLocation: CustomerLocation = { id: crypto.randomUUID(), customer_id: customerId, estate: trimmed, specific_address: specificAddress?.trim() || null, is_default: makeDefault };
+    const now = new Date().toISOString();
+    const current = customers.find(customer => customer.id === customerId);
+    if (current) {
+      const nextLocations = [...(makeDefault ? current.locations.map(l => ({ ...l, is_default: false })) : current.locations), newLocation];
+      await patchCachedCustomer(customerId, { locations: nextLocations, updated_at: now });
+      setCustomers(prev => prev.map(customer => customer.id === customerId ? { ...customer, locations: nextLocations, updated_at: now } : customer));
+    }
     await refreshCustomers();
   };
 
