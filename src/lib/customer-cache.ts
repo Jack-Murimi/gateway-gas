@@ -25,14 +25,7 @@ class GatewayCache extends Dexie {
   constructor() {
     super('gateway-operations-cache');
     this.version(1).stores({ customers: 'id, name, status, updated_at, deleted', metadata: 'key' });
-    this.version(2).stores({ customers: 'id, name, status, updated_at, deleted', metadata: 'key' })
-      .upgrade(async tx => {
-        await tx.table('customers').toCollection().modify((row: CachedCustomer & { phoneDigits?: string[]; searchTokens?: string[] }) => {
-          row.phoneDigits = (row.phones || []).map(p => p.phone_number.replace(/\\D/g, ''));
-          row.searchTokens = [row.name || '', ...(row.locations || []).flatMap(l => [l.estate, l.specific_address || ''])]
-            .join(' ').toLowerCase().split(/\\s+/).filter(Boolean);
-        });
-      });
+    this.version(2).stores({ customers: 'id, name, status, updated_at, deleted', metadata: 'key' });
   }
 }
 export const customerDb = new GatewayCache();
