@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle, CheckCircle2, FileText, Package, Plus, Save, Search, Trash2, X,
 } from 'lucide-react';
@@ -105,6 +105,19 @@ export function PosWorkspace({
   const [formError, setFormError] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    const customerId = new URLSearchParams(window.location.search).get('customerId');
+    if (!customerId) return;
+    const match = customers.find(item => item.id === customerId);
+    if (!match) return;
+    setCustomer(match);
+    setPhone(match.phones[0]?.phone_number || '');
+    const location = match.locations.find(item => item.is_default) || match.locations[0];
+    setEstate(location?.estate || '');
+    setAddress(location?.specific_address || '');
+    setCustomerQuery('');
+  }, [customers]);
+
   const tareBrands = (category?: string) => category === 'water'
     ? ['KERINGET', 'AQUAMIST']
     : ['AFRIGAS', 'K-GAS', 'TOTAL', 'OLA', 'PROGAS', 'TOSHA', 'LAKE', 'HASHI', 'SUPA', 'JATEL', 'SEAGAS', 'RAHA', 'BONOKO', 'PURE', 'HUNKER', 'HASS'];
@@ -208,7 +221,7 @@ export function PosWorkspace({
     return {
       branch_id: branchId, is_pos_walkin: !isDelivery, customer_id: customer?.id || null,
       receipt_number: receiptNumber.trim(), created_at: createdAt,
-      customer_name: customer?.name || 'Walk-in Counter Customer',
+      customer_name: customer?.name?.trim() || customer?.phones[0]?.phone_number || 'Walk-in Counter Customer',
       customer_phone: phone || customer?.phones[0]?.phone_number || '+254700000000',
       delivery_estate: isDelivery ? estate : undefined,
       delivery_address: isDelivery ? address : undefined,
