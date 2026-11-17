@@ -327,9 +327,9 @@ export default function CustomersPage() {
 
       {statsSection}
 
-      {/* ─── DESKTOP: master-detail split ─── */}
-      <div className="hidden lg:flex lg:gap-5">
-        {/* Left: list panel */}
+      {/* ─── DESKTOP+MOBILE: shared list column ─── */}
+      <div className="lg:flex lg:gap-5">
+        {/* Left: list panel (always rendered once) */}
         <div className="min-w-0 flex-1">
           {searchSection}
           {statusBar}
@@ -341,8 +341,8 @@ export default function CustomersPage() {
           </details>
         </div>
 
-        {/* Right: detail panel (always visible) */}
-        <aside className="sticky top-20 h-fit w-[380px] shrink-0 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-sm xl:w-[420px]" style={{ maxHeight: 'calc(100dvh - 100px)' }}>
+        {/* Right: detail panel (desktop only, always visible) */}
+        <aside className="sticky top-20 hidden h-fit w-[380px] shrink-0 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:block xl:w-[420px]" style={{ maxHeight: 'calc(100dvh - 100px)' }}>
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-bold text-slate-950">{detailTitle}</h2>
             {(selected || adding) && <button type="button" onClick={() => { setSelected(null); setAdding(false); setEditing(false); }} className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200"><X className="h-4 w-4" /></button>}
@@ -351,27 +351,14 @@ export default function CustomersPage() {
         </aside>
       </div>
 
-      {/* ─── MOBILE: single column + modal ─── */}
-      <div className="lg:hidden">
-        {searchSection}
-        {statusBar}
-        {alertBanners}
-        {listContent}
-
-        <details className="mt-5 text-[11px] text-slate-400">
-          <summary className="cursor-pointer select-none">{t.customerRepair}</summary>
-          <button type="button" className="mt-2 rounded-lg border border-slate-200 px-3 py-2 font-semibold text-slate-600" onClick={() => { if (window.confirm(t.customerRedownload + '?')) void refreshCustomers(true); }}>{t.customerRedownload}</button>
-        </details>
-
-        {/* Mobile bottom-sheet modal */}
-        {(selected || adding) && <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/45 p-0 sm:items-center sm:p-4" onClick={() => { setSelected(null); setAdding(false); setEditing(false); }}>
-          <section role="dialog" aria-modal="true" aria-label={detailTitle} onClick={e => e.stopPropagation()} className="max-h-[88dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+20px)] shadow-2xl sm:rounded-3xl">
-            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-200 sm:hidden" />
-            <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-bold text-slate-950">{detailTitle}</h2><button type="button" onClick={() => { setSelected(null); setAdding(false); setEditing(false); }} className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600"><X className="h-5 w-5" /></button></div>
-            <DetailPanel {...detailPanelProps} />
-          </section>
-        </div>}
-      </div>
+      {/* ─── MOBILE: bottom-sheet modal ─── */}
+      {(selected || adding) && <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/45 p-0 sm:items-center sm:p-4 lg:hidden" onClick={() => { setSelected(null); setAdding(false); setEditing(false); }}>
+        <section role="dialog" aria-modal="true" aria-label={detailTitle} onClick={e => e.stopPropagation()} className="max-h-[88dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+20px)] shadow-2xl sm:rounded-3xl">
+          <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-200 sm:hidden" />
+          <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-bold text-slate-950">{detailTitle}</h2><button type="button" onClick={() => { setSelected(null); setAdding(false); setEditing(false); }} className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600"><X className="h-5 w-5" /></button></div>
+          <DetailPanel {...detailPanelProps} />
+        </section>
+      </div>}
     </main>
   );
 }
