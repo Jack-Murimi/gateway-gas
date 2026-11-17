@@ -21,6 +21,7 @@ import {
 } from '@/types';
 import { createClient } from '@/lib/supabase/client';
 import { setDemoSessionCookies, clearDemoSessionCookies } from '@/lib/demo-mode';
+import { clearCustomerCache, prepareCustomerCache, readCachedCustomers, syncCustomerCache, upsertCachedCustomer } from '@/lib/customer-cache';
 
 interface CreateOrderParams {
   branch_id: string;
@@ -64,6 +65,8 @@ interface StoreContextType {
   customersLoading: boolean;
   customersError: string | null;
   refreshCustomers: () => Promise<void>;
+  customerSyncProgress: { done: number; total: number; initial: boolean } | null;
+  customerCacheAvailable: boolean;
   leaderboard: RiderLeaderboardEntry[];
   shiftReports: ShiftZReport[];
   signupStaff: (email: string, password: string, full_name: string, phone: string, vehicle_plate?: string) => Promise<{ success: boolean; message: string }>;
@@ -97,34 +100,48 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customersLoading, setCustomersLoading] = useState(false);
   const [customersError, setCustomersError] = useState<string | null>(null);
+  const [customerSyncProgress, setCustomerSyncProgress] = useState<{ done: number; total: number; initial: boolean } | null>(null);
+  const [customerCacheAvailable, setCustomerCacheAvailable] = useState(true);
   const [shiftReports, setShiftReports] = useState<ShiftZReport[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
   const refreshCustomers = useCallback(async () => {
-    setCustomersLoading(true);
     setCustomersError(null);
     try {
       const supabase = createClient();
-      const allCustomers: Customer[] = [];
-      const pageSize = 500;
-      for (let from = 0; ; from += pageSize) {
-        const { data, error } = await supabase
-          .from('customers')
-          .select('*, phones:customer_phones(*), locations:customer_locations(*)')
-          .order('created_at', { ascending: false })
-          .order('id', { ascending: false })
-          .range(from, from + pageSize - 1);
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData.user?.id;
+      if (!userId) throw new Error('Sign in to load customer accounts.');
+      try {
+        await prepareCustomerCache(userId);
+        const cached = await readCachedCustomers();
+        if (cached.length) setCustomers(cached);
+        setCustomerCacheAvailable(true);
+        setCustomersLoading(cached.length === 0);
+        await syncCustomerCache(supabase, (done, total, initial) => {
+          setCustomerSyncProgress({ done, total, initial });
+        });
+        setCustomers(await readCachedCustomers());
+        setCustomerSyncProgress(null);
+      } catch (cacheError) {
+        console.warn('Customer cache unavailable; using limited online fallback.', cacheError);
+        setCustomerCacheAvailable(false);
+        const { data, error } = await supabase.from('customer_directory_sync')
+          .select('id,name,is_active,created_at,updated_at,phones,locations,deleted_at')
+          .is('deleted_at', null).order('updated_at', { ascending: false }).limit(20);
         if (error) throw error;
-        const page = (data || []) as Customer[];
-        allCustomers.push(...page);
-        if (page.length < pageSize) break;
+        setCustomers((data || []).map((row: any) => ({
+          id: row.id, name: row.name || '', created_at: row.created_at || row.updated_at,
+          updated_at: row.updated_at, is_active: row.is_active,
+          phones: row.phones || [], locations: row.locations || [],
+        })) as Customer[]);
       }
-      setCustomers(allCustomers);
     } catch (error) {
-      console.error('Failed to load customers', error);
-      setCustomersError(error instanceof Error ? error.message : 'Could not load the complete customer directory.');
+      console.error('Failed to sync customers', error);
+      setCustomersError(error instanceof Error ? error.message : 'Could not load customers.');
     } finally {
       setCustomersLoading(false);
+      setCustomerSyncProgress(null);
     }
   }, []);
 
@@ -215,6 +232,21 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
     return () => { mounted = false; };
   }, [fetchLiveData]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const sync = () => { if (navigator.onLine) void refreshCustomers(); };
+    const interval = window.setInterval(sync, 5 * 60 * 1000);
+    window.addEventListener('focus', sync);
+    window.addEventListener('online', sync);
+    document.addEventListener('visibilitychange', sync);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', sync);
+      window.removeEventListener('online', sync);
+      document.removeEventListener('visibilitychange', sync);
+    };
+  }, [currentUser?.id, refreshCustomers]);
 
   // Persist only current user session hint locally (no mock business data)
   useEffect(() => {
@@ -401,7 +433,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       phones: [{ id: crypto.randomUUID(), customer_id: customer.id, phone_number: trimmedPhone, is_primary: true }],
       locations: [{ id: crypto.randomUUID(), customer_id: customer.id, estate: trimmedEstate, specific_address: specificAddress?.trim() || null, is_default: true }],
     };
-    await fetchLiveData();
+    await upsertCachedCustomer(created);
+    setCustomers(await readCachedCustomers());
+    void refreshCustomers();
     return created;
   };
 
@@ -409,14 +443,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const supabase = createClient();
     const { error } = await supabase.from('customers').update({ name: name.trim() || null, updated_at: new Date().toISOString() }).eq('id', customerId);
     if (error) throw error;
-    await fetchLiveData();
+    await refreshCustomers();
   };
 
   const setCustomerActive = async (customerId: string, isActive: boolean) => {
     const supabase = createClient();
     const { error } = await supabase.from('customers').update({ is_active: isActive, updated_at: new Date().toISOString() }).eq('id', customerId);
     if (error) throw error;
-    await fetchLiveData();
+    await refreshCustomers();
   };
 
   const addCustomerPhone = async (customerId: string, phone: string, makePrimary = false) => {
@@ -426,7 +460,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (makePrimary) await supabase.from('customer_phones').update({ is_primary: false }).eq('customer_id', customerId);
     const { error } = await supabase.from('customer_phones').insert({ customer_id: customerId, phone_number: trimmed, is_primary: makePrimary });
     if (error) throw error;
-    await fetchLiveData();
+    await refreshCustomers();
   };
 
   const addCustomerLocation = async (customerId: string, estate: string, specificAddress?: string, makeDefault = false) => {
@@ -436,7 +470,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (makeDefault) await supabase.from('customer_locations').update({ is_default: false }).eq('customer_id', customerId);
     const { error } = await supabase.from('customer_locations').insert({ customer_id: customerId, estate: trimmed, specific_address: specificAddress?.trim() || null, is_default: makeDefault });
     if (error) throw error;
-    await fetchLiveData();
+    await refreshCustomers();
   };
 
   const assignRider = (orderId: string, riderId: string) => {
@@ -500,6 +534,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     setCurrentUser(null);
     clearDemoSessionCookies();
+    void clearCustomerCache();
+    setCustomers([]);
     try {
       localStorage.removeItem('gwg_user');
       localStorage.removeItem('gwg_demo_user_id');
@@ -555,6 +591,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         customersLoading,
         customersError,
         refreshCustomers,
+        customerSyncProgress,
+        customerCacheAvailable,
         leaderboard,
         shiftReports,
         signupStaff,
