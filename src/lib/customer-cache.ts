@@ -14,6 +14,7 @@ export interface CachedCustomer {
   phones: CustomerPhone[];
   locations: CustomerLocation[];
   status: 'active' | 'inactive';
+  created_at: string;
   updated_at: string;
   deleted: boolean;
 }
@@ -52,12 +53,13 @@ export function toCachedCustomer(row: any): CachedCustomer {
     phones: (row.phones || []).map((p: any) => ({ id: p.id, customer_id: row.id, phone_number: p.phone_number, is_primary: !!p.is_primary })),
     locations: (row.locations || []).map((l: any) => ({ id: l.id, customer_id: row.id, estate: l.estate, specific_address: l.specific_address ?? null, is_default: !!l.is_default })),
     status: row.is_active === false ? 'inactive' : 'active',
+    created_at: row.created_at || row.updated_at,
     updated_at: row.updated_at,
     deleted: !!row.deleted_at,
   };
 }
 export function fromCachedCustomer(row: CachedCustomer): Customer {
-  return { id: row.id, name: row.name || '', created_at: row.updated_at, updated_at: row.updated_at, is_active: row.status === 'active', phones: row.phones || [], locations: row.locations || [] };
+  return { id: row.id, name: row.name || '', created_at: row.created_at, updated_at: row.updated_at, is_active: row.status === 'active', phones: row.phones || [], locations: row.locations || [] };
 }
 
 async function meta(key: string, value?: string) {
@@ -109,7 +111,7 @@ export async function syncCustomerCache(
   let done = 0;
   let total = 0;
   while (true) {
-    let query = supabase.from('customer_directory_sync').select('id,name,is_active,updated_at,deleted_at,phones,locations', { count: offset === 0 ? 'exact' : undefined })
+    let query = supabase.from('customer_directory_sync').select('id,name,is_active,created_at,updated_at,deleted_at,phones,locations', { count: offset === 0 ? 'exact' : undefined })
       .lte('updated_at', startedAt).order('updated_at', { ascending: true }).order('id', { ascending: true })
       .range(offset, offset + pageSize - 1);
     if (checkpoint) query = query.gt('updated_at', checkpoint);
