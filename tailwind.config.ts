@@ -1,6 +1,12 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  // Light-only app: `dark:` variants must never activate from the OS/browser
+  // `prefers-color-scheme` setting (Tailwind's default is 'media', which made
+  // the customers page render dark patches on machines in dark mode while the
+  // rest of the app stayed light). 'class' means dark: only applies if the
+  // app explicitly adds a `dark` class — which it never does.
+  darkMode: 'class',
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
