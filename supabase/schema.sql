@@ -848,3 +848,9 @@ revoke all on function public.record_supplier_payment(jsonb,jsonb) from public, 
 grant execute on function public.post_supplier_credit_note(jsonb) to authenticated;
 grant execute on function public.reverse_supplier_payment(uuid,date,text) to authenticated;
 grant execute on function public.record_supplier_payment(jsonb,jsonb) to authenticated;
+
+-- Index one-to-many customer contact joins for fast customer directory loading.
+CREATE INDEX IF NOT EXISTS idx_customer_phones_customer_id
+  ON public.customer_phones (customer_id);
+CREATE INDEX IF NOT EXISTS idx_customer_locations_customer_id
+  ON public.customer_locations (customer_id);
