@@ -395,22 +395,33 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const { error: itemsError } = await supabase.from('order_items').insert(withOrderId);
     if (itemsError) throw itemsError;
 
-    // Update inventory in DB
+    // Update inventory in DB. Running totals so several rows of one product (split returns) accumulate.
+    const running = new Map<string, { full: number; empty: number }>();
+    const rowFor = (branch: string, product: string) => {
+      const key = `${branch}:${product}`;
+      if (!running.has(key)) {
+        const row = inventory.find((i) => i.branch_id === branch && i.product_id === product);
+        running.set(key, { full: row?.full_units ?? 0, empty: row?.empty_units ?? 0 });
+      }
+      return running.get(key)!;
+    };
+    const touched = new Set<string>();
     for (const item of params.items) {
       const itemBranchId = item.branch_id || params.branch_id;
-      const stockRow = inventory.find((i) => i.branch_id === itemBranchId && i.product_id === item.product_id);
-      const newFull = Math.max(0, (stockRow?.full_units ?? 0) - item.quantity);
-      let newEmpty = stockRow?.empty_units ?? 0;
-      await supabase.from('branch_inventory').upsert({ branch_id: itemBranchId, product_id: item.product_id, full_units: newFull, empty_units: newEmpty, updated_at: new Date().toISOString() }, { onConflict: 'branch_id,product_id' });
+      rowFor(itemBranchId, item.product_id).full = Math.max(0, rowFor(itemBranchId, item.product_id).full - item.quantity);
+      touched.add(`${itemBranchId}:${item.product_id}`);
 
       if (item.order_type === 'refill' && item.incoming_brand && item.cylinder_size_kg) {
         const incomingProduct = products.find((p) => p.brand.toLowerCase() === item.incoming_brand!.toLowerCase() && p.size_kg === item.cylinder_size_kg);
         const targetId = incomingProduct?.id || item.product_id;
-        const targetRow = inventory.find((i) => i.branch_id === itemBranchId && i.product_id === targetId);
-        const targetEmpty = Math.max(0, (targetRow?.empty_units ?? 0) + item.quantity);
-        const targetFull = targetId === item.product_id ? newFull : (targetRow?.full_units ?? 0);
-        await supabase.from('branch_inventory').upsert({ branch_id: itemBranchId, product_id: targetId, full_units: targetFull, empty_units: targetEmpty, updated_at: new Date().toISOString() }, { onConflict: 'branch_id,product_id' });
+        rowFor(itemBranchId, targetId).empty += item.quantity;
+        touched.add(`${itemBranchId}:${targetId}`);
       }
+    }
+    for (const key of touched) {
+      const [branch_id, product_id] = key.split(':');
+      const { full, empty } = running.get(key)!;
+      await supabase.from('branch_inventory').upsert({ branch_id, product_id, full_units: full, empty_units: empty, updated_at: new Date().toISOString() }, { onConflict: 'branch_id,product_id' });
     }
 
     await fetchLiveData();

@@ -8,7 +8,9 @@ import {
 import { useStore } from '@/context/store-context';
 import { useToast } from '@/components/ui/toast';
 import { formatKES } from '@/lib/formatters';
+import type { Product } from '@/types';
 import { createClient } from '@/lib/supabase/client';
+import { PurchaseInvoiceItems, type InvoiceLineDraft } from './purchase-invoice-items';
 
 type Tab = 'overview' | 'suppliers' | 'invoices' | 'new-invoice' | 'payments' | 'adjustments';
 type Supplier = {
@@ -35,10 +37,6 @@ type SupplierPayment = {
 };
 type SupplierCreditNote = { id: string; supplier_id: string; invoice_id: string; credit_note_number: string; credit_note_date: string; amount_kes: number; reason: string; supplier?: { name: string } | null; invoice?: { invoice_number: string } | null };
 type PaymentReversal = { id: string; supplier_id: string; payment_id: string; reversal_date: string; reason: string };
-type InvoiceLineDraft = {
-  key: string; product_id: string; description: string; quantity: string;
-  unit_cost_kes: string; track_stock: boolean;
-};
 type PaymentAllocationDraft = { key: string; invoice_id: string; amount_kes: string };
 
 const today = () => new Date().toLocaleDateString('en-CA');
@@ -48,11 +46,11 @@ const emptyAllocation = (): PaymentAllocationDraft => ({ key: newKey(), invoice_
 const canUse = (role?: string) => role === 'admin' || role === 'director' || role === 'operator';
 
 function Field({ label, children, className = '' }: { label: string; children: React.ReactNode; className?: string }) {
-  return <label className={`block min-w-0 ${className}`}><span className="mb-1.5 block text-xs font-semibold text-slate-600">{label}</span>{children}</label>;
+  return <label className={`block min-w-0 ${className}`}><span className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">{label}</span>{children}</label>;
 }
-const inputClass = 'min-h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-100';
-const buttonClass = 'inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50';
-const secondaryClass = 'inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50';
+const inputClass = 'h-8 w-full rounded border border-slate-300 bg-white px-2 text-[13px] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 disabled:bg-slate-100';
+const buttonClass = 'inline-flex h-8 items-center justify-center gap-1.5 rounded bg-orange-600 px-3 text-xs font-semibold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50';
+const secondaryClass = 'inline-flex h-8 items-center justify-center gap-1.5 rounded border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50';
 
 function money(value: number | string | null | undefined) {
   return formatKES(Number(value || 0));
@@ -63,7 +61,7 @@ function dateLabel(value?: string | null) {
 }
 
 export default function PurchasesPage() {
-  const { currentUser, branches, products } = useStore();
+  const { currentUser, branches, products, inventory } = useStore();
   const { showError, showSuccess } = useToast();
   const [tab, setTab] = useState<Tab>('overview');
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -89,7 +87,8 @@ export default function PurchasesPage() {
     supplier_id: '', branch_id: '', invoice_number: '', invoice_date: today(),
     due_date: '', tax_kes: '0', notes: '',
   });
-  const [lines, setLines] = useState<InvoiceLineDraft[]>([emptyLine()]);
+  const [lines, setLines] = useState<InvoiceLineDraft[]>([]);
+  const [productCosts, setProductCosts] = useState<Map<string, number>>(new Map());
   const [paymentForm, setPaymentForm] = useState({
     supplier_id: '', payment_date: today(), payment_method: 'mpesa',
     reference: '', notes: '',
@@ -100,7 +99,7 @@ export default function PurchasesPage() {
     if (!currentUser || !canUse(currentUser.role)) return;
     setLoading(true);
     const supabase = createClient();
-    const [s, i, p, c] = await Promise.all([
+    const [s, i, p, c, pc] = await Promise.all([
       supabase.from('suppliers').select('*').order('name'),
       supabase.from('supplier_invoices')
         .select('*, supplier:suppliers(name,supplier_code), branch:branches(name), items:supplier_invoice_items(*)')
@@ -109,6 +108,7 @@ export default function PurchasesPage() {
         .select('*, supplier:suppliers(name), allocations:supplier_payment_allocations(*, invoice:supplier_invoices(invoice_number)), reversal:supplier_payment_reversals(*)')
         .order('payment_date', { ascending: false }).limit(500),
       supabase.from('supplier_credit_notes').select('*, supplier:suppliers(name), invoice:supplier_invoices(invoice_number)').order('credit_note_date', { ascending: false }).limit(500),
+      supabase.from('product_costs').select('product_id,refill_cost_kes,unit_cost_kes,complete_cost_kes'),
     ]);
     if (s.error) showError(`Could not load suppliers: ${s.error.message}`);
     else setSuppliers((s.data || []).map((row: any) => ({ ...row, opening_balance_kes: Number(row.opening_balance_kes || 0) })));
@@ -118,6 +118,7 @@ export default function PurchasesPage() {
     else setPayments((p.data || []).map((row: any) => ({ ...row, reversal: Array.isArray(row.reversal) ? (row.reversal[0] || null) : row.reversal, amount_kes: Number(row.amount_kes), allocations: (row.allocations || []).map((a: any) => ({ ...a, amount_kes: Number(a.amount_kes) })) })));
     if (c.error) showError(`Could not load supplier credit notes: ${c.error.message}`);
     else setCreditNotes((c.data || []).map((row: any) => ({ ...row, amount_kes: Number(row.amount_kes) })));
+    if (pc.data) setProductCosts(new Map((pc.data as any[]).map(r => [r.product_id, Number(r.refill_cost_kes ?? r.unit_cost_kes ?? r.complete_cost_kes ?? 0)])));
     setLoading(false);
   }, [currentUser, showError]);
 
@@ -232,7 +233,7 @@ export default function PurchasesPage() {
     if (error) return showError(error.message);
     showSuccess('Supplier invoice posted and recorded.');
     setInvoiceForm({ supplier_id: '', branch_id: '', invoice_number: '', invoice_date: today(), due_date: '', tax_kes: '0', notes: '' });
-    setLines([emptyLine()]);
+    setLines([]);
     await loadData();
     setTab('invoices');
   };
@@ -297,12 +298,13 @@ export default function PurchasesPage() {
     await loadData();
   };
 
-  const setProductOnLine = (key: string, productId: string) => {
-    const product = products.find(p => p.id === productId);
-    updateLine(key, {
-      product_id: productId,
-      description: product ? `${product.brand} ${product.size_kg ? `${product.size_kg}kg` : product.name}` : '',
-      track_stock: !!product,
+  const addProductLine = (product: Product) => {
+    setLines(prev => {
+      const existing = prev.find(l => l.product_id === product.id);
+      if (existing) return prev.map(l => l.key === existing.key ? { ...l, quantity: String((Number(l.quantity) || 0) + 1) } : l);
+      const cost = productCosts.get(product.id);
+      const description = `${product.brand} ${product.size_kg ? `${product.size_kg}kg` : product.name}`;
+      return [{ key: newKey(), product_id: product.id, description, quantity: '1', unit_cost_kes: cost ? String(cost) : '', track_stock: true }, ...prev];
     });
   };
 
@@ -321,78 +323,83 @@ export default function PurchasesPage() {
   const tabs = allTabs.filter(item => item.id !== 'adjustments' || currentUser.role === 'admin' || currentUser.role === 'director');
 
   return (
-    <main className="mx-auto max-w-[1440px] space-y-5 px-4 py-5 pb-28 sm:px-6 lg:px-8">
-      <header className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-end sm:justify-between">
-        <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Accounts payable</p><h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">Purchases & suppliers</h1><p className="mt-1 text-sm text-slate-600">Supplier invoices, balances and payments in one place.</p></div>
-        <button type="button" className={buttonClass} onClick={() => setTab('new-invoice')}><Plus className="h-4 w-4" /> Post supplier invoice</button>
+    <main className="mx-auto max-w-[1440px] space-y-2 px-2 py-2 pb-24 sm:px-4 lg:px-5">
+      <header className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-300 bg-white px-2.5 py-1.5">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-sm font-bold text-slate-950">Purchases</h1>
+          <nav aria-label="Purchases navigation" className="flex gap-0.5 overflow-x-auto rounded bg-slate-100 p-0.5">
+            {tabs.map(item => <button key={item.id} type="button" onClick={() => setTab(item.id)} className={`h-7 shrink-0 rounded px-2.5 text-xs font-semibold transition ${tab === item.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>{item.label}</button>)}
+          </nav>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+          <span>Payable <strong className="tabular-nums text-slate-900">{money(totalPayable)}</strong></span>
+          <span>Unpaid <strong className="tabular-nums text-slate-900">{outstandingInvoices.length}</strong></span>
+          <span>Suppliers <strong className="tabular-nums text-slate-900">{suppliers.filter(s => s.is_active).length}</strong></span>
+        </div>
       </header>
 
-      <nav aria-label="Purchases navigation" className="flex gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1">
-        {tabs.map(item => { const Icon = item.icon; return <button key={item.id} type="button" onClick={() => setTab(item.id)} className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-semibold transition ${tab === item.id ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}><Icon className="h-4 w-4" />{item.label}</button>; })}
-      </nav>
+      {loading ? <div className="rounded-md border border-slate-300 bg-white px-3 py-10 text-center text-xs text-slate-500">Loading…</div> : null}
 
-      {loading ? <div className="rounded-xl border border-slate-200 bg-white px-4 py-16 text-center text-sm text-slate-500">Loading supplier accounts…</div> : null}
-
-      {!loading && tab === 'overview' && <>
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {[
-            { label: 'Total outstanding', value: money(totalPayable), icon: Wallet, note: 'All supplier balances' },
-            { label: 'Active suppliers', value: suppliers.filter(s => s.is_active).length.toString(), icon: Building2, note: 'Available for purchases' },
-            { label: 'Unpaid invoices', value: outstandingInvoices.length.toString(), icon: FileText, note: 'Fully or partly unpaid' },
-            { label: 'Invoices today', value: dailyInvoices.length.toString(), icon: CalendarDays, note: money(dailyTotal) },
-          ].map(card => { const Icon = card.icon; return <section key={card.label} className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex items-center justify-between"><span className="text-xs font-semibold text-slate-500">{card.label}</span><Icon className="h-4 w-4 text-slate-400" /></div><p className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 tabular-nums">{card.value}</p><p className="mt-1 text-xs text-slate-500">{card.note}</p></section>; })}
-        </section>
-        <section className="grid gap-4 xl:grid-cols-[1.2fr_1fr]">
-          <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3"><div><h2 className="text-sm font-semibold text-slate-900">Supplier balances</h2><p className="text-xs text-slate-500">Largest outstanding balances first</p></div><button type="button" className="text-xs font-semibold text-orange-700" onClick={() => setTab('suppliers')}>All suppliers</button></div>
-            <div className="divide-y divide-slate-100">{suppliers.filter(s => s.is_active && (supplierBalances.get(s.id) || 0) > 0).sort((a,b) => (supplierBalances.get(b.id)||0)-(supplierBalances.get(a.id)||0)).slice(0,8).map(s => <button key={s.id} type="button" onClick={() => { setPaymentForm(p => ({ ...p, supplier_id: s.id })); setTab('payments'); }} className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-50"><span className="min-w-0"><span className="block truncate text-sm font-semibold text-slate-900">{s.name}</span><span className="text-xs text-slate-500">{s.supplier_code}</span></span><span className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">{money(supplierBalances.get(s.id))}</span></button>)}{!suppliers.some(s => s.is_active && (supplierBalances.get(s.id)||0)>0) && <p className="px-4 py-10 text-center text-sm text-slate-500">No outstanding supplier balances.</p>}</div>
+      {!loading && tab === 'overview' && (
+        <section className="grid gap-2 xl:grid-cols-[1.2fr_1fr]">
+          <section className="overflow-hidden rounded-md border border-slate-300 bg-white">
+            <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2"><h2 className="text-xs font-bold uppercase tracking-wide text-slate-600">Supplier balances</h2><button type="button" className="text-xs font-semibold text-orange-700" onClick={() => setTab('suppliers')}>All suppliers</button></div>
+            <div className="divide-y divide-slate-100">{suppliers.filter(s => s.is_active && (supplierBalances.get(s.id) || 0) > 0).sort((a,b) => (supplierBalances.get(b.id)||0)-(supplierBalances.get(a.id)||0)).slice(0,8).map(s => <button key={s.id} type="button" onClick={() => { setPaymentForm(p => ({ ...p, supplier_id: s.id })); setTab('payments'); }} className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-slate-50"><span className="min-w-0"><span className="block truncate text-[13px] font-semibold text-slate-900">{s.name}</span><span className="text-[11px] text-slate-500">{s.supplier_code}</span></span><span className="shrink-0 text-[13px] font-semibold tabular-nums text-slate-900">{money(supplierBalances.get(s.id))}</span></button>)}{!suppliers.some(s => s.is_active && (supplierBalances.get(s.id)||0)>0) && <p className="px-3 py-8 text-center text-xs text-slate-500">No outstanding balances.</p>}</div>
           </section>
-          <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3"><div><h2 className="text-sm font-semibold text-slate-900">Invoices for a day</h2><p className="text-xs text-slate-500">Review what was posted on a specific date</p></div><CalendarDays className="h-4 w-4 text-slate-400" /></div>
-            <div className="grid grid-cols-[1fr_auto] gap-2 border-b border-slate-100 p-3"><input type="date" className={inputClass} value={invoiceDay} onChange={e => setInvoiceDay(e.target.value)} /><span className="self-center text-sm font-semibold tabular-nums">{money(dailyTotal)}</span></div>
-            <div className="divide-y divide-slate-100">{dailyInvoices.slice(0,7).map(i => <div key={i.id} className="flex items-center justify-between gap-3 px-4 py-3"><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-900">{i.supplier?.name || 'Supplier'} · {i.invoice_number}</p><p className="text-xs text-slate-500">{i.branch?.name || 'Branch'} · {dateLabel(i.invoice_date)}</p></div><span className="shrink-0 text-sm font-semibold tabular-nums">{money(i.total_kes)}</span></div>)}{dailyInvoices.length===0 && <p className="px-4 py-8 text-center text-sm text-slate-500">No invoices recorded for this date.</p>}</div>
-            {dailyInvoices.length>7 && <button type="button" onClick={() => setTab('invoices')} className="w-full border-t border-slate-100 px-4 py-2.5 text-xs font-semibold text-orange-700">View all {dailyInvoices.length} invoices</button>}
+          <section className="overflow-hidden rounded-md border border-slate-300 bg-white">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-3 py-1.5"><h2 className="text-xs font-bold uppercase tracking-wide text-slate-600">Invoices by date</h2><div className="flex items-center gap-2"><input type="date" className={`${inputClass} w-36`} value={invoiceDay} onChange={e => setInvoiceDay(e.target.value)} /><strong className="text-xs tabular-nums">{money(dailyTotal)}</strong></div></div>
+            <div className="divide-y divide-slate-100">{dailyInvoices.slice(0,8).map(i => <div key={i.id} className="flex items-center justify-between gap-3 px-3 py-2"><div className="min-w-0"><p className="truncate text-[13px] font-semibold text-slate-900">{i.supplier?.name || 'Supplier'} · {i.invoice_number}</p><p className="text-[11px] text-slate-500">{i.branch?.name || 'Branch'} · {dateLabel(i.invoice_date)}</p></div><span className="shrink-0 text-[13px] font-semibold tabular-nums">{money(i.total_kes)}</span></div>)}{dailyInvoices.length===0 && <p className="px-3 py-8 text-center text-xs text-slate-500">No invoices on this date.</p>}</div>
+            {dailyInvoices.length>8 && <button type="button" onClick={() => setTab('invoices')} className="w-full border-t border-slate-100 px-3 py-2 text-xs font-semibold text-orange-700">View all {dailyInvoices.length}</button>}
           </section>
         </section>
-        <section className="flex flex-wrap gap-2"><button type="button" className={secondaryClass} onClick={startNewSupplier}><Plus className="h-4 w-4" /> Add supplier</button><button type="button" className={secondaryClass} onClick={() => setTab('new-invoice')}><FileText className="h-4 w-4" /> Post invoice</button><button type="button" className={secondaryClass} onClick={() => setTab('payments')}><Wallet className="h-4 w-4" /> Record payment</button></section>
-      </>}
+      )}
 
       {!loading && tab === 'suppliers' && <section className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,1fr)]">
-        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <section className="overflow-hidden rounded-md border border-slate-300 bg-white">
           <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-sm font-semibold text-slate-900">Supplier directory</h2><p className="text-xs text-slate-500">{suppliers.length} registered suppliers</p></div><div className="relative w-full sm:max-w-xs"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input className={`${inputClass} pl-9`} placeholder="Search supplier…" value={supplierSearch} onChange={e => setSupplierSearch(e.target.value)} /></div></div>
           <div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3 font-semibold">Supplier</th><th className="px-4 py-3 font-semibold">Contact</th><th className="px-4 py-3 text-right font-semibold">Balance</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3"></th></tr></thead><tbody className="divide-y divide-slate-100">{filteredSuppliers.map(s => <tr key={s.id} className="hover:bg-slate-50/70"><td className="px-4 py-3"><p className="font-semibold text-slate-900">{s.name}</p><p className="text-xs text-slate-500">{s.supplier_code}</p></td><td className="px-4 py-3"><p className="text-slate-700">{s.phone || '—'}</p><p className="text-xs text-slate-500">{s.contact_person || s.email || ''}</p></td><td className="px-4 py-3 text-right font-semibold tabular-nums">{money(supplierBalances.get(s.id))}</td><td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${s.is_active?'bg-emerald-50 text-emerald-700':'bg-slate-100 text-slate-500'}`}>{s.is_active?'Active':'Inactive'}</span></td><td className="px-4 py-3 text-right"><div className="flex items-center justify-end gap-3"><button type="button" className="text-xs font-semibold text-orange-700 hover:text-orange-800" onClick={() => editSupplier(s)}>Edit</button><button type="button" className="text-xs font-semibold text-slate-500 hover:text-slate-900" onClick={() => void toggleSupplierStatus(s)}>{s.is_active ? 'Deactivate' : 'Activate'}</button></div></td></tr>)}</tbody></table></div>
           {filteredSuppliers.length===0 && <p className="px-4 py-10 text-center text-sm text-slate-500">No suppliers match your search.</p>}
         </section>
-        <form onSubmit={saveSupplier} className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
-          <div className="flex items-center justify-between"><div><h2 className="text-sm font-semibold text-slate-900">{editingSupplier?'Edit supplier':'Add supplier'}</h2><p className="text-xs text-slate-500">Supplier details and any brought-forward balance</p></div>{editingSupplier && <button type="button" className="text-slate-400 hover:text-slate-700" onClick={() => { setEditingSupplier(null); setSupplierForm({ supplier_code:'',name:'',contact_person:'',phone:'',email:'',kra_pin:'',address:'',opening_balance_kes:'0',opening_balance_date:today(),notes:'' }); }}><X className="h-4 w-4" /></button>}</div>
+        <form onSubmit={saveSupplier} className="space-y-4 rounded-md border border-slate-300 bg-white p-4">
+          <div className="flex items-center justify-between"><div><h2 className="text-sm font-semibold text-slate-900">{editingSupplier?'Edit supplier':'Add supplier'}</h2></div>{editingSupplier && <button type="button" className="text-slate-400 hover:text-slate-700" onClick={() => { setEditingSupplier(null); setSupplierForm({ supplier_code:'',name:'',contact_person:'',phone:'',email:'',kra_pin:'',address:'',opening_balance_kes:'0',opening_balance_date:today(),notes:'' }); }}><X className="h-4 w-4" /></button>}</div>
           <div className="grid gap-3 sm:grid-cols-2"><Field label="Supplier name *" className="sm:col-span-2"><input className={inputClass} required value={supplierForm.name} onChange={e=>setSupplierField('name',e.target.value)} placeholder="e.g. TotalEnergies" /></Field><Field label="Supplier code"><input className={inputClass} value={supplierForm.supplier_code} onChange={e=>setSupplierField('supplier_code',e.target.value)} placeholder="Auto-generated if blank" /></Field><Field label="Contact person"><input className={inputClass} value={supplierForm.contact_person} onChange={e=>setSupplierField('contact_person',e.target.value)} /></Field><Field label="Phone"><input className={inputClass} value={supplierForm.phone} onChange={e=>setSupplierField('phone',e.target.value)} /></Field><Field label="Email"><input type="email" className={inputClass} value={supplierForm.email} onChange={e=>setSupplierField('email',e.target.value)} /></Field><Field label="KRA PIN"><input className={inputClass} value={supplierForm.kra_pin} onChange={e=>setSupplierField('kra_pin',e.target.value)} /></Field><Field label="Address"><input className={inputClass} value={supplierForm.address} onChange={e=>setSupplierField('address',e.target.value)} /></Field><Field label="Opening balance (KES)"><input type="number" min="0" step="0.01" disabled={!!editingSupplier} className={inputClass} value={supplierForm.opening_balance_kes} onChange={e=>setSupplierField('opening_balance_kes',e.target.value)} /></Field><Field label="Opening balance date"><input type="date" disabled={!!editingSupplier} className={inputClass} value={supplierForm.opening_balance_date} onChange={e=>setSupplierField('opening_balance_date',e.target.value)} /></Field><Field label="Notes" className="sm:col-span-2"><textarea className={inputClass} rows={2} value={supplierForm.notes} onChange={e=>setSupplierField('notes',e.target.value)} /></Field></div>
           <button className={buttonClass} disabled={saving} type="submit">{saving?'Saving…':editingSupplier?'Save changes':'Save supplier'}</button>
         </form>
       </section>}
 
-      {!loading && tab === 'new-invoice' && <form onSubmit={postInvoice} className="space-y-4">
-        <section className="rounded-xl border border-slate-200 bg-white p-4">
-          <div className="mb-4 flex items-center justify-between"><div><h2 className="text-sm font-semibold text-slate-900">Supplier invoice details</h2><p className="text-xs text-slate-500">Enter the supplier's document details exactly as printed</p></div><span className="rounded-full bg-orange-50 px-2.5 py-1 text-xs font-semibold text-orange-700">Posting is final</span></div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><Field label="Supplier *"><select required className={inputClass} value={invoiceForm.supplier_id} onChange={e=>setInvoiceForm(p=>({...p,supplier_id:e.target.value}))}><option value="">Select supplier…</option>{suppliers.filter(s=>s.is_active).map(s=><option key={s.id} value={s.id}>{s.name} ({s.supplier_code})</option>)}</select></Field><Field label="Receiving branch *"><select required className={inputClass} value={invoiceForm.branch_id} onChange={e=>setInvoiceForm(p=>({...p,branch_id:e.target.value}))}><option value="">Select branch…</option>{branches.filter(b=>b.is_active).map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></Field><Field label="Supplier invoice number *"><input required className={inputClass} value={invoiceForm.invoice_number} onChange={e=>setInvoiceForm(p=>({...p,invoice_number:e.target.value}))} placeholder="As printed on supplier invoice" /></Field><Field label="Invoice date *"><input required type="date" className={inputClass} value={invoiceForm.invoice_date} onChange={e=>setInvoiceForm(p=>({...p,invoice_date:e.target.value}))} /></Field><Field label="Due date"><input type="date" className={inputClass} min={invoiceForm.invoice_date} value={invoiceForm.due_date} onChange={e=>setInvoiceForm(p=>({...p,due_date:e.target.value}))} /></Field><Field label="Tax / VAT (KES)"><input type="number" min="0" step="0.01" className={inputClass} value={invoiceForm.tax_kes} onChange={e=>setInvoiceForm(p=>({...p,tax_kes:e.target.value}))} /></Field></div>
+      {!loading && tab === 'new-invoice' && <form onSubmit={postInvoice} className="space-y-2">
+        <section className="grid grid-cols-2 gap-1.5 rounded-md border border-slate-300 bg-white p-2 sm:grid-cols-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_130px_130px_110px]">
+          <Field label="Supplier *" className="col-span-2 sm:col-span-1"><select required className={inputClass} value={invoiceForm.supplier_id} onChange={e=>setInvoiceForm(p=>({...p,supplier_id:e.target.value}))}><option value="">Select supplier…</option>{suppliers.filter(s=>s.is_active).map(s=><option key={s.id} value={s.id}>{s.name} ({s.supplier_code})</option>)}</select></Field>
+          <Field label="Branch *"><select required className={inputClass} value={invoiceForm.branch_id} onChange={e=>setInvoiceForm(p=>({...p,branch_id:e.target.value}))}><option value="">Select branch…</option>{branches.filter(b=>b.is_active).map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></Field>
+          <Field label="Invoice no. *"><input required className={inputClass} value={invoiceForm.invoice_number} onChange={e=>setInvoiceForm(p=>({...p,invoice_number:e.target.value}))} placeholder="Invoice no." /></Field>
+          <Field label="Date *"><input required type="date" className={inputClass} value={invoiceForm.invoice_date} onChange={e=>setInvoiceForm(p=>({...p,invoice_date:e.target.value}))} /></Field>
+          <Field label="Due date"><input type="date" className={inputClass} min={invoiceForm.invoice_date} value={invoiceForm.due_date} onChange={e=>setInvoiceForm(p=>({...p,due_date:e.target.value}))} /></Field>
+          <Field label="Tax / VAT"><input type="number" min="0" step="0.01" className={inputClass} value={invoiceForm.tax_kes} onChange={e=>setInvoiceForm(p=>({...p,tax_kes:e.target.value}))} /></Field>
         </section>
-        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3"><div><h2 className="text-sm font-semibold text-slate-900">Invoice items</h2><p className="text-xs text-slate-500">Choose a catalogue item to add it to branch stock, or enter a non-stock charge</p></div><button type="button" className={secondaryClass} onClick={()=>setLines(p=>[...p,emptyLine()])}><Plus className="h-4 w-4" /> Add line</button></div>
-          <div className="space-y-3 p-4">{lines.map((line,index)=><div key={line.key} className="grid gap-3 rounded-lg border border-slate-100 bg-slate-50/60 p-3 sm:grid-cols-2 lg:grid-cols-[1.4fr_1.5fr_.6fr_.8fr_.9fr_auto] lg:items-end"><Field label={`Catalogue item ${index+1}`}><select className={inputClass} value={line.product_id} onChange={e=>setProductOnLine(line.key,e.target.value)}><option value="">Non-stock / custom charge</option>{products.filter(p=>p.is_active).map(p=><option key={p.id} value={p.id}>{p.brand} · {p.size_kg?p.size_kg+'kg':p.name}</option>)}</select></Field><Field label="Description *"><input required className={inputClass} value={line.description} onChange={e=>updateLine(line.key,{description:e.target.value})} placeholder="Goods or service description" /></Field><Field label="Quantity *"><input required type="number" min="0.001" step="0.001" className={inputClass} value={line.quantity} onChange={e=>updateLine(line.key,{quantity:e.target.value})} /></Field><Field label="Unit cost (KES) *"><input required type="number" min="0" step="0.01" className={inputClass} value={line.unit_cost_kes} onChange={e=>updateLine(line.key,{unit_cost_kes:e.target.value})} placeholder="0.00" /></Field><div className="flex flex-col gap-2"><span className="text-xs font-semibold text-slate-600">Line total</span><span className="min-h-10 flex items-center text-sm font-semibold tabular-nums">{money(Number(line.quantity||0)*Number(line.unit_cost_kes||0))}</span><label className="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" checked={line.track_stock} disabled={!line.product_id} onChange={e=>updateLine(line.key,{track_stock:e.target.checked})} /> Add to stock</label></div><button type="button" aria-label="Remove invoice line" disabled={lines.length===1} onClick={()=>setLines(p=>p.filter(l=>l.key!==line.key))} className="mb-1 flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30"><X className="h-4 w-4" /></button></div>)}</div>
-          <div className="grid gap-4 border-t border-slate-100 bg-slate-50/70 p-4 sm:grid-cols-[1fr_280px]"><Field label="Notes / delivery reference"><textarea rows={2} className={inputClass} value={invoiceForm.notes} onChange={e=>setInvoiceForm(p=>({...p,notes:e.target.value}))} /></Field><div className="space-y-2 text-sm"><div className="flex justify-between text-slate-600"><span>Subtotal</span><span className="font-medium tabular-nums">{money(invoiceSubtotal)}</span></div><div className="flex justify-between text-slate-600"><span>Tax / VAT</span><span className="font-medium tabular-nums">{money(invoiceForm.tax_kes)}</span></div><div className="flex justify-between border-t border-slate-200 pt-2 text-base font-bold text-slate-950"><span>Invoice total</span><span className="tabular-nums">{money(invoiceTotal)}</span></div><button type="submit" className={`${buttonClass} w-full`} disabled={saving||!suppliers.some(s=>s.is_active)||!branches.some(b=>b.is_active)}>{saving?'Posting invoice…':'Post invoice'}</button></div></div>
+        <section className="rounded-md border border-slate-300 bg-white p-2">
+          <PurchaseInvoiceItems lines={lines} products={products} inventory={inventory} branchId={invoiceForm.branch_id || branches.find(b => b.is_active)?.id || ''} onAddProduct={addProductLine} onAddCustom={() => setLines(p => [...p, emptyLine()])} onChange={updateLine} onRemove={key => setLines(p => p.filter(l => l.key !== key))} />
+          <div className="mt-2 grid items-end gap-2 border-t border-slate-200 pt-2 sm:grid-cols-[1fr_auto]">
+            <Field label="Notes"><input className={inputClass} value={invoiceForm.notes} onChange={e=>setInvoiceForm(p=>({...p,notes:e.target.value}))} placeholder="Optional" /></Field>
+            <div className="flex flex-wrap items-center justify-end gap-3 text-xs">
+              <span className="text-slate-500">Subtotal <strong className="tabular-nums text-slate-900">{money(invoiceSubtotal)}</strong></span>
+              <span className="text-slate-500">Tax <strong className="tabular-nums text-slate-900">{money(invoiceForm.tax_kes)}</strong></span>
+              <span className="text-sm font-bold text-slate-950">Total <span className="tabular-nums">{money(invoiceTotal)}</span></span>
+              <button type="submit" className={buttonClass} disabled={saving||!suppliers.some(s=>s.is_active)||!branches.some(b=>b.is_active)}>{saving?'Posting…':'Post invoice'}</button>
+            </div>
+          </div>
         </section>
-        <p className="text-xs text-slate-500">Posting records the supplier liability. Only lines marked “Add to stock” increase the selected branch's stock. Posted invoices are not editable or deletable; corrections should be handled through a documented credit note workflow.</p>
       </form>}
 
-      {!loading && tab === 'invoices' && <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <div className="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-[1fr_180px_220px]"><div><h2 className="text-sm font-semibold text-slate-900">Supplier invoices</h2><p className="text-xs text-slate-500">Posted purchase invoices and remaining balances</p></div><Field label="Invoice date"><input type="date" className={inputClass} value={invoiceDay} onChange={e=>setInvoiceDay(e.target.value)} /></Field><Field label="Supplier"><select className={inputClass} value={invoiceSupplierFilter} onChange={e=>setInvoiceSupplierFilter(e.target.value)}><option value="all">All suppliers</option>{suppliers.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></Field></div>
+      {!loading && tab === 'invoices' && <section className="overflow-hidden rounded-md border border-slate-300 bg-white">
+        <div className="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-[1fr_180px_220px]"><div><h2 className="text-sm font-semibold text-slate-900">Supplier invoices</h2></div><Field label="Invoice date"><input type="date" className={inputClass} value={invoiceDay} onChange={e=>setInvoiceDay(e.target.value)} /></Field><Field label="Supplier"><select className={inputClass} value={invoiceSupplierFilter} onChange={e=>setInvoiceSupplierFilter(e.target.value)}><option value="all">All suppliers</option>{suppliers.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></Field></div>
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3"><div className="relative w-full max-w-xs"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input className={`${inputClass} pl-9`} placeholder="Search invoice or supplier…" value={invoiceSearch} onChange={e=>setInvoiceSearch(e.target.value)} /></div><div className="text-sm text-slate-600">{dailyInvoices.length} invoices · <strong className="text-slate-900">{money(dailyTotal)}</strong> on selected day</div></div>
         <div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3 font-semibold">Invoice</th><th className="px-4 py-3 font-semibold">Supplier</th><th className="px-4 py-3 font-semibold">Branch</th><th className="px-4 py-3 font-semibold">Date</th><th className="px-4 py-3 text-right font-semibold">Total</th><th className="px-4 py-3 text-right font-semibold">Paid</th><th className="px-4 py-3 text-right font-semibold">Credited</th><th className="px-4 py-3 text-right font-semibold">Balance</th></tr></thead><tbody className="divide-y divide-slate-100">{filteredInvoices.filter(i=>i.invoice_date===invoiceDay&&(invoiceSupplierFilter==='all'||i.supplier_id===invoiceSupplierFilter)).map(i=>{const paid=invoicePaid.get(i.id)||0;const credited=invoiceCredited.get(i.id)||0;return <tr key={i.id} className="hover:bg-slate-50/70"><td className="px-4 py-3"><p className="font-semibold text-slate-900">{i.invoice_number}</p><p className="text-xs text-slate-500">{i.items?.length||0} line items</p></td><td className="px-4 py-3 text-slate-700">{i.supplier?.name||'—'}</td><td className="px-4 py-3 text-slate-700">{i.branch?.name||'—'}</td><td className="px-4 py-3 text-slate-600">{dateLabel(i.invoice_date)}</td><td className="px-4 py-3 text-right tabular-nums">{money(i.total_kes)}</td><td className="px-4 py-3 text-right tabular-nums text-emerald-700">{money(paid)}</td><td className="px-4 py-3 text-right tabular-nums text-orange-700">{money(credited)}</td><td className="px-4 py-3 text-right font-semibold tabular-nums">{money(Math.max(0,i.total_kes-paid-credited))}</td></tr>;})}</tbody></table></div>
         {filteredInvoices.filter(i=>i.invoice_date===invoiceDay&&(invoiceSupplierFilter==='all'||i.supplier_id===invoiceSupplierFilter)).length===0&&<p className="px-4 py-12 text-center text-sm text-slate-500">No supplier invoices found for the selected filters.</p>}
       </section>}
 
       {!loading && tab === 'payments' && <section className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-        <form onSubmit={postPayment} className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
-          <div><h2 className="text-sm font-semibold text-slate-900">Record supplier payment</h2><p className="text-xs text-slate-500">Allocate the payment against one or more outstanding invoices or an opening balance.</p></div>
+        <form onSubmit={postPayment} className="space-y-4 rounded-md border border-slate-300 bg-white p-4">
+          <div><h2 className="text-sm font-semibold text-slate-900">Record supplier payment</h2></div>
           <div className="grid gap-3 sm:grid-cols-2"><Field label="Supplier *" className="sm:col-span-2"><select required className={inputClass} value={paymentForm.supplier_id} onChange={e=>{setPaymentForm(p=>({...p,supplier_id:e.target.value}));setAllocations([emptyAllocation()]);}}><option value="">Choose supplier…</option>{suppliers.filter(s=>(supplierBalances.get(s.id)||0)>0).map(s=><option key={s.id} value={s.id}>{s.name} · {money(supplierBalances.get(s.id))} due</option>)}</select></Field><Field label="Payment date *"><input type="date" required className={inputClass} value={paymentForm.payment_date} onChange={e=>setPaymentForm(p=>({...p,payment_date:e.target.value}))} /></Field><Field label="Payment method *"><select className={inputClass} value={paymentForm.payment_method} onChange={e=>setPaymentForm(p=>({...p,payment_method:e.target.value}))}><option value="mpesa">M-Pesa</option><option value="bank_transfer">Bank transfer</option><option value="cash">Cash</option><option value="cheque">Cheque</option><option value="pdq">PDQ</option></select></Field><Field label="Transaction / cheque reference"><input className={inputClass} value={paymentForm.reference} onChange={e=>setPaymentForm(p=>({...p,reference:e.target.value}))} placeholder="Optional reference" /></Field><Field label="Notes"><input className={inputClass} value={paymentForm.notes} onChange={e=>setPaymentForm(p=>({...p,notes:e.target.value}))} /></Field></div>
           <div className="space-y-3 rounded-lg border border-slate-100 p-3"><div className="flex items-center justify-between"><h3 className="text-xs font-semibold text-slate-700">Payment allocation</h3><button type="button" className="text-xs font-semibold text-orange-700" disabled={!paymentForm.supplier_id} onClick={()=>setAllocations(p=>[...p,emptyAllocation()])}><Plus className="mr-1 inline h-3.5 w-3.5" />Add allocation</button></div>
             {allocations.map((a,index)=><div key={a.key} className="grid grid-cols-[minmax(0,1fr)_120px_32px] items-end gap-2"><Field label={index===0?'Apply to':'Additional allocation'}><select required className={inputClass} value={a.invoice_id} onChange={e=>setAllocations(p=>p.map(x=>x.key===a.key?{...x,invoice_id:e.target.value}:x))}><option value="">Select balance…</option>{openingRemaining>0&&<option value="opening">Opening balance · {money(openingRemaining)}</option>}{supplierOpenInvoices.map(i=><option key={i.id} value={i.id}>{i.invoice_number} · {money(i.total_kes-(invoicePaid.get(i.id)||0)-(invoiceCredited.get(i.id)||0))} due</option>)}</select></Field><Field label="Amount (KES)"><input required type="number" min="0.01" step="0.01" className={inputClass} value={a.amount_kes} onChange={e=>setAllocations(p=>p.map(x=>x.key===a.key?{...x,amount_kes:e.target.value}:x))} /></Field><button type="button" aria-label="Remove allocation" disabled={allocations.length===1} onClick={()=>setAllocations(p=>p.filter(x=>x.key!==a.key))} className="mb-0.5 flex h-10 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30"><X className="h-4 w-4" /></button></div>)}
@@ -400,12 +407,12 @@ export default function PurchasesPage() {
           </div>
           <button type="submit" className={buttonClass} disabled={saving||!paymentForm.supplier_id||paymentTotal<=0}>{saving?'Recording payment…':'Record payment'}</button>
         </form>
-        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white"><div className="flex items-center justify-between border-b border-slate-100 p-4"><div><h2 className="text-sm font-semibold text-slate-900">Payment history</h2><p className="text-xs text-slate-500">Payments recorded by date</p></div><Wallet className="h-4 w-4 text-slate-400" /></div><div className="p-3"><Field label="Payment date"><input type="date" className={inputClass} value={paymentDay} onChange={e=>setPaymentDay(e.target.value)} /></Field></div><div className="divide-y divide-slate-100">{payments.filter(p=>p.payment_date===paymentDay).map(p=><div key={p.id} className="px-4 py-3"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-slate-900">{p.supplier?.name||'Supplier'}</p><p className="text-xs text-slate-500">{p.payment_method.replace('_',' ')} · {p.reference||'No reference'}</p></div><strong className="text-sm tabular-nums text-emerald-700">{money(p.amount_kes)}</strong></div><div className="mt-2 flex flex-wrap gap-1.5">{(p.allocations||[]).map(a=><span key={a.id} className="rounded-md bg-slate-100 px-2 py-1 text-[11px] text-slate-600">{a.invoice?.invoice_number||'Opening balance'}: {money(a.amount_kes)}</span>)}</div>{p.reversal ? <div className="mt-2 rounded-md bg-rose-50 px-2 py-1 text-[11px] text-rose-700">Reversed on {dateLabel(p.reversal.reversal_date)} · {p.reversal.reason}</div> : (currentUser.role==='admin'||currentUser.role==='director') ? <button type="button" onClick={()=>{setReversalTarget(p);setReversalForm({reversal_date:today(),reason:''});}} className="mt-2 text-xs font-semibold text-rose-700 hover:text-rose-800">Reverse payment</button> : null}</div>)}{payments.filter(p=>p.payment_date===paymentDay).length===0&&<p className="px-4 py-10 text-center text-sm text-slate-500">No supplier payments recorded for this date.</p>}</div></section>
+        <section className="overflow-hidden rounded-md border border-slate-300 bg-white"><div className="flex items-center justify-between border-b border-slate-100 p-4"><div><h2 className="text-sm font-semibold text-slate-900">Payment history</h2></div><Wallet className="h-4 w-4 text-slate-400" /></div><div className="p-3"><Field label="Payment date"><input type="date" className={inputClass} value={paymentDay} onChange={e=>setPaymentDay(e.target.value)} /></Field></div><div className="divide-y divide-slate-100">{payments.filter(p=>p.payment_date===paymentDay).map(p=><div key={p.id} className="px-4 py-3"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-slate-900">{p.supplier?.name||'Supplier'}</p><p className="text-xs text-slate-500">{p.payment_method.replace('_',' ')} · {p.reference||'No reference'}</p></div><strong className="text-sm tabular-nums text-emerald-700">{money(p.amount_kes)}</strong></div><div className="mt-2 flex flex-wrap gap-1.5">{(p.allocations||[]).map(a=><span key={a.id} className="rounded-md bg-slate-100 px-2 py-1 text-[11px] text-slate-600">{a.invoice?.invoice_number||'Opening balance'}: {money(a.amount_kes)}</span>)}</div>{p.reversal ? <div className="mt-2 rounded-md bg-rose-50 px-2 py-1 text-[11px] text-rose-700">Reversed on {dateLabel(p.reversal.reversal_date)} · {p.reversal.reason}</div> : (currentUser.role==='admin'||currentUser.role==='director') ? <button type="button" onClick={()=>{setReversalTarget(p);setReversalForm({reversal_date:today(),reason:''});}} className="mt-2 text-xs font-semibold text-rose-700 hover:text-rose-800">Reverse payment</button> : null}</div>)}{payments.filter(p=>p.payment_date===paymentDay).length===0&&<p className="px-4 py-10 text-center text-sm text-slate-500">No supplier payments recorded for this date.</p>}</div></section>
       </section>}
 
       {!loading && tab === 'adjustments' && <section className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <form onSubmit={postCreditNote} className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
-          <div><h2 className="text-sm font-semibold text-slate-900">Post supplier credit note</h2><p className="text-xs text-slate-500">Record a supplier-issued discount, short delivery or accepted return against an unpaid invoice.</p></div>
+        <form onSubmit={postCreditNote} className="space-y-4 rounded-md border border-slate-300 bg-white p-4">
+          <div><h2 className="text-sm font-semibold text-slate-900">Post supplier credit note</h2></div>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Invoice *" className="sm:col-span-2"><select required className={inputClass} value={creditForm.invoice_id} onChange={e=>setCreditForm(p=>({...p,invoice_id:e.target.value}))}><option value="">Choose an unpaid invoice…</option>{outstandingInvoices.map(i=><option key={i.id} value={i.id}>{i.supplier?.name} · {i.invoice_number} · {money(i.total_kes-(invoicePaid.get(i.id)||0)-(invoiceCredited.get(i.id)||0))} outstanding</option>)}</select></Field>
             <Field label="Credit note number *"><input required className={inputClass} value={creditForm.credit_note_number} onChange={e=>setCreditForm(p=>({...p,credit_note_number:e.target.value}))} /></Field>
@@ -416,8 +423,8 @@ export default function PurchasesPage() {
           <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800">Credit notes only reduce the unpaid portion of an invoice. Credits against already-paid amounts are not supported in this version.</p>
           <button type="submit" className={buttonClass} disabled={saving||!outstandingInvoices.length}>{saving?'Posting…':'Post credit note'}</button>
         </form>
-        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-          <div className="border-b border-slate-100 p-4"><h2 className="text-sm font-semibold text-slate-900">Credit note history</h2><p className="text-xs text-slate-500">Posted adjustments · newest first</p></div>
+        <section className="overflow-hidden rounded-md border border-slate-300 bg-white">
+          <div className="border-b border-slate-100 p-4"><h2 className="text-sm font-semibold text-slate-900">Credit note history</h2></div>
           <div className="divide-y divide-slate-100">{creditNotes.map(n=><div key={n.id} className="flex items-start justify-between gap-3 px-4 py-3"><div className="min-w-0"><p className="text-sm font-semibold text-slate-900">{n.credit_note_number} · {n.supplier?.name||'Supplier'}</p><p className="text-xs text-slate-500">{n.invoice?.invoice_number||'Invoice'} · {dateLabel(n.credit_note_date)}</p><p className="mt-1 text-xs text-slate-500">{n.reason}</p></div><strong className="shrink-0 text-sm tabular-nums text-orange-700">{money(n.amount_kes)}</strong></div>)}{creditNotes.length===0&&<p className="px-4 py-10 text-center text-sm text-slate-500">No supplier credit notes recorded.</p>}</div>
         </section>
       </section>}
