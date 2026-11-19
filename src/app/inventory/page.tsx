@@ -8,7 +8,10 @@ import { useToast } from '@/components/ui/toast';
 import { formatKES, hasEmptyState } from '@/lib/formatters';
 import { createClient } from '@/lib/supabase/client';
 import type { Product } from '@/types';
+import { StockSheet } from './stock-sheet';
+import { StockAudit } from './stock-audit';
 
+type Tab = 'stock' | 'daily' | 'adjustment' | 'initial' | 'audit';
 type Stock = { full: number; empty: number };
 type Category = 'all' | 'cylinder' | 'water' | 'accessory';
 const EDIT_ROLES = ['admin', 'director', 'operator'];
@@ -76,8 +79,9 @@ function stockStatus(product: Product, stock: Stock) {
 }
 
 export default function InventoryPage() {
-  const { currentUser, branches, products, inventory, updateBranchStock } = useStore();
+  const { currentUser, branches, products, inventory, updateBranchStock, refreshLiveData } = useStore();
   const { showError, showSuccess } = useToast();
+  const [tab, setTab] = useState<Tab>('stock');
   const [branchId, setBranchId] = useState('all');
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<Category>('all');
@@ -207,17 +211,54 @@ export default function InventoryPage() {
     <p className="mt-1 text-sm text-slate-500">Sign in with an approved staff profile to view stock.</p>
   </div>;
 
-  return <main className="mx-auto max-w-7xl space-y-4 px-4 pb-24 pt-5 sm:px-6 lg:px-8">
-    <header className="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Stock</h1>
-        <p className="mt-1 text-sm text-slate-500">One clear list of products and available quantities.</p>
+  const tabs: Array<{ id: Tab; label: string }> = [
+    { id: 'stock', label: 'Stock' },
+    { id: 'daily', label: 'Daily count' },
+    { id: 'adjustment', label: 'Adjust all' },
+    { id: 'initial', label: 'Initial stock' },
+    { id: 'audit', label: 'Audit trail' },
+  ];
+
+  return <main className="mx-auto max-w-[1440px] space-y-2 px-2 pb-24 pt-2 sm:px-4 lg:px-5">
+    <header className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-300 bg-white px-2.5 py-1.5">
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="text-sm font-bold text-slate-950">Inventory</h1>
+        <nav aria-label="Inventory navigation" className="flex gap-0.5 overflow-x-auto rounded bg-slate-100 p-0.5">
+          {tabs.map(item => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setTab(item.id)}
+              className={`h-7 shrink-0 rounded px-2.5 text-xs font-semibold transition ${tab === item.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
       </div>
-      <Link href="/inventory/transfers" className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
-        <ArrowLeftRight className="h-4 w-4 text-orange-600" /> Stock transfers
+      <Link href="/inventory/transfers" className="inline-flex h-8 items-center gap-1.5 rounded border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
+        <ArrowLeftRight className="h-3.5 w-3.5 text-orange-600" /> Transfers
       </Link>
     </header>
 
+    {(tab === 'daily' || tab === 'adjustment' || tab === 'initial') && (
+      <StockSheet
+        mode={tab}
+        branches={branches}
+        branchId={branchId}
+        onBranchChange={setBranchId}
+        products={products}
+        inventory={inventory}
+        canEdit={canEdit}
+        onApplied={refreshLiveData}
+      />
+    )}
+
+    {tab === 'audit' && (
+      <StockAudit branches={branches} branchId={branchId} onBranchChange={setBranchId} />
+    )}
+
+    {tab === 'stock' && <>
     <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
       <details className="group">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-4 py-3 hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
@@ -370,5 +411,6 @@ export default function InventoryPage() {
         <span>{rows.length} products</span><span>{branchId === 'all' ? 'All branches combined' : activeBranch?.code}</span>
       </div>
     </section>
+    </>}
   </main>;
 }

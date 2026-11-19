@@ -62,22 +62,18 @@ export default function InventoryTransfersPage() {
     if (!valid || saving) return;
     setSaving(true);
     try {
-      // Build every source and destination row first, then write them in one upsert.
-      // Each product can appear only once in this transfer, preventing duplicate row keys.
-      const updates: Array<{ branch_id: string; product_id: string; full_units: number; empty_units: number; updated_at: string }> = [];
-      const timestamp = new Date().toISOString();
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const p = products.find(item => item.id === line.productId)!;
-        const { filled, empty, stock } = lineErrors[i];
-        const target = stockMap.get(`${toId}:${p.id}`) ?? { full: 0, empty: 0 };
-        updates.push(
-          { branch_id: fromId, product_id: p.id, full_units: stock.full - filled, empty_units: stock.empty - empty, updated_at: timestamp },
-          { branch_id: toId, product_id: p.id, full_units: target.full + filled, empty_units: target.empty + empty, updated_at: timestamp }
-        );
-      }
+      const payload = lines.map((line, i) => ({
+        product_id: line.productId,
+        full_units: lineErrors[i].filled,
+        empty_units: lineErrors[i].empty,
+      }));
       const supabase = createClient();
-      const { error } = await supabase.from('branch_inventory').upsert(updates, { onConflict: 'branch_id,product_id' });
+      const { error } = await supabase.rpc('transfer_branch_stock', {
+        p_from_branch_id: fromId,
+        p_to_branch_id: toId,
+        p_note: '',
+        p_lines: payload,
+      });
       if (error) throw error;
       showSuccess(`Transfer completed: ${lines.length} product${lines.length === 1 ? '' : 's'} moved.`);
       window.setTimeout(() => { window.location.href = '/inventory'; }, 700);

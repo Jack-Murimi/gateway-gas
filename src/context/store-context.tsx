@@ -86,6 +86,7 @@ interface StoreContextType {
   updateDeliveryStatus: (orderId: string, status: DeliveryStatus, comment?: string) => void;
   updateRiderComment: (orderId: string, comment: string) => void;
   updateBranchStock: (branchId: string, productId: string, fullDelta: number, emptyDelta: number) => void;
+  refreshLiveData: () => Promise<void>;
   createBranch: (name: string, code: string, location_estate: string, contact_phone: string) => void;
   createShiftReport: (data: Omit<ShiftZReport, 'id' | 'report_number' | 'closed_at'>) => Promise<ShiftZReport>;
   resetDemoData: () => void;
@@ -752,6 +753,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         updateDeliveryStatus,
         updateRiderComment,
         updateBranchStock,
+        refreshLiveData: fetchLiveData,
         createBranch,
         createShiftReport,
         resetDemoData,
