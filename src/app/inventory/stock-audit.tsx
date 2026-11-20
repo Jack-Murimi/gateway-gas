@@ -5,8 +5,9 @@ import { RefreshCw } from 'lucide-react';
 import type { Branch } from '@/types';
 import { createClient } from '@/lib/supabase/client';
 import { fieldClass, labelClass } from '@/components/pos/pos-ui';
+import { Skeleton } from '@/components/ui/skeleton';
 
-type AuditAction = 'all' | 'initial' | 'daily' | 'adjustment' | 'sale' | 'purchase' | 'transfer' | 'edit';
+type AuditAction = 'all' | 'initial' | 'daily' | 'adjustment' | 'sale' | 'cancel' | 'purchase' | 'transfer' | 'edit';
 
 interface AuditRow {
   id: string;
@@ -19,6 +20,7 @@ interface AuditRow {
   new_full: number;
   new_empty: number;
   note: string | null;
+  stock_date?: string | null;
   created_at: string;
   branch?: { name: string } | { name: string }[] | null;
   product?: { name: string; brand: string; size_kg: number | null } | { name: string; brand: string; size_kg: number | null }[] | null;
@@ -30,6 +32,7 @@ const ACTION_STYLE: Record<Exclude<AuditAction, 'all'>, { label: string; cls: st
   daily: { label: 'Daily count', cls: 'bg-sky-50 text-sky-800' },
   adjustment: { label: 'Adjustment', cls: 'bg-amber-50 text-amber-800' },
   sale: { label: 'Sale', cls: 'bg-emerald-50 text-emerald-800' },
+  cancel: { label: 'Cancelled', cls: 'bg-rose-50 text-rose-800' },
   purchase: { label: 'Purchase', cls: 'bg-indigo-50 text-indigo-800' },
   transfer: { label: 'Transfer', cls: 'bg-orange-50 text-orange-800' },
   edit: { label: 'Quick edit', cls: 'bg-slate-100 text-slate-700' },
@@ -52,15 +55,24 @@ export function StockAudit({ branches, branchId, onBranchChange }: { branches: B
   const load = useCallback(async () => {
     setLoading(true);
     const supabase = createClient();
-    let q = supabase
-      .from('stock_audit_log')
-      .select('id,batch_id,action,branch_id,product_id,prev_full,prev_empty,new_full,new_empty,note,created_at,branch:branches(name),product:products(name,brand,size_kg),actor:profiles(full_name)')
-      .order('created_at', { ascending: false })
-      .limit(250);
-    if (branchId !== 'all') q = q.eq('branch_id', branchId);
-    if (action !== 'all') q = q.eq('action', action);
-    if (day) q = q.gte('created_at', `${day}T00:00:00`).lte('created_at', `${day}T23:59:59.999`);
-    const { data } = await q;
+    const runQuery = (includeStockDate: boolean) => {
+      const cols = includeStockDate
+        ? 'id,batch_id,action,branch_id,product_id,prev_full,prev_empty,new_full,new_empty,note,stock_date,created_at,branch:branches(name),product:products(name,brand,size_kg),actor:profiles(full_name)'
+        : 'id,batch_id,action,branch_id,product_id,prev_full,prev_empty,new_full,new_empty,note,created_at,branch:branches(name),product:products(name,brand,size_kg),actor:profiles(full_name)';
+      let q = supabase
+        .from('stock_audit_log')
+        .select(cols)
+        .order('created_at', { ascending: false })
+        .limit(250);
+      if (branchId !== 'all') q = q.eq('branch_id', branchId);
+      if (action !== 'all') q = q.eq('action', action);
+      if (day) q = q.gte('created_at', `${day}T00:00:00`).lte('created_at', `${day}T23:59:59.999`);
+      return q;
+    };
+    let { data, error } = await runQuery(true);
+    if (error && error.code === '42703') {
+      ({ data } = await runQuery(false));
+    }
     setRows((data as unknown as AuditRow[]) || []);
     setLoading(false);
   }, [branchId, action, day]);
@@ -112,14 +124,31 @@ export function StockAudit({ branches, branchId, onBranchChange }: { branches: B
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {rows.map(r => {
+              {loading && Array.from({ length: 8 }).map((_, i) => (
+                <tr key={`sk-${i}`} className="odd:bg-white even:bg-slate-50/50">
+                  <td className="px-2.5 py-2"><Skeleton className="h-3.5 w-24 rounded" /></td>
+                  <td className="px-2 py-2"><Skeleton className="h-4 w-16 rounded" /></td>
+                  <td className="px-2 py-2"><Skeleton className="h-3.5 w-20 rounded" /></td>
+                  <td className="px-2 py-2"><Skeleton className="h-3.5 w-36 rounded" /></td>
+                  <td className="px-2 py-2"><Skeleton className="ml-auto h-3.5 w-16 rounded" /></td>
+                  <td className="px-2 py-2"><Skeleton className="ml-auto h-3.5 w-16 rounded" /></td>
+                  <td className="px-2 py-2"><Skeleton className="h-3.5 w-24 rounded" /></td>
+                  <td className="px-2.5 py-2"><Skeleton className="h-3.5 w-32 rounded" /></td>
+                </tr>
+              ))}
+              {!loading && rows.map(r => {
                 const p = pick(r.product);
                 const b = pick(r.branch);
                 const a = pick(r.actor);
                 const meta = ACTION_STYLE[r.action] ?? ACTION_STYLE.edit;
                 return (
                   <tr key={r.id} className="odd:bg-white even:bg-slate-50/50">
-                    <td className="whitespace-nowrap px-2.5 py-1.5 tabular-nums text-slate-600">{new Date(r.created_at).toLocaleString('en-KE', { dateStyle: 'short', timeStyle: 'short' })}</td>
+                    <td className="whitespace-nowrap px-2.5 py-1.5 tabular-nums text-slate-600">
+                      <div>{new Date(r.created_at).toLocaleString('en-KE', { dateStyle: 'short', timeStyle: 'short' })}</div>
+                      {r.stock_date && r.action === 'initial' && (
+                        <div className="text-[10px] font-medium text-purple-700">Stock date: {r.stock_date}</div>
+                      )}
+                    </td>
                     <td className="px-2 py-1.5"><span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold ${meta.cls}`}>{meta.label}</span></td>
                     <td className="px-2 py-1.5 font-medium text-slate-700">{b?.name ?? '—'}</td>
                     <td className="px-2 py-1.5 font-semibold text-slate-900">{p ? `${p.name} (${p.brand}${p.size_kg ? ` ${p.size_kg}kg` : ''})` : '—'}</td>

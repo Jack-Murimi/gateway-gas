@@ -406,6 +406,7 @@ export default function CustomersPage() {
                         query={debounced}
                         selected={selectedId === c.id}
                         onOpen={openDetails}
+                        onDoubleClick={(cust) => router.push(`/customers/${cust.id}`)}
                         t={t}
                       />
                     </div>

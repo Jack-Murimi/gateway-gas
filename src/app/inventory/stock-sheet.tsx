@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, RotateCcw, Search, X } from 'lucide-react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, CheckCircle2, RotateCcw, Search, X } from 'lucide-react';
 import type { Branch, BranchInventory, Product } from '@/types';
 import { hasEmptyState } from '@/lib/formatters';
+import { groupProducts, sortProducts } from '@/lib/product-order';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/toast';
 import { fieldClass, labelClass } from '@/components/pos/pos-ui';
@@ -13,7 +14,7 @@ type Draft = { full: string; empty: string };
 type Category = 'all' | 'cylinder' | 'water' | 'accessory';
 
 const COLS = 'md:grid-cols-[minmax(0,1fr)_84px_100px_100px_96px]';
-const cell = 'h-7 w-full rounded border border-slate-300 bg-white px-1.5 text-right text-xs font-semibold tabular-nums text-slate-900 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 disabled:bg-slate-100 disabled:text-slate-400';
+const cell = 'h-8 w-full scroll-mt-40 rounded border border-slate-300 bg-white px-2 text-right text-xs font-semibold tabular-nums text-slate-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30 disabled:bg-slate-100 disabled:text-slate-400';
 
 const diffBadge = (d: number) =>
   d === 0 ? <span className="text-slate-300">0</span>
@@ -36,17 +37,23 @@ export function StockSheet({
   const { showError, showSuccess } = useToast();
   const activeBranches = useMemo(() => branches.filter(b => b.is_active), [branches]);
   const targetBranchId = branchId !== 'all' && activeBranches.some(b => b.id === branchId) ? branchId : activeBranches[0]?.id || '';
+  const activeBranch = useMemo(() => activeBranches.find(b => b.id === targetBranchId), [activeBranches, targetBranchId]);
+  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [note, setNote] = useState('');
+  const [stockDate, setStockDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<Category>('all');
   const [onlyChanged, setOnlyChanged] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [initialInfo, setInitialInfo] = useState<{ takenAt: string; actor?: string } | null>(null);
+  const [initialInfo, setInitialInfo] = useState<{ stockDate?: string | null; takenAt: string; actor?: string } | null>(null);
+  const [postDateOrderCount, setPostDateOrderCount] = useState(0);
+  const [activeCell, setActiveCell] = useState<{ productId: string; name: string; field: 'full' | 'empty' } | null>(null);
+  const today = useMemo(() => new Date().toLocaleDateString('en-CA'), []);
 
   const activeProducts = useMemo(
-    () => [...products].filter(p => p.is_active).sort((a, b) => a.brand.localeCompare(b.brand) || (a.size_kg ?? 0) - (b.size_kg ?? 0) || a.name.localeCompare(b.name)),
+    () => sortProducts(products.filter(p => p.is_active)),
     [products]
   );
 
@@ -70,21 +77,63 @@ export function StockSheet({
     if (mode !== 'initial' || !targetBranchId) { setInitialInfo(null); return; }
     let live = true;
     const supabase = createClient();
-    void supabase
-      .from('stock_audit_log')
-      .select('created_at, actor:profiles(full_name)')
-      .eq('branch_id', targetBranchId)
-      .eq('action', 'initial')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!live) return;
-        const actor = (data as any)?.actor;
-        setInitialInfo(data ? { takenAt: data.created_at, actor: Array.isArray(actor) ? actor[0]?.full_name : actor?.full_name } : null);
-      });
+    const loadInitialInfo = async () => {
+      let res = await supabase
+        .from('stock_audit_log')
+        .select('stock_date, created_at, actor:profiles(full_name)')
+        .eq('branch_id', targetBranchId)
+        .eq('action', 'initial')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (res.error && res.error.code === '42703') {
+        res = await supabase
+          .from('stock_audit_log')
+          .select('created_at, actor:profiles(full_name)')
+          .eq('branch_id', targetBranchId)
+          .eq('action', 'initial')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle() as typeof res;
+      }
+
+      if (!live) return;
+      const data = res.data as any;
+      const actor = data?.actor;
+      setInitialInfo(
+        data
+          ? {
+              stockDate: data.stock_date ?? null,
+              takenAt: data.created_at,
+              actor: Array.isArray(actor) ? actor[0]?.full_name : actor?.full_name,
+            }
+          : null,
+      );
+    };
+    void loadInitialInfo();
     return () => { live = false; };
   }, [mode, targetBranchId]);
+
+  useEffect(() => {
+    if (mode !== 'initial' || !targetBranchId || !stockDate || initialInfo) {
+      setPostDateOrderCount(0);
+      return;
+    }
+    let live = true;
+    const supabase = createClient();
+    void supabase
+      .from('orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('branch_id', targetBranchId)
+      .neq('delivery_status', 'cancelled')
+      .gt('created_at', `${stockDate}T23:59:59.999`)
+      .then(({ count }) => {
+        if (!live) return;
+        setPostDateOrderCount(count ?? 0);
+      });
+    return () => { live = false; };
+  }, [mode, targetBranchId, stockDate, initialInfo]);
 
   const parse = (v: string | undefined, fallback: number) => {
     if (v === undefined || v.trim() === '') return fallback;
@@ -111,6 +160,62 @@ export function StockSheet({
     });
   }, [activeProducts, systemStock, drafts, search, category, onlyChanged]);
 
+  const groupedRows = useMemo(
+    () => groupProducts(rows, r => r.product),
+    [rows]
+  );
+
+  const flatRows = useMemo(
+    () => groupedRows.flatMap(g => g.items),
+    [groupedRows]
+  );
+
+  const focusCell = useCallback((productId: string, field: 'full' | 'empty') => {
+    const el = inputRefs.current[`${productId}:${field}`];
+    if (!el || el.disabled) return;
+    el.focus();
+    el.select();
+    el.scrollIntoView({ block: 'nearest' });
+  }, []);
+
+  const handleCellKeyDown = useCallback((
+    e: React.KeyboardEvent<HTMLInputElement>,
+    productId: string,
+    field: 'full' | 'empty',
+  ) => {
+    const idx = flatRows.findIndex(r => r.product.id === productId);
+    if (idx === -1) return;
+
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (idx > 0) {
+        const target = flatRows[idx - 1];
+        focusCell(target.product.id, field === 'empty' && target.returnable ? 'empty' : 'full');
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowDown' || e.key === 'Enter') {
+      e.preventDefault();
+      if (idx < flatRows.length - 1) {
+        const target = flatRows[idx + 1];
+        focusCell(target.product.id, field === 'empty' && target.returnable ? 'empty' : 'full');
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowRight' && field === 'full' && flatRows[idx].returnable) {
+      e.preventDefault();
+      focusCell(productId, 'empty');
+      return;
+    }
+
+    if (e.key === 'ArrowLeft' && field === 'empty') {
+      e.preventDefault();
+      focusCell(productId, 'full');
+    }
+  }, [flatRows, focusCell]);
+
   const changedCount = useMemo(() => {
     return activeProducts.filter(p => {
       const sys = systemStock(p.id);
@@ -129,30 +234,66 @@ export function StockSheet({
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (locked || !targetBranchId) return;
+    if (mode === 'initial' && !stockDate) { showError('Select the date the initial stock was taken.'); return; }
     if (needNote && !note.trim()) { showError('Enter a reason for the stock adjustment.'); return; }
     if (mode !== 'initial' && changedCount === 0) { showError('No quantities have changed.'); return; }
     setSaving(true);
-    const lines = activeProducts.map(p => {
-      const sys = systemStock(p.id);
-      const d = drafts[p.id];
-      return {
-        product_id: p.id,
-        full_units: parse(d?.full, sys.full),
-        empty_units: hasEmptyState(p) ? parse(d?.empty, sys.empty) : 0,
-      };
-    });
+    const lines = activeProducts
+      .map(p => {
+        const sys = systemStock(p.id);
+        const returnable = hasEmptyState(p);
+        const d = drafts[p.id];
+        const full_units = parse(d?.full, sys.full);
+        const empty_units = returnable ? parse(d?.empty, sys.empty) : 0;
+        const changed = full_units !== sys.full || (returnable && empty_units !== sys.empty);
+        return {
+          product_id: p.id,
+          full_units,
+          empty_units,
+          ...(mode !== 'initial' ? { expected_full: sys.full, expected_empty: returnable ? sys.empty : 0 } : {}),
+          _changed: changed,
+        };
+      })
+      .filter(line => mode === 'initial' || line._changed)
+      .map(({ _changed: _, ...rest }) => rest);
+    const resolvedNote = note.trim() || (
+      mode === 'daily'
+        ? `Daily count ${new Date().toLocaleDateString('en-CA')}`
+        : mode === 'initial'
+          ? `Opening stock (${stockDate})`
+          : ''
+    );
     const supabase = createClient();
-    const { data, error } = await supabase.rpc('apply_branch_stock', {
-      p_branch_id: targetBranchId,
-      p_action: mode,
-      p_note: note.trim() || (mode === 'daily' ? `Daily count ${new Date().toLocaleDateString('en-CA')}` : mode === 'initial' ? 'Opening stock' : ''),
-      p_lines: lines,
-    });
+    let { data, error } = mode === 'initial'
+      ? await supabase.rpc('apply_branch_stock', {
+          p_branch_id: targetBranchId,
+          p_action: mode,
+          p_note: resolvedNote,
+          p_lines: lines,
+          p_stock_date: stockDate,
+        })
+      : await supabase.rpc('apply_branch_stock', {
+          p_branch_id: targetBranchId,
+          p_action: mode,
+          p_note: resolvedNote,
+          p_lines: lines,
+        });
+
+    if (error && mode === 'initial' && error.code === 'PGRST202') {
+      const fallbackNote = note.trim() ? `Stock date ${stockDate} · ${note.trim()}` : `Opening stock (${stockDate})`;
+      ({ data, error } = await supabase.rpc('apply_branch_stock', {
+        p_branch_id: targetBranchId,
+        p_action: mode,
+        p_note: fallbackNote,
+        p_lines: lines,
+      }));
+    }
+
     setSaving(false);
     if (error) { showError(error.message); return; }
     setNote('');
     await onApplied();
-    if (mode === 'initial') setInitialInfo({ takenAt: new Date().toISOString() });
+    if (mode === 'initial') setInitialInfo({ stockDate, takenAt: new Date().toISOString() });
     showSuccess(`${mode === 'initial' ? 'Initial stock' : mode === 'daily' ? 'Daily count' : 'Stock adjustment'} saved (${(data as any)?.changed ?? changedCount} rows logged).`);
   };
 
@@ -161,13 +302,28 @@ export function StockSheet({
 
   return (
     <form onSubmit={submit} className="space-y-2">
-      <section className="grid grid-cols-2 items-end gap-1.5 rounded-md border border-slate-300 bg-white p-2 sm:grid-cols-4 lg:grid-cols-[180px_minmax(0,1fr)_120px_minmax(0,1.2fr)_auto]">
+      <section className={`grid grid-cols-2 items-end gap-1.5 rounded-md border border-slate-300 bg-white p-2 sm:grid-cols-4 ${mode === 'initial' ? 'lg:grid-cols-[170px_145px_minmax(0,1fr)_115px_minmax(0,1fr)_auto]' : 'lg:grid-cols-[180px_minmax(0,1fr)_120px_minmax(0,1.2fr)_auto]'}`}>
         <div>
           <label className={labelClass}>Branch *</label>
           <select value={targetBranchId} onChange={e => onBranchChange(e.target.value)} className={fieldClass}>
             {activeBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         </div>
+        {mode === 'initial' && (
+          <div>
+            <label htmlFor="initial-stock-date" className={labelClass}>Stock date *</label>
+            <input
+              id="initial-stock-date"
+              type="date"
+              required
+              max={today}
+              disabled={locked}
+              value={stockDate}
+              onChange={e => setStockDate(e.target.value)}
+              className={fieldClass}
+            />
+          </div>
+        )}
         <div className="relative">
           <label className={labelClass}>Filter products</label>
           <Search className="pointer-events-none absolute bottom-2 left-2 h-3.5 w-3.5 text-slate-400" />
@@ -211,61 +367,124 @@ export function StockSheet({
         </div>
       </section>
 
+      {mode === 'initial' && !initialInfo && postDateOrderCount > 0 && (
+        <div className="flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700" />
+          <span>
+            <strong>Heads up:</strong> {postDateOrderCount} order{postDateOrderCount === 1 ? '' : 's'} already exist for this branch after <strong>{stockDate}</strong>. Saving initial stock sets current live branch quantities directly.
+          </span>
+        </div>
+      )}
+
       {mode === 'initial' && initialInfo && (
         <div className="flex items-center justify-between gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
           <span className="flex items-center gap-1.5 font-medium">
             <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-700" />
-            Initial stock for this branch was recorded on {new Date(initialInfo.takenAt).toLocaleString('en-KE')}{initialInfo.actor ? ` by ${initialInfo.actor}` : ''}.
+            Initial stock for this branch was taken{initialInfo.stockDate ? ` on ${new Date(`${initialInfo.stockDate}T00:00:00`).toLocaleDateString('en-KE', { dateStyle: 'medium' })}` : ''} (recorded {new Date(initialInfo.takenAt).toLocaleString('en-KE')}{initialInfo.actor ? ` by ${initialInfo.actor}` : ''}).
           </span>
           <span className="text-emerald-700">Use Daily count or Adjust all for later changes.</span>
         </div>
       )}
 
-      <div className="overflow-hidden rounded-md border border-slate-300 bg-white">
-        <div className={`hidden gap-x-2 border-b border-slate-300 bg-slate-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 md:grid ${COLS}`}>
-          <span>Product</span>
-          <span className="text-right">System (F / E)</span>
-          <span className="text-right">{colHeader} full</span>
-          <span className="text-right">{colHeader} empty</span>
-          <span className="text-right">Diff (F / E)</span>
+      <div className="rounded-md border border-slate-300 bg-white">
+        <div className="sticky top-14 z-20 rounded-t-md border-b border-slate-300 bg-slate-100/95 shadow-sm backdrop-blur sm:top-16">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white/95 px-2.5 py-1.5 text-xs">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="truncate font-bold text-slate-900">{activeBranch?.name || 'Select branch'}</span>
+              <span className="rounded bg-orange-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-700">{title}</span>
+              {mode === 'initial' && stockDate && (
+                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-slate-700">
+                  Date: {stockDate}
+                </span>
+              )}
+              {activeCell && (
+                <span className="hidden truncate rounded bg-slate-900 px-2 py-0.5 text-[11px] font-semibold text-white sm:inline-block">
+                  Editing: {activeCell.name} · {activeCell.field === 'full' ? 'Full' : 'Empty'}
+                </span>
+              )}
+            </div>
+            <span className="shrink-0 text-[11px] font-medium tabular-nums text-slate-500">
+              {rows.length} items{changedCount > 0 ? ` · ${changedCount} changed` : ''}
+            </span>
+          </div>
+          <div className={`hidden gap-x-2 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600 md:grid ${COLS}`}>
+            <span>Product</span>
+            <span className="text-right">System (F / E)</span>
+            <span className="text-right">{colHeader} full</span>
+            <span className="text-right">{colHeader} empty</span>
+            <span className="text-right">Diff (F / E)</span>
+          </div>
+          <div className="grid grid-cols-12 gap-x-2 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600 md:hidden">
+            <span className="col-span-3">Sys (F/E)</span>
+            <span className="col-span-3 text-right">{colHeader} full</span>
+            <span className="col-span-3 text-right">{colHeader} empty</span>
+            <span className="col-span-3 text-right">Diff</span>
+          </div>
         </div>
         <ul className="divide-y divide-slate-200">
-          {rows.map(r => (
-            <li key={r.product.id} className={`grid grid-cols-12 items-center gap-x-2 gap-y-1 px-2.5 py-1.5 ${COLS} ${r.changed ? 'bg-amber-50/60' : 'odd:bg-white even:bg-slate-50/50'}`}>
-              <div className="col-span-12 min-w-0 md:col-span-1">
-                <p className="truncate text-[13px] font-semibold leading-tight text-slate-900">{r.product.name}</p>
-                <p className="truncate text-[11px] leading-tight text-slate-500">{r.product.brand}{r.product.size_kg ? ` · ${r.product.size_kg}kg` : ''} · {r.product.category}</p>
-              </div>
-              <div className="col-span-3 text-xs tabular-nums text-slate-500 md:col-span-1 md:text-right">
-                <span className="text-[9px] uppercase text-slate-400 md:hidden">Sys </span>
-                {r.sys.full} / {r.returnable ? r.sys.empty : '—'}
-              </div>
-              <div className="col-span-3 md:col-span-1">
-                <input
-                  aria-label={`${colHeader} full for ${r.product.name}`}
-                  type="number" min="0" step="1" inputMode="numeric" disabled={locked}
-                  value={r.d?.full ?? String(r.sys.full)}
-                  onFocus={e => e.currentTarget.select()}
-                  onChange={e => patch(r.product.id, { full: e.target.value })}
-                  className={cell}
-                />
-              </div>
-              <div className="col-span-3 md:col-span-1">
-                {r.returnable ? (
-                  <input
-                    aria-label={`${colHeader} empty for ${r.product.name}`}
-                    type="number" min="0" step="1" inputMode="numeric" disabled={locked}
-                    value={r.d?.empty ?? String(r.sys.empty)}
-                    onFocus={e => e.currentTarget.select()}
-                    onChange={e => patch(r.product.id, { empty: e.target.value })}
-                    className={cell}
-                  />
-                ) : <span className="block text-right text-xs text-slate-300">—</span>}
-              </div>
-              <div className="col-span-3 text-right text-xs tabular-nums md:col-span-1">
-                {diffBadge(r.dFull)} <span className="text-slate-300">/</span> {r.returnable ? diffBadge(r.dEmpty) : <span className="text-slate-300">—</span>}
-              </div>
-            </li>
+          {groupedRows.map(group => (
+            <Fragment key={group.key}>
+              <li className="flex items-center justify-between bg-slate-100/90 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-700">
+                <span>{group.label}</span>
+                <span className="text-[10px] font-semibold tabular-nums text-slate-500">{group.items.length}</span>
+              </li>
+              {group.items.map(r => {
+                const isActive = activeCell?.productId === r.product.id;
+                return (
+                <li
+                  key={r.product.id}
+                  className={`group grid scroll-mt-40 grid-cols-12 items-center gap-x-2 gap-y-1 border-l-4 px-2 py-1.5 transition-colors ${COLS} ${
+                    isActive
+                      ? 'border-l-orange-600 bg-orange-100/75 ring-1 ring-inset ring-orange-400'
+                      : r.changed
+                        ? 'border-l-amber-400 bg-amber-50/60'
+                        : 'border-l-transparent odd:bg-white even:bg-slate-50/50'
+                  }`}
+                >
+                  <div className="col-span-12 flex min-w-0 items-center md:col-span-1">
+                    <p className={`truncate text-sm ${isActive ? 'font-bold text-orange-950' : 'font-semibold text-slate-900'}`}>{r.product.name}</p>
+                  </div>
+                  <div className="col-span-3 text-xs tabular-nums text-slate-500 md:col-span-1 md:text-right">
+                    <span className="text-[9px] uppercase text-slate-400 md:hidden">Sys </span>
+                    {r.sys.full} / {r.returnable ? r.sys.empty : '—'}
+                  </div>
+                  <div className="col-span-3 md:col-span-1">
+                    <input
+                      ref={el => { inputRefs.current[`${r.product.id}:full`] = el; }}
+                      aria-label={`${colHeader} full for ${r.product.name}`}
+                      type="number" min="0" step="1" inputMode="numeric" disabled={locked}
+                      value={r.d?.full ?? String(r.sys.full)}
+                      onFocus={e => { e.currentTarget.select(); setActiveCell({ productId: r.product.id, name: r.product.name, field: 'full' }); }}
+                      onBlur={() => setActiveCell(prev => (prev?.productId === r.product.id && prev.field === 'full' ? null : prev))}
+                      onWheel={e => e.currentTarget.blur()}
+                      onKeyDown={e => handleCellKeyDown(e, r.product.id, 'full')}
+                      onChange={e => patch(r.product.id, { full: e.target.value })}
+                      className={cell}
+                    />
+                  </div>
+                  <div className="col-span-3 md:col-span-1">
+                    {r.returnable ? (
+                      <input
+                        ref={el => { inputRefs.current[`${r.product.id}:empty`] = el; }}
+                        aria-label={`${colHeader} empty for ${r.product.name}`}
+                        type="number" min="0" step="1" inputMode="numeric" disabled={locked}
+                        value={r.d?.empty ?? String(r.sys.empty)}
+                        onFocus={e => { e.currentTarget.select(); setActiveCell({ productId: r.product.id, name: r.product.name, field: 'empty' }); }}
+                        onBlur={() => setActiveCell(prev => (prev?.productId === r.product.id && prev.field === 'empty' ? null : prev))}
+                        onWheel={e => e.currentTarget.blur()}
+                        onKeyDown={e => handleCellKeyDown(e, r.product.id, 'empty')}
+                        onChange={e => patch(r.product.id, { empty: e.target.value })}
+                        className={cell}
+                      />
+                    ) : <span className="block text-right text-xs text-slate-300">—</span>}
+                  </div>
+                  <div className="col-span-3 text-right text-xs tabular-nums md:col-span-1">
+                    {diffBadge(r.dFull)} <span className="text-slate-300">/</span> {r.returnable ? diffBadge(r.dEmpty) : <span className="text-slate-300">—</span>}
+                  </div>
+                </li>
+                );
+              })}
+            </Fragment>
           ))}
           {rows.length === 0 && <li className="px-3 py-8 text-center text-xs text-slate-500">No matching products.</li>}
         </ul>

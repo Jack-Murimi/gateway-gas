@@ -13,6 +13,7 @@ export const CustomerRow = memo(function CustomerRow({
   query,
   selected,
   onOpen,
+  onDoubleClick,
   t,
 }: {
   customer: Customer;
@@ -20,6 +21,7 @@ export const CustomerRow = memo(function CustomerRow({
   query: string;
   selected: boolean;
   onOpen: (c: Customer) => void;
+  onDoubleClick?: (c: Customer) => void;
   t: T;
 }) {
   const primary = primaryPhoneOf(c);
@@ -49,6 +51,8 @@ export const CustomerRow = memo(function CustomerRow({
       <button
         type="button"
         onClick={() => onOpen(c)}
+        onDoubleClick={() => onDoubleClick?.(c)}
+        title="Double-click to open full customer profile"
         aria-current={selected || undefined}
         className="flex min-h-[82px] min-w-0 flex-1 items-center gap-3 rounded-2xl p-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange-400 lg:min-h-[66px] lg:rounded-xl lg:p-2.5"
       >

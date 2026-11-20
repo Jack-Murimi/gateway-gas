@@ -20,10 +20,12 @@ import {
   ShiftZReport,
 } from '@/types';
 import { createClient } from '@/lib/supabase/client';
+import { Skeleton } from '@/components/ui/skeleton';
 import { setDemoSessionCookies, clearDemoSessionCookies } from '@/lib/demo-mode';
 import { clearCustomerCache, prepareCustomerCache, readCachedCustomers, syncCustomerCache, upsertCachedCustomer, patchCachedCustomer } from '@/lib/customer-cache';
 
 interface CreateOrderParams {
+  client_request_id?: string;
   branch_id: string;
   is_pos_walkin: boolean;
   customer_id?: string | null;
@@ -73,6 +75,7 @@ interface StoreContextType {
   approveStaff: (staffId: string, role: UserRole) => void;
   rejectStaff: (staffId: string) => void;
   createOrder: (params: CreateOrderParams) => Promise<Order>;
+  cancelOrder: (orderId: string, reason?: string) => Promise<void>;
   createCustomer: (name: string, phone: string, estate: string, specificAddress?: string) => Promise<Customer>;
   updateCustomer: (customerId: string, name: string) => Promise<void>;
   setCustomerActive: (customerId: string, isActive: boolean) => Promise<void>;
@@ -85,7 +88,6 @@ interface StoreContextType {
   assignRider: (orderId: string, riderId: string) => void;
   updateDeliveryStatus: (orderId: string, status: DeliveryStatus, comment?: string) => void;
   updateRiderComment: (orderId: string, comment: string) => void;
-  updateBranchStock: (branchId: string, productId: string, fullDelta: number, emptyDelta: number) => void;
   refreshLiveData: () => Promise<void>;
   createBranch: (name: string, code: string, location_estate: string, contact_phone: string) => void;
   createShiftReport: (data: Omit<ShiftZReport, 'id' | 'report_number' | 'closed_at'>) => Promise<ShiftZReport>;
@@ -313,121 +315,79 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     })();
   };
 
-  const updateBranchStock = (branchId: string, productId: string, fullDelta: number, emptyDelta: number) => {
-    (async () => {
-      try {
-        const supabase = createClient();
-        const current = inventory.find((i) => i.branch_id === branchId && i.product_id === productId);
-        const full_units = Math.max(0, (current?.full_units ?? 0) + fullDelta);
-        const empty_units = Math.max(0, (current?.empty_units ?? 0) + emptyDelta);
-        await supabase.from('branch_inventory').upsert({ branch_id: branchId, product_id: productId, full_units, empty_units, updated_at: new Date().toISOString() }, { onConflict: 'branch_id,product_id' });
-        await fetchLiveData();
-      } catch (e) { console.error(e); }
-    })();
-  };
-
   const createOrder = async (params: CreateOrderParams): Promise<Order> => {
     const supabase = createClient();
 
-    // Validate stock locally against latest known inventory
-    const requestedBySource = new Map<string, number>();
-    params.items.forEach((item) => {
-      const key = `${item.branch_id || params.branch_id}:${item.product_id}`;
-      requestedBySource.set(key, (requestedBySource.get(key) || 0) + item.quantity);
-    });
-    for (const [key, requested] of requestedBySource) {
-      const [sourceBranchId, productId] = key.split(':');
-      const stock = inventory.find((row) => row.branch_id === sourceBranchId && row.product_id === productId);
-      if (!stock || stock.full_units < requested) {
-        const productName = products.find((p) => p.id === productId)?.name || 'Selected product';
-        const branchName = branches.find((b) => b.id === sourceBranchId)?.name || 'selected branch';
-        throw new Error(`Insufficient stock: ${productName} has ${stock?.full_units ?? 0} available at ${branchName}, but ${requested} requested.`);
-      }
-    }
+    const p_order = {
+      client_request_id: params.client_request_id || null,
+      customer_id: params.customer_id || null,
+      branch_id: params.branch_id,
+      is_pos_walkin: params.is_pos_walkin,
+      rider_ids: params.rider_ids || [],
+      vehicle_plate: params.vehicle_plate || null,
+      receipt_number: params.receipt_number || null,
+      lpo_number: params.lpo_number || null,
+      sale_comment: params.sale_comment || null,
+      customer_name: params.customer_name,
+      customer_phone: params.customer_phone,
+      delivery_estate: params.delivery_estate || null,
+      delivery_address: params.delivery_address || null,
+      payment_method: params.payment_method,
+      payment_status: params.payment_status,
+      payment_reference: params.payment_reference || null,
+      delivery_fee_kes: params.delivery_fee_kes,
+      created_at: params.created_at || new Date().toISOString(),
+    };
 
-    const orderNumber = `GWG-${Math.floor(1000 + Math.random() * 9000)}`;
-    const itemsPayload = params.items.map((item) => ({
+    const p_items = params.items.map((item) => ({
       product_id: item.product_id,
+      branch_id: item.branch_id || params.branch_id,
       order_type: item.order_type,
       outgoing_brand: item.outgoing_brand,
       incoming_brand: item.incoming_brand || null,
       cylinder_size_kg: item.cylinder_size_kg ?? null,
       quantity: item.quantity,
       unit_price_kes: item.unit_price_kes,
-      subtotal_kes: item.quantity * item.unit_price_kes,
-      branch_id: item.branch_id || params.branch_id,
     }));
-    const subtotal = itemsPayload.reduce((acc, i) => acc + i.subtotal_kes, 0);
-    const total = subtotal + params.delivery_fee_kes;
 
-    const { data: inserted, error: orderError } = await supabase
-      .from('orders')
-      .insert({
-        order_number: orderNumber,
-        branch_id: params.branch_id,
-        sales_rep_id: currentUser?.id || null,
-        rider_id: params.rider_ids?.[0] || null,
-        rider_ids: params.rider_ids || [],
-        vehicle_plate: params.vehicle_plate || null,
-        receipt_number: params.receipt_number || null,
-        lpo_number: params.lpo_number || null,
-        sale_comment: params.sale_comment || null,
-        is_pos_walkin: params.is_pos_walkin,
-        customer_name: params.customer_name,
-        customer_phone: params.customer_phone,
-        delivery_estate: params.delivery_estate || null,
-        delivery_address: params.delivery_address || null,
-        delivery_status: params.is_pos_walkin ? 'delivered' : params.rider_ids?.length ? 'assigned' : 'pending',
-        payment_method: params.payment_method,
-        payment_status: params.payment_status,
-        payment_reference: params.payment_reference || null,
-        subtotal_kes: subtotal,
-        delivery_fee_kes: params.delivery_fee_kes,
-        total_kes: total,
-        assigned_at: !params.is_pos_walkin && params.rider_ids?.length ? new Date().toISOString() : null,
-        delivered_at: params.is_pos_walkin ? new Date().toISOString() : null,
-        created_at: params.created_at || new Date().toISOString(),
-      })
-      .select('*')
-      .single();
-    if (orderError || !inserted) throw orderError || new Error('Failed to create order');
+    const { data: orderId, error } = await supabase.rpc('create_pos_order', {
+      p_order,
+      p_items,
+    });
 
-    const withOrderId = itemsPayload.map((it) => ({ ...it, order_id: inserted.id }));
-    const { error: itemsError } = await supabase.from('order_items').insert(withOrderId);
-    if (itemsError) throw itemsError;
-
-    // Update inventory in DB. Running totals so several rows of one product (split returns) accumulate.
-    const running = new Map<string, { full: number; empty: number }>();
-    const rowFor = (branch: string, product: string) => {
-      const key = `${branch}:${product}`;
-      if (!running.has(key)) {
-        const row = inventory.find((i) => i.branch_id === branch && i.product_id === product);
-        running.set(key, { full: row?.full_units ?? 0, empty: row?.empty_units ?? 0 });
+    if (error || !orderId) {
+      if (error?.code === 'PGRST202') {
+        throw new Error('Database update required: apply migration 20261120010000_stock_integrity_and_atomic_sales.sql in Supabase.');
       }
-      return running.get(key)!;
-    };
-    const touched = new Set<string>();
-    for (const item of params.items) {
-      const itemBranchId = item.branch_id || params.branch_id;
-      rowFor(itemBranchId, item.product_id).full = Math.max(0, rowFor(itemBranchId, item.product_id).full - item.quantity);
-      touched.add(`${itemBranchId}:${item.product_id}`);
-
-      if (item.order_type === 'refill' && item.incoming_brand && item.cylinder_size_kg) {
-        const incomingProduct = products.find((p) => p.brand.toLowerCase() === item.incoming_brand!.toLowerCase() && p.size_kg === item.cylinder_size_kg);
-        const targetId = incomingProduct?.id || item.product_id;
-        rowFor(itemBranchId, targetId).empty += item.quantity;
-        touched.add(`${itemBranchId}:${targetId}`);
-      }
-    }
-    for (const key of touched) {
-      const [branch_id, product_id] = key.split(':');
-      const { full, empty } = running.get(key)!;
-      await supabase.from('branch_inventory').upsert({ branch_id, product_id, full_units: full, empty_units: empty, updated_at: new Date().toISOString() }, { onConflict: 'branch_id,product_id' });
+      throw new Error(error?.message || 'Failed to record sale.');
     }
 
     await fetchLiveData();
-    const refreshed = await supabase.from('orders').select('*, items:order_items(*)').eq('id', inserted.id).single();
-    return (refreshed.data || { ...inserted, items: withOrderId }) as Order;
+    const { data: refreshed } = await supabase
+      .from('orders')
+      .select('*, items:order_items(*)')
+      .eq('id', orderId)
+      .single();
+
+    if (!refreshed) {
+      throw new Error('Sale recorded, but could not reload order details.');
+    }
+    return refreshed as Order;
+  };
+
+  const cancelOrder = async (orderId: string, reason?: string): Promise<void> => {
+    const supabase = createClient();
+    const { error } = await supabase.rpc('cancel_order', {
+      p_order_id: orderId,
+      p_reason: reason?.trim() || null,
+    });
+    if (error) {
+      if (error.code === 'PGRST202') {
+        throw new Error('Database update required: apply migration 20261120010000_stock_integrity_and_atomic_sales.sql in Supabase.');
+      }
+      throw new Error(error.message || 'Failed to cancel order.');
+    }
+    await fetchLiveData();
   };
 
   const createCustomer = async (name: string, phone: string, estate: string, specificAddress?: string): Promise<Customer> => {
@@ -620,6 +580,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateDeliveryStatus = (orderId: string, status: DeliveryStatus, comment?: string) => {
+    if (status === 'cancelled') {
+      void cancelOrder(orderId, comment).catch((e) => console.error(e));
+      return;
+    }
     (async () => {
       try {
         const supabase = createClient();
@@ -715,7 +679,43 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     .sort((a, b) => b.completed_deliveries - a.completed_deliveries);
 
   if (!isLoaded) {
-    return <div className="flex min-h-screen items-center justify-center text-sm text-slate-500">Loading…</div>;
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <div className="border-b border-slate-200 bg-white">
+          <div className="mx-auto flex h-14 max-w-[1440px] items-center justify-between px-3 sm:h-16 sm:px-5 lg:px-7">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-9 w-9 rounded-lg" />
+              <div className="space-y-1.5">
+                <Skeleton className="h-4 w-28 rounded" />
+                <Skeleton className="h-2.5 w-16 rounded" />
+              </div>
+            </div>
+            <div className="hidden items-center gap-2 xl:flex">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-8 w-20 rounded-lg" />
+              ))}
+            </div>
+            <Skeleton className="h-9 w-24 rounded-lg" />
+          </div>
+        </div>
+        <div className="mx-auto max-w-[1440px] space-y-3 px-3 py-4 sm:px-5 lg:px-7">
+          <Skeleton className="h-11 w-full rounded-md" />
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="space-y-2 rounded-md border border-slate-200 bg-white p-3">
+                <Skeleton className="h-3 w-24 rounded" />
+                <Skeleton className="h-6 w-28 rounded" />
+              </div>
+            ))}
+          </div>
+          <div className="space-y-2 rounded-md border border-slate-200 bg-white p-3">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <Skeleton key={i} className="h-9 w-full rounded" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -740,6 +740,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         approveStaff,
         rejectStaff,
         createOrder,
+        cancelOrder,
         createCustomer,
         updateCustomer,
         setCustomerActive,
@@ -752,7 +753,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         assignRider,
         updateDeliveryStatus,
         updateRiderComment,
-        updateBranchStock,
         refreshLiveData: fetchLiveData,
         createBranch,
         createShiftReport,

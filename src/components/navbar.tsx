@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useStore } from '@/context/store-context';
@@ -19,13 +19,22 @@ import {
   X,
   Languages,
   FileText,
+  ChevronDown,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+
+function initialsOf(name?: string | null) {
+  const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return 'GG';
+  return (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase();
+}
 
 export function Navbar() {
   const { currentUser, logout } = useStore();
   const [showMoreDrawer, setShowMoreDrawer] = useState(false);
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [locale, setLocale] = useState<Locale>('en');
+  const accountMenuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
 
   useEffect(() => {
@@ -51,7 +60,26 @@ export function Navbar() {
   }, [showMoreDrawer]);
 
   useEffect(() => {
+    if (!showAccountMenu) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target as Node)) {
+        setShowAccountMenu(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowAccountMenu(false);
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showAccountMenu]);
+
+  useEffect(() => {
     setShowMoreDrawer(false);
+    setShowAccountMenu(false);
   }, [pathname]);
 
   const toggleLocale = () => {
@@ -87,84 +115,119 @@ export function Navbar() {
   const isOverflowActive = overflowMobileTabs.some((link) => isActive(link.href));
 
   const roleLabel = currentUser.role.replace('_', ' ');
+  const firstName = currentUser.full_name?.trim().split(/\s+/)[0] || 'Account';
 
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/90">
-        <div className="mx-auto max-w-[1440px] px-3 sm:px-5 lg:px-7">
+        <div className="mx-auto max-w-[1440px] px-3 sm:px-4 lg:px-5">
           <div className="flex h-14 items-center justify-between gap-3 sm:h-16">
-            <div className="flex min-w-0 items-center gap-5">
-              <Link
-                href={currentUser.role === 'sales_rep' ? '/sales' : currentUser.role === 'rider' ? '/rider' : '/'}
-                aria-label="Gateway Gas home"
-                className="flex shrink-0 items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
-              >
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-600 text-white sm:h-10 sm:w-10">
-                  <Flame className="h-5 w-5 sm:h-5 sm:w-5" aria-hidden="true" />
+            {/* Brand */}
+            <Link
+              href={currentUser.role === 'sales_rep' ? '/sales' : currentUser.role === 'rider' ? '/rider' : '/'}
+              aria-label="Gateway Gas home"
+              className="flex shrink-0 items-center gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-600 text-white sm:h-9 sm:w-9">
+                <Flame className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
+              </span>
+              <span className="leading-none">
+                <span className="block whitespace-nowrap text-sm font-bold tracking-tight text-slate-900">
+                  Gateway Gas
                 </span>
-                <span className="min-w-0 leading-tight">
-                  <span className="block whitespace-nowrap text-sm font-semibold tracking-tight text-slate-900 sm:text-base">
-                    Gateway Gas
-                  </span>
-                  <span className="block text-[10px] font-medium uppercase tracking-[0.14em] text-slate-500">
-                    Operations
-                  </span>
+                <span className="mt-0.5 hidden text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-400 2xl:block">
+                  Operations
                 </span>
-              </Link>
+              </span>
+            </Link>
 
-              <nav aria-label="Main navigation" className="hidden items-center gap-1 xl:flex">
-                {roleLinks.map((link) => {
-                  const Icon = link.icon;
-                  const active = isActive(link.href);
-                  return (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      aria-current={active ? 'page' : undefined}
-                      className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-2.5 py-2 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 2xl:px-3 2xl:text-sm ${
-                        active
-                          ? 'bg-slate-900 text-white shadow-sm'
-                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
-                      }`}
+            {/* Primary Desktop Nav */}
+            <nav
+              aria-label="Main navigation"
+              className="hidden min-w-0 flex-1 items-center justify-center gap-0.5 overflow-x-auto px-1 lg:flex xl:gap-1"
+            >
+              {roleLinks.map((link) => {
+                const Icon = link.icon;
+                const active = isActive(link.href);
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    aria-current={active ? 'page' : undefined}
+                    className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 xl:px-2.5 xl:py-2 xl:text-[13px] ${
+                      active
+                        ? 'bg-slate-900 text-white shadow-sm'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5 shrink-0 xl:h-4 xl:w-4" aria-hidden="true" />
+                    <span>{link.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+
+            {/* Compact Account Menu (contains Language switch + Profile + Sign out) */}
+            <div ref={accountMenuRef} className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowAccountMenu((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={showAccountMenu}
+                className="flex h-9 items-center gap-2 rounded-full border border-slate-200 bg-white pl-1 pr-2.5 text-left transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+              >
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                  {initialsOf(currentUser.full_name)}
+                </span>
+                <span className="hidden max-w-[96px] truncate text-xs font-semibold text-slate-800 sm:block">
+                  {firstName}
+                </span>
+                <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${showAccountMenu ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showAccountMenu && (
+                <div
+                  role="menu"
+                  className="absolute right-0 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-2 shadow-xl ring-1 ring-slate-950/5"
+                >
+                  <div className="border-b border-slate-100 px-2.5 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-sm font-bold text-slate-900">{currentUser.full_name}</p>
+                      <Badge variant={currentUser.role === 'admin' ? 'purple' : currentUser.role === 'rider' ? 'warning' : 'default'}>
+                        {roleLabel}
+                      </Badge>
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-slate-500">{currentUser.email}</p>
+                  </div>
+
+                  <div className="mt-1 space-y-0.5">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={toggleLocale}
+                      className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
                     >
-                      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-                      <span>{link.label}</span>
-                    </Link>
-                  );
-                })}
-              </nav>
-            </div>
+                      <span className="flex items-center gap-2">
+                        <Languages className="h-4 w-4 text-orange-600" aria-hidden="true" />
+                        Language
+                      </span>
+                      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-bold text-slate-800">
+                        {locale === 'en' ? 'English → SW' : 'Kiswahili → EN'}
+                      </span>
+                    </button>
 
-            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
-              <button
-                type="button"
-                onClick={toggleLocale}
-                aria-label={locale === 'en' ? 'Switch language to Swahili' : 'Switch language to English'}
-                title="Badili lugha / Toggle language"
-                className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
-              >
-                <Languages className="h-4 w-4 text-orange-600" aria-hidden="true" />
-                <span>{locale === 'en' ? 'SW' : 'EN'}</span>
-              </button>
-
-              <div className="hidden min-w-0 items-center gap-2 sm:flex">
-                <Badge variant={currentUser.role === 'admin' ? 'purple' : currentUser.role === 'rider' ? 'warning' : 'default'}>
-                  {roleLabel}
-                </Badge>
-                <span className="max-w-[150px] truncate text-sm font-semibold text-slate-700 2xl:max-w-[210px]">
-                  {currentUser.full_name}
-                </span>
-              </div>
-
-              <button
-                type="button"
-                onClick={logout}
-                aria-label="Sign out"
-                title="Sign out"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
-              >
-                <LogOut className="h-5 w-5" aria-hidden="true" />
-              </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={logout}
+                      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-50"
+                    >
+                      <LogOut className="h-4 w-4" aria-hidden="true" />
+                      Sign out
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -172,7 +235,7 @@ export function Navbar() {
 
       <nav
         aria-label="Mobile navigation"
-        className="fixed inset-x-0 bottom-0 z-40 flex min-h-16 items-stretch border-t border-slate-200 bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_24px_rgba(15,23,42,0.08)] backdrop-blur xl:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 flex min-h-16 items-stretch border-t border-slate-200 bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_24px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden"
       >
         {primaryMobileTabs.map((link) => {
           const Icon = link.icon;
@@ -213,7 +276,7 @@ export function Navbar() {
       </nav>
 
       {showMoreDrawer && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end xl:hidden">
+        <div className="fixed inset-0 z-50 flex flex-col justify-end lg:hidden">
           <button
             type="button"
             aria-label="Close navigation menu"

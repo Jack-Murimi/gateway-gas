@@ -13,6 +13,7 @@ export interface Branch {
 export interface StaffProfile {
   id: string; email: string; full_name: string; phone?: string | null; role: UserRole;
   approval_status: ApprovalStatus; vehicle_plate?: string | null; avatar_url?: string | null;
+  branch_id?: string | null; national_id?: string | null; notes?: string | null;
   created_at?: string; updated_at?: string;
 }
 export interface Product {
@@ -31,7 +32,7 @@ export interface OrderItem {
 }
 export interface CustomerPhone { id: string; customer_id: string; phone_number: string; is_primary: boolean; label?: string | null; }
 export interface CustomerLocation {
-  id: string; customer_id: string; estate: string; specific_address?: string | null; is_default: boolean;
+  id: string; customer_id: string; estate: string; specific_address?: string | null; pin_location?: string | null; is_default: boolean;
 }
 export interface Customer {
   id: string; name: string; created_at: string; is_active?: boolean; updated_at?: string | null;

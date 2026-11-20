@@ -7,9 +7,10 @@ import {
 } from 'lucide-react';
 import { useStore } from '@/context/store-context';
 import { useToast } from '@/components/ui/toast';
-import { formatKES } from '@/lib/formatters';
+import { formatKES, hasEmptyState } from '@/lib/formatters';
 import type { Product } from '@/types';
 import { createClient } from '@/lib/supabase/client';
+import { Skeleton } from '@/components/ui/skeleton';
 import { PurchaseInvoiceItems, type InvoiceLineDraft } from './purchase-invoice-items';
 
 type Tab = 'overview' | 'suppliers' | 'invoices' | 'new-invoice' | 'payments' | 'adjustments';
@@ -41,7 +42,7 @@ type PaymentAllocationDraft = { key: string; invoice_id: string; amount_kes: str
 
 const today = () => new Date().toLocaleDateString('en-CA');
 const newKey = () => Math.random().toString(36).slice(2, 10);
-const emptyLine = (): InvoiceLineDraft => ({ key: newKey(), product_id: '', description: '', quantity: '1', unit_cost_kes: '', track_stock: false });
+const emptyLine = (): InvoiceLineDraft => ({ key: newKey(), product_id: '', description: '', quantity: '1', unit_cost_kes: '', track_stock: false, stock_mode: 'none' });
 const emptyAllocation = (): PaymentAllocationDraft => ({ key: newKey(), invoice_id: '', amount_kes: '' });
 const canUse = (role?: string) => role === 'admin' || role === 'director' || role === 'operator';
 
@@ -61,7 +62,7 @@ function dateLabel(value?: string | null) {
 }
 
 export default function PurchasesPage() {
-  const { currentUser, branches, products, inventory } = useStore();
+  const { currentUser, branches, products, inventory, refreshLiveData } = useStore();
   const { showError, showSuccess } = useToast();
   const [tab, setTab] = useState<Tab>('overview');
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -215,6 +216,23 @@ export default function PurchasesPage() {
     e.preventDefault();
     if (!invoiceForm.supplier_id || !invoiceForm.branch_id || !invoiceForm.invoice_number.trim()) return showError('Select a supplier and branch, and enter the supplier invoice number.');
     if (!lines.length || lines.some(line => !line.description.trim() || Number(line.quantity) <= 0 || line.unit_cost_kes === '' || Number(line.unit_cost_kes) < 0)) return showError('Complete every invoice line before posting.');
+
+    // Strict client check before hitting DB: cannot refill more empty containers than currently in branch
+    const refillTotals = new Map<string, number>();
+    for (const line of lines) {
+      if (line.track_stock && line.stock_mode === 'refill' && line.product_id) {
+        refillTotals.set(line.product_id, (refillTotals.get(line.product_id) || 0) + Number(line.quantity));
+      }
+    }
+    for (const [productId, requested] of refillTotals) {
+      const inv = inventory.find(r => r.branch_id === invoiceForm.branch_id && r.product_id === productId);
+      const avail = inv?.empty_units ?? 0;
+      if (requested > avail) {
+        const prodName = products.find(p => p.id === productId)?.name || 'Selected product';
+        return showError(`Cannot refill ${requested} × ${prodName}: branch only has ${avail} empty containers available.`);
+      }
+    }
+
     setSaving(true);
     const supabase = createClient();
     const { data, error } = await supabase.rpc('post_supplier_invoice', {
@@ -227,6 +245,7 @@ export default function PurchasesPage() {
         product_id: line.product_id || null, description: line.description.trim(),
         quantity: Number(line.quantity), unit_cost_kes: Number(line.unit_cost_kes),
         track_stock: line.track_stock,
+        stock_mode: line.track_stock ? line.stock_mode : 'none',
       })),
     });
     setSaving(false);
@@ -234,7 +253,7 @@ export default function PurchasesPage() {
     showSuccess('Supplier invoice posted and recorded.');
     setInvoiceForm({ supplier_id: '', branch_id: '', invoice_number: '', invoice_date: today(), due_date: '', tax_kes: '0', notes: '' });
     setLines([]);
-    await loadData();
+    await Promise.all([loadData(), refreshLiveData()]);
     setTab('invoices');
   };
 
@@ -304,7 +323,8 @@ export default function PurchasesPage() {
       if (existing) return prev.map(l => l.key === existing.key ? { ...l, quantity: String((Number(l.quantity) || 0) + 1) } : l);
       const cost = productCosts.get(product.id);
       const description = `${product.brand} ${product.size_kg ? `${product.size_kg}kg` : product.name}`;
-      return [{ key: newKey(), product_id: product.id, description, quantity: '1', unit_cost_kes: cost ? String(cost) : '', track_stock: true }, ...prev];
+      const defaultMode = hasEmptyState(product) ? 'refill' : 'complete';
+      return [{ key: newKey(), product_id: product.id, description, quantity: '1', unit_cost_kes: cost ? String(cost) : '', track_stock: true, stock_mode: defaultMode }, ...prev];
     });
   };
 
@@ -338,7 +358,23 @@ export default function PurchasesPage() {
         </div>
       </header>
 
-      {loading ? <div className="rounded-md border border-slate-300 bg-white px-3 py-10 text-center text-xs text-slate-500">Loading…</div> : null}
+      {loading ? (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="space-y-2 rounded-md border border-slate-300 bg-white p-3">
+                <Skeleton className="h-3 w-24 rounded" />
+                <Skeleton className="h-6 w-28 rounded" />
+              </div>
+            ))}
+          </div>
+          <div className="space-y-2 rounded-md border border-slate-300 bg-white p-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-9 w-full rounded" />
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {!loading && tab === 'overview' && (
         <section className="grid gap-2 xl:grid-cols-[1.2fr_1fr]">

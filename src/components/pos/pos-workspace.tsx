@@ -15,6 +15,7 @@ import { PosProductSearch } from './pos-product-search';
 export type { PosLine };
 
 export interface PosSaleSubmission {
+  client_request_id: string;
   branch_id: string;
   is_pos_walkin: boolean;
   customer_id: string | null;
@@ -77,6 +78,7 @@ export function PosWorkspace({
   const [showPayment, setShowPayment] = useState(false);
   const [formError, setFormError] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
+  const requestIdRef = useRef<string>(crypto.randomUUID());
 
   const activeRiders = staffList.filter(s => s.role === 'rider' && s.approval_status === 'approved');
   const canEditDate = ['admin', 'director', 'operator'].includes(currentUser.role);
@@ -106,6 +108,7 @@ export function PosWorkspace({
 
   const addProduct = (product: Product) => {
     setFormError('');
+    requestIdRef.current = crypto.randomUUID();
     setCart(prev => {
       const existing = prev.find(l => l.productId === product.id && l.branchId === branchId);
       if (!existing) return [newLine(product, branchId), ...prev];
@@ -116,8 +119,14 @@ export function PosWorkspace({
     });
   };
 
-  const updateLine = (id: string, patch: Partial<PosLine>) => setCart(prev => prev.map(l => (l.id === id ? { ...l, ...patch } : l)));
-  const removeLine = (id: string) => setCart(prev => prev.filter(l => l.id !== id));
+  const updateLine = (id: string, patch: Partial<PosLine>) => {
+    requestIdRef.current = crypto.randomUUID();
+    setCart(prev => prev.map(l => (l.id === id ? { ...l, ...patch } : l)));
+  };
+  const removeLine = (id: string) => {
+    requestIdRef.current = crypto.randomUUID();
+    setCart(prev => prev.filter(l => l.id !== id));
+  };
 
   const changeBranch = (id: string) => {
     setBranchId(id);
@@ -161,6 +170,7 @@ export function PosWorkspace({
     const createdAt = y && m && d ? new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds()).toISOString() : now.toISOString();
     const phone = customer?.phones.find(p => p.is_primary)?.phone_number || customer?.phones[0]?.phone_number;
     return {
+      client_request_id: requestIdRef.current,
       branch_id: branchId, is_pos_walkin: !isDelivery, customer_id: customer?.id || null,
       receipt_number: receiptNumber.trim(), created_at: createdAt,
       customer_name: customer?.name?.trim() || phone || 'Walk-in Counter Customer',
@@ -189,6 +199,7 @@ export function PosWorkspace({
   };
 
   const resetSale = () => {
+    requestIdRef.current = crypto.randomUUID();
     setCart([]); setCustomer(null); setLocationId(''); setIsDelivery(false); setRiderId(''); setVehiclePlate('');
     setReceiptNumber(''); setLpoNumber(''); setSaleComment(''); setFormError(''); setShowPayment(false);
     onStartNextSale();

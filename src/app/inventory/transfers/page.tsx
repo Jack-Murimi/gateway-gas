@@ -8,6 +8,7 @@ import { useStore } from '@/context/store-context';
 import { useToast } from '@/components/ui/toast';
 import { createClient } from '@/lib/supabase/client';
 import { hasEmptyState } from '@/lib/formatters';
+import { groupProducts } from '@/lib/product-order';
 import type { Product } from '@/types';
 
 type DraftLine = { productId: string; filled: string; empty: string };
@@ -36,7 +37,10 @@ export default function InventoryTransfersPage() {
     return map;
   }, [inventory]);
   const selectedIds = new Set(lines.map(line => line.productId));
-  const availableProducts = products.filter(p => !selectedIds.has(p.id));
+  const availableProductGroups = useMemo(
+    () => groupProducts(products.filter(p => !selectedIds.has(p.id)), p => p),
+    [products, lines]
+  );
   const lineErrors = lines.map(line => {
     const p = products.find(item => item.id === line.productId)!;
     const stock = stockMap.get(`${fromId}:${p.id}`) ?? { full: 0, empty: 0 };
@@ -118,7 +122,11 @@ export default function InventoryTransfersPage() {
       <div className="flex flex-col gap-2 p-4 sm:flex-row sm:px-5">
         <select value={addingId} onChange={e => setAddingId(e.target.value)} className="h-10 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-orange-400">
           <option value="">Choose a product to add…</option>
-          {availableProducts.map(p => <option key={p.id} value={p.id}>{p.name} · {p.brand}</option>)}
+          {availableProductGroups.map(group => (
+            <optgroup key={group.key} label={group.label}>
+              {group.items.map(p => <option key={p.id} value={p.id}>{p.name} · {p.brand}</option>)}
+            </optgroup>
+          ))}
         </select>
         <button type="button" onClick={addProduct} disabled={!addingId} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"><Plus className="h-4 w-4" /> Add product</button>
       </div>

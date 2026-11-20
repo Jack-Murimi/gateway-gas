@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Check, Package, Search, X } from 'lucide-react';
 import type { BranchInventory, Product } from '@/types';
 import { formatKES, hasEmptyState } from '@/lib/formatters';
+import { compareProducts } from '@/lib/product-order';
 import { fieldClass, labelClass } from './pos-ui';
 
 interface Props {
@@ -27,6 +28,7 @@ export function PosProductSearch({ products, inventory, branchId, inCart, inputR
     if (!words.length) return [];
     return products
       .filter(p => p.is_active && words.every(w => [p.name, p.brand, p.category, p.size_kg ? `${p.size_kg}kg ${p.size_kg}` : ''].join(' ').toLowerCase().includes(w)))
+      .sort(compareProducts)
       .slice(0, 8);
   }, [products, query]);
 

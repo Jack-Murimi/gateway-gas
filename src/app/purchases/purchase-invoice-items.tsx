@@ -3,8 +3,10 @@
 import { useRef } from 'react';
 import { Minus, Package, Plus, X } from 'lucide-react';
 import type { BranchInventory, Product } from '@/types';
-import { formatKES } from '@/lib/formatters';
+import { formatKES, hasEmptyState } from '@/lib/formatters';
 import { PosProductSearch } from '@/components/pos/pos-product-search';
+
+export type PurchaseStockMode = 'refill' | 'complete' | 'none';
 
 export type InvoiceLineDraft = {
   key: string;
@@ -13,9 +15,10 @@ export type InvoiceLineDraft = {
   quantity: string;
   unit_cost_kes: string;
   track_stock: boolean;
+  stock_mode: PurchaseStockMode;
 };
 
-const COLS = 'md:grid-cols-[minmax(0,1fr)_92px_96px_92px_68px_28px]';
+const COLS = 'md:grid-cols-[minmax(0,1fr)_92px_96px_92px_108px_28px]';
 const cell = 'h-7 w-full rounded border border-slate-300 bg-white px-1.5 text-xs text-slate-900 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30';
 const tag = 'mb-px block text-[9px] font-semibold uppercase tracking-wide text-slate-400 md:hidden';
 
@@ -64,8 +67,12 @@ export function PurchaseInvoiceItems({
             <ul className="divide-y divide-slate-200">
               {lines.map((line, i) => {
                 const product = products.find(p => p.id === line.product_id);
+                const returnable = product ? hasEmptyState(product) : false;
+                const invRow = product && branchId ? inventory.find(r => r.branch_id === branchId && r.product_id === product.id) : undefined;
+                const emptyAvail = invRow?.empty_units ?? 0;
                 const qty = Number(line.quantity) || 0;
                 const cost = Number(line.unit_cost_kes) || 0;
+                const refillExceedsEmpty = line.track_stock && line.stock_mode === 'refill' && returnable && qty > emptyAvail;
                 const stepQty = (delta: number) => onChange(line.key, { quantity: String(Math.max(1, Math.round(qty + delta))) });
 
                 return (
@@ -81,8 +88,10 @@ export function PurchaseInvoiceItems({
                           className={`${cell} font-semibold`}
                         />
                       </div>
-                      <p className="mt-0.5 truncate pl-4 text-[11px] leading-tight text-slate-500">
-                        {product ? `${product.brand}${product.size_kg ? ` ${product.size_kg}kg` : ''} · ${product.category}` : 'Custom / non-stock charge'}
+                      <p className={`mt-0.5 truncate pl-4 text-[11px] leading-tight ${refillExceedsEmpty ? 'font-semibold text-rose-600' : 'text-slate-500'}`}>
+                        {product
+                          ? `${product.brand}${product.size_kg ? ` ${product.size_kg}kg` : ''} · ${product.category}${returnable && line.stock_mode === 'refill' ? ` · ${emptyAvail} empty available${refillExceedsEmpty ? ' (exceeds available empties!)' : ''}` : ''}`
+                          : 'Custom / non-stock charge'}
                       </p>
                     </div>
 
@@ -117,14 +126,21 @@ export function PurchaseInvoiceItems({
                     </div>
 
                     <div className="order-5 col-span-4 md:order-none md:col-span-1">
-                      <span className={tag}>Add to stock</span>
-                      <label className={`flex h-7 items-center justify-center gap-1 text-xs ${product ? 'cursor-pointer text-slate-700' : 'text-slate-300'}`}>
-                        <input
-                          type="checkbox" checked={line.track_stock} disabled={!product}
-                          onChange={e => onChange(line.key, { track_stock: e.target.checked })}
-                        />
-                        <span className="md:hidden">Stock</span>
-                      </label>
+                      <span className={tag}>Stock mode</span>
+                      <select
+                        aria-label={`Stock mode for ${line.description || 'line'}`}
+                        disabled={!product}
+                        value={product && line.track_stock ? line.stock_mode : 'none'}
+                        onChange={e => {
+                          const mode = e.target.value as PurchaseStockMode;
+                          onChange(line.key, { stock_mode: mode, track_stock: mode !== 'none' });
+                        }}
+                        className={`${cell} px-1 text-[11px] font-semibold`}
+                      >
+                        {returnable && <option value="refill">Refill (-E/+F)</option>}
+                        {product && <option value="complete">{returnable ? 'New (+F)' : 'Add (+F)'}</option>}
+                        <option value="none">No stock</option>
+                      </select>
                     </div>
 
                     <button

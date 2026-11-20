@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { ArrowUpRight, Check, Copy, MapPin, Pencil, Phone, Plus, Star, Trash2, WifiOff, X } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { formatKES } from '@/lib/formatters';
@@ -191,6 +192,10 @@ export function CustomerDetails({
           <ArrowUpRight className="h-4 w-4" />
           {t.customerStartSale}
         </button>
+        <Link href={`/customers/${customer.id}`} className={`${secondaryBtn} col-span-2`}>
+          <ArrowUpRight className="h-4 w-4 text-orange-600" />
+          Open full profile (cylinders, receipts & audit)
+        </Link>
         {primary ? (
           <a href={`tel:${primary}`} className={secondaryBtn}>
             <Phone className="h-4 w-4 text-emerald-600" />
