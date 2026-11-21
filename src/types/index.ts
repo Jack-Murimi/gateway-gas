@@ -5,6 +5,61 @@ export type OrderType = 'refill' | 'complete' | 'accessory';
 export type DeliveryStatus = 'pending' | 'assigned' | 'in_transit' | 'delivered' | 'cancelled';
 export type PaymentMethod = 'mpesa' | 'cash' | 'bank_transfer' | 'pdq' | 'cheque';
 export type PaymentStatus = 'pending' | 'paid';
+export type ExpenseCategory =
+  | 'fuel'
+  | 'bike_service'
+  | 'salary'
+  | 'rent'
+  | 'utilities'
+  | 'office_supplies'
+  | 'licenses_permits'
+  | 'other';
+export type ExpenseStatus = 'posted' | 'void';
+
+export interface Bike {
+  id: string;
+  plate_number: string;
+  model?: string | null;
+  branch_id?: string | null;
+  assigned_rider_id?: string | null;
+  is_active: boolean;
+  notes?: string | null;
+  created_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  branch?: { id: string; name: string; code: string } | null;
+  assigned_rider?: { id: string; full_name: string; phone?: string | null } | null;
+}
+
+export interface Expense {
+  id: string;
+  expense_date: string;
+  category: ExpenseCategory;
+  amount_kes: number;
+  payment_method: PaymentMethod;
+  payment_reference?: string | null;
+  branch_id?: string | null;
+  bike_id?: string | null;
+  staff_id?: string | null;
+  vendor_name?: string | null;
+  description: string;
+  fuel_litres?: number | null;
+  odometer_km?: number | null;
+  salary_period?: string | null;
+  notes?: string | null;
+  status: ExpenseStatus;
+  voided_at?: string | null;
+  voided_by?: string | null;
+  void_reason?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  created_at: string;
+  updated_at: string;
+  bike?: { id: string; plate_number: string; model?: string | null } | null;
+  branch?: { id: string; name: string; code: string } | null;
+  staff?: { id: string; full_name: string; role: UserRole } | null;
+  recorder?: { id: string; full_name: string } | null;
+}
 
 export interface Branch {
   id: string; name: string; code: string; location_estate: string; contact_phone: string;

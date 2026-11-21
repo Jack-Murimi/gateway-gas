@@ -274,6 +274,9 @@ export default function HomePage() {
           <Link href="/sales"><Button size="sm"><Plus className="mr-1.5 h-4 w-4" /> New sale</Button></Link>
           <Link href="/operations"><Button variant="outline" size="sm"><Send className="mr-1.5 h-4 w-4" /> Dispatch</Button></Link>
           <Link href="/inventory"><Button variant="outline" size="sm"><Package className="mr-1.5 h-4 w-4" /> Inventory</Button></Link>
+          {isManager && (
+            <Link href="/expenses"><Button variant="outline" size="sm"><Wallet className="mr-1.5 h-4 w-4" /> Expenses</Button></Link>
+          )}
         </div>
       </header>
 

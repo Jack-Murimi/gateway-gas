@@ -56,15 +56,21 @@ export function middleware(request: NextRequest) {
   }
 
   if (role === 'sales_rep') {
-    // Sales rep only has access to POS /sales and inventory lookup
-    if (pathname === '/' || pathname === '/operations' || pathname === '/staff') {
+    // Sales rep only has access to POS /sales, inventory lookup, and shift reports
+    if (
+      pathname === '/' ||
+      pathname === '/operations' ||
+      pathname === '/staff' ||
+      pathname === '/expenses' ||
+      pathname.startsWith('/expenses/')
+    ) {
       return NextResponse.redirect(new URL('/sales', request.url));
     }
   }
 
   if (role === 'operator') {
-    // Operator has access to overview, operations desk, sales, and inventory, but not staff admin
-    if (pathname === '/staff') {
+    // Operator has access to overview, operations desk, sales, and inventory, but not staff admin or expenses
+    if (pathname === '/staff' || pathname === '/expenses' || pathname.startsWith('/expenses/')) {
       return NextResponse.redirect(new URL('/operations', request.url));
     }
   }

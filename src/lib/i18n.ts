@@ -10,6 +10,7 @@ export const translations = {
     navDispatch: 'Dispatch',
     navDeliveries: 'My Deliveries',
     navReports: 'Shift Z-Report',
+    navExpenses: 'Expenses',
     navStaff: 'Staff',
     // POS Flow
     stepCustomer: '1. Customer',
@@ -60,6 +61,7 @@ export const translations = {
     navDispatch: 'Ugawaji',
     navDeliveries: 'Safari Zangu',
     navReports: 'Ripoti ya Z (Zamu)',
+    navExpenses: 'Matumizi',
     navStaff: 'Wafanyikazi',
     // POS Flow
     stepCustomer: '1. Mteja',

@@ -20,6 +20,7 @@ import {
   Languages,
   FileText,
   ChevronDown,
+  Banknote,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
@@ -97,6 +98,7 @@ export function Navbar() {
     { href: '/inventory', label: t.navStock, icon: Package, roles: ['admin', 'director', 'operator', 'sales_rep'] },
     { href: '/customers', label: 'Customers', icon: Users, roles: ['admin', 'director', 'operator'] },
     { href: '/purchases', label: 'Purchases', icon: Receipt, roles: ['admin', 'director', 'operator'] },
+    { href: '/expenses', label: t.navExpenses, icon: Banknote, roles: ['admin', 'director'] },
     { href: '/operations', label: t.navDispatch, icon: Send, roles: ['admin', 'director', 'operator'] },
     { href: '/reports', label: t.navReports, icon: FileText, roles: ['admin', 'director', 'operator', 'sales_rep'] },
     { href: '/rider', label: t.navDeliveries, icon: Bike, roles: ['rider', 'admin'] },
