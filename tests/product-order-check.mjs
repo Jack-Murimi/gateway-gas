@@ -38,7 +38,7 @@ const catalog = [
   ...['AFRIGAS', 'K-GAS', 'TOTAL', 'OLA', 'PROGAS', 'TOSHA', 'LAKE', 'HASHI', 'SUPA', 'JATEL', 'SEAGAS', 'RAHA', 'BONOKO'].map(
     (brand, i) => makeProduct(`c6-${i}`, `6KG ${brand}`, brand, 6, 'cylinder', 1350),
   ),
-  ...['AFRIGAS', 'K-GAS', 'TOTAL', 'OLA', 'PROGAS', 'TOSHA', 'LAKE', 'HASHI', 'SUPA', 'JATEL', 'SEAGAS', 'RAHA', 'BONOKO'].map(
+  ...['SAFE GAS', 'AFRIGAS', 'K-GAS', 'TOTAL', 'OLA', 'PROGAS', 'TOSHA', 'LAKE', 'HASHI', 'SUPA', 'JATEL', 'SEAGAS', 'RAHA', 'BONOKO'].map(
     (brand, i) => makeProduct(`c13-${i}`, `13KG ${brand}`, brand, 13, 'cylinder', 3100),
   ),
   makeProduct('c22', '22.5KG TOTAL', 'TOTAL', 22.5, 'cylinder', 6300),
@@ -107,8 +107,21 @@ assert.deepStrictEqual(
 );
 assert.deepStrictEqual(
   byLabel['13kg Gas'],
-  expectedBrands.map(b => `13KG ${b}`),
+  ['SAFE GAS', ...expectedBrands].map(b => `13KG ${b}`),
 );
+
+// Verify SAFE GAS aliases (e.g. SAFEGAS, Safe Gas) also sort at the top of 13kg Gas
+for (const aliasBrand of ['SAFEGAS', 'Safe Gas', 'safe-gas', 'SAFE']) {
+  const aliasGroups = groupProducts(
+    [
+      makeProduct('t1', '13KG AFRIGAS', 'AFRIGAS', 13, 'cylinder', 3100),
+      makeProduct('t2', `13KG ${aliasBrand}`, aliasBrand, 13, 'cylinder', 3100),
+      makeProduct('t3', '13KG TOTAL', 'TOTAL', 13, 'cylinder', 3100),
+    ],
+    p => p,
+  );
+  assert.strictEqual(aliasGroups[0].items[0].id, 't2', `Expected ${aliasBrand} to sort first in 13kg Gas`);
+}
 assert.deepStrictEqual(byLabel['22.5kg Gas'], ['22.5KG TOTAL']);
 assert.deepStrictEqual(byLabel['35kg Gas'], ['35KG K-GAS', '35KG HASHI']);
 assert.deepStrictEqual(byLabel['45kg Gas'], ['45KG AFRIGAS']);

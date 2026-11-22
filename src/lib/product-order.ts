@@ -2,6 +2,7 @@ import type { Product } from '@/types';
 import { hasEmptyState } from '@/lib/formatters';
 
 const GAS_BRAND_ORDER = [
+  'safe gas',
   'afrigas',
   'k-gas',
   'total',
@@ -17,6 +18,9 @@ const GAS_BRAND_ORDER = [
 ] as const;
 
 const GAS_BRAND_ALIASES: Record<string, string> = {
+  safegas: 'safe gas',
+  'safe-gas': 'safe gas',
+  safe: 'safe gas',
   kgas: 'k-gas',
   'k gas': 'k-gas',
   seagas: 'sea',

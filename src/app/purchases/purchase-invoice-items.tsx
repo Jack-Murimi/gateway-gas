@@ -27,6 +27,7 @@ interface Props {
   products: Product[];
   inventory: BranchInventory[];
   branchId: string;
+  isPreCutoff?: boolean;
   onAddProduct: (product: Product) => void;
   onAddCustom: () => void;
   onChange: (key: string, patch: Partial<InvoiceLineDraft>) => void;
@@ -34,7 +35,7 @@ interface Props {
 }
 
 export function PurchaseInvoiceItems({
-  lines, products, inventory, branchId, onAddProduct, onAddCustom, onChange, onRemove,
+  lines, products, inventory, branchId, isPreCutoff = false, onAddProduct, onAddCustom, onChange, onRemove,
 }: Props) {
   const searchRef = useRef<HTMLInputElement>(null);
   const inCart = new Set(lines.map(l => l.product_id).filter(Boolean));
@@ -72,7 +73,7 @@ export function PurchaseInvoiceItems({
                 const emptyAvail = invRow?.empty_units ?? 0;
                 const qty = Number(line.quantity) || 0;
                 const cost = Number(line.unit_cost_kes) || 0;
-                const refillExceedsEmpty = line.track_stock && line.stock_mode === 'refill' && returnable && qty > emptyAvail;
+                const refillExceedsEmpty = !isPreCutoff && line.track_stock && line.stock_mode === 'refill' && returnable && qty > emptyAvail;
                 const stepQty = (delta: number) => onChange(line.key, { quantity: String(Math.max(1, Math.round(qty + delta))) });
 
                 return (
@@ -127,20 +128,26 @@ export function PurchaseInvoiceItems({
 
                     <div className="order-5 col-span-4 md:order-none md:col-span-1">
                       <span className={tag}>Stock mode</span>
-                      <select
-                        aria-label={`Stock mode for ${line.description || 'line'}`}
-                        disabled={!product}
-                        value={product && line.track_stock ? line.stock_mode : 'none'}
-                        onChange={e => {
-                          const mode = e.target.value as PurchaseStockMode;
-                          onChange(line.key, { stock_mode: mode, track_stock: mode !== 'none' });
-                        }}
-                        className={`${cell} px-1 text-[11px] font-semibold`}
-                      >
-                        {returnable && <option value="refill">Refill (-E/+F)</option>}
-                        {product && <option value="complete">{returnable ? 'New (+F)' : 'Add (+F)'}</option>}
-                        <option value="none">No stock</option>
-                      </select>
+                      {isPreCutoff ? (
+                        <span className="flex h-7 items-center justify-center rounded border border-sky-200 bg-sky-50 px-1.5 text-[10px] font-semibold text-sky-800">
+                          No stock
+                        </span>
+                      ) : (
+                        <select
+                          aria-label={`Stock mode for ${line.description || 'line'}`}
+                          disabled={!product}
+                          value={product && line.track_stock ? line.stock_mode : 'none'}
+                          onChange={e => {
+                            const mode = e.target.value as PurchaseStockMode;
+                            onChange(line.key, { stock_mode: mode, track_stock: mode !== 'none' });
+                          }}
+                          className={`${cell} px-1 text-[11px] font-semibold`}
+                        >
+                          {returnable && <option value="refill">Refill (-E/+F)</option>}
+                          {product && <option value="complete">{returnable ? 'New (+F)' : 'Add (+F)'}</option>}
+                          <option value="none">No stock</option>
+                        </select>
+                      )}
                     </div>
 
                     <button

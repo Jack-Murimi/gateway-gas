@@ -1,9 +1,10 @@
 'use client';
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle2, RotateCcw, Search, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, RotateCcw, Search, X } from 'lucide-react';
 import type { Branch, BranchInventory, Product } from '@/types';
 import { hasEmptyState } from '@/lib/formatters';
+import { buildCutoffTimestampEAT, cutoffDateEAT, cutoffTimeEAT, formatCutoffLabel } from '@/lib/stock-cutoff';
 import { groupProducts, sortProducts } from '@/lib/product-order';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/toast';
@@ -47,8 +48,16 @@ export function StockSheet({
 
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [note, setNote] = useState('');
-  const [stockDate, setStockDate] = useState(() => new Date().toLocaleDateString('en-CA'));
+  const [stockDate, setStockDate] = useState(() => cutoffDateEAT(activeBranch?.stock_cutoff_at) || '2026-11-19');
+  const [cutoffTime, setCutoffTime] = useState(() => cutoffTimeEAT(activeBranch?.stock_cutoff_at) || '00:01');
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    if (mode === 'initial' && activeBranch?.stock_cutoff_at) {
+      setStockDate(cutoffDateEAT(activeBranch.stock_cutoff_at) || '2026-11-19');
+      setCutoffTime(cutoffTimeEAT(activeBranch.stock_cutoff_at) || '00:01');
+    }
+  }, [mode, activeBranch?.id, activeBranch?.stock_cutoff_at]);
   const [category, setCategory] = useState<Category>('all');
   const [onlyChanged, setOnlyChanged] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -277,9 +286,10 @@ export function StockSheet({
       mode === 'daily'
         ? `Daily count ${new Date().toLocaleDateString('en-CA')}`
         : mode === 'initial'
-          ? `Opening stock (${stockDate})`
+          ? `Opening stock (${stockDate} ${cutoffTime} EAT)`
           : ''
     );
+    const cutoffIso = mode === 'initial' ? buildCutoffTimestampEAT(stockDate, cutoffTime) : null;
     const supabase = createClient();
     let { data, error } = mode === 'initial'
       ? await supabase.rpc('apply_branch_stock', {
@@ -288,6 +298,7 @@ export function StockSheet({
           p_note: resolvedNote,
           p_lines: lines,
           p_stock_date: stockDate,
+          p_cutoff_at: cutoffIso,
         })
       : await supabase.rpc('apply_branch_stock', {
           p_branch_id: targetBranchId,
@@ -297,12 +308,12 @@ export function StockSheet({
         });
 
     if (error && mode === 'initial' && error.code === 'PGRST202') {
-      const fallbackNote = note.trim() ? `Stock date ${stockDate} · ${note.trim()}` : `Opening stock (${stockDate})`;
       ({ data, error } = await supabase.rpc('apply_branch_stock', {
         p_branch_id: targetBranchId,
         p_action: mode,
-        p_note: fallbackNote,
+        p_note: resolvedNote,
         p_lines: lines,
+        p_stock_date: stockDate,
       }));
     }
 
@@ -319,7 +330,7 @@ export function StockSheet({
 
   return (
     <form onSubmit={submit} className="space-y-2">
-      <section className={`grid grid-cols-2 items-end gap-1.5 rounded-md border border-slate-300 bg-white p-2 sm:grid-cols-4 ${mode === 'initial' ? 'lg:grid-cols-[170px_145px_minmax(0,1fr)_115px_minmax(0,1fr)_auto]' : 'lg:grid-cols-[180px_minmax(0,1fr)_120px_minmax(0,1.2fr)_auto]'}`}>
+      <section className={`grid grid-cols-2 items-end gap-1.5 rounded-md border border-slate-300 bg-white p-2 sm:grid-cols-4 ${mode === 'initial' ? 'lg:grid-cols-[160px_135px_95px_minmax(0,1fr)_110px_minmax(0,1fr)_auto]' : 'lg:grid-cols-[180px_minmax(0,1fr)_120px_minmax(0,1.2fr)_auto]'}`}>
         <div>
           <label htmlFor="stock-sheet-branch" className={labelClass}>Branch *</label>
           <select
@@ -337,19 +348,33 @@ export function StockSheet({
           </select>
         </div>
         {mode === 'initial' && (
-          <div>
-            <label htmlFor="initial-stock-date" className={labelClass}>Stock date *</label>
-            <input
-              id="initial-stock-date"
-              type="date"
-              required
-              max={today}
-              disabled={locked}
-              value={stockDate}
-              onChange={e => setStockDate(e.target.value)}
-              className={fieldClass}
-            />
-          </div>
+          <>
+            <div>
+              <label htmlFor="initial-stock-date" className={labelClass}>Cutover date *</label>
+              <input
+                id="initial-stock-date"
+                type="date"
+                required
+                max={today}
+                disabled={locked}
+                value={stockDate}
+                onChange={e => setStockDate(e.target.value)}
+                className={fieldClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="initial-stock-time" className={labelClass}>Time (EAT) *</label>
+              <input
+                id="initial-stock-time"
+                type="time"
+                required
+                disabled={locked}
+                value={cutoffTime}
+                onChange={e => setCutoffTime(e.target.value)}
+                className={fieldClass}
+              />
+            </div>
+          </>
         )}
         <div className="relative">
           <label className={labelClass}>Filter products</label>
@@ -394,6 +419,15 @@ export function StockSheet({
         </div>
       </section>
 
+      {mode === 'initial' && !initialInfo && (
+        <div className="flex items-center gap-2 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-950">
+          <Clock className="h-4 w-4 shrink-0 text-sky-700" />
+          <span>
+            <strong>Stock cutover rule:</strong> Sales &amp; purchases dated <strong>before {stockDate} {cutoffTime} EAT</strong> will be recorded in history, customer/supplier balances &amp; P&amp;L <strong>without affecting live stock</strong>. Transactions on or after <strong>{stockDate} {cutoffTime}</strong> update live stock normally.
+          </span>
+        </div>
+      )}
+
       {mode === 'initial' && !initialInfo && postDateOrderCount > 0 && (
         <div className="flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950">
           <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700" />
@@ -404,10 +438,10 @@ export function StockSheet({
       )}
 
       {mode === 'initial' && initialInfo && (
-        <div className="flex items-center justify-between gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
           <span className="flex items-center gap-1.5 font-medium">
             <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-700" />
-            Initial stock for this branch was taken{initialInfo.stockDate ? ` on ${new Date(`${initialInfo.stockDate}T00:00:00`).toLocaleDateString('en-KE', { dateStyle: 'medium' })}` : ''} (recorded {new Date(initialInfo.takenAt).toLocaleString('en-KE')}{initialInfo.actor ? ` by ${initialInfo.actor}` : ''}).
+            Initial stock for this branch was taken{initialInfo.stockDate ? ` on ${new Date(`${initialInfo.stockDate}T00:00:00`).toLocaleDateString('en-KE', { dateStyle: 'medium' })}` : ''} · Active cutover: <strong>{formatCutoffLabel(activeBranch?.stock_cutoff_at)} EAT</strong> (recorded {new Date(initialInfo.takenAt).toLocaleString('en-KE')}{initialInfo.actor ? ` by ${initialInfo.actor}` : ''}).
           </span>
           <span className="text-emerald-700">Use Daily count or Adjust all for later changes.</span>
         </div>

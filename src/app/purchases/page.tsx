@@ -3,11 +3,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowDownLeft, ArrowUpRight, Building2, CalendarDays, Check, ChevronDown,
-  CircleDollarSign, FileText, Plus, Search, Truck, Wallet, X,
+  CircleDollarSign, Clock, FileText, Plus, Search, Truck, Wallet, X,
 } from 'lucide-react';
 import { useStore } from '@/context/store-context';
 import { useToast } from '@/components/ui/toast';
 import { formatKES, hasEmptyState } from '@/lib/formatters';
+import { formatCutoffLabel, isDateBeforeStockCutoff } from '@/lib/stock-cutoff';
 import type { Product } from '@/types';
 import { createClient } from '@/lib/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -221,6 +222,11 @@ export default function PurchasesPage() {
   };
 
   const updateLine = (key: string, patch: Partial<InvoiceLineDraft>) => setLines(prev => prev.map(line => line.key === key ? { ...line, ...patch } : line));
+  const selectedInvoiceBranch = useMemo(
+    () => branches.find(b => b.id === invoiceForm.branch_id),
+    [branches, invoiceForm.branch_id],
+  );
+  const isInvoicePreCutoff = isDateBeforeStockCutoff(invoiceForm.invoice_date, selectedInvoiceBranch?.stock_cutoff_at);
   const invoiceSubtotal = lines.reduce((sum, line) => sum + Math.max(0, Number(line.quantity || 0)) * Math.max(0, Number(line.unit_cost_kes || 0)), 0);
   const invoiceTotal = invoiceSubtotal + Math.max(0, Number(invoiceForm.tax_kes || 0));
   const postInvoice = async (e: React.FormEvent) => {
@@ -228,19 +234,21 @@ export default function PurchasesPage() {
     if (!invoiceForm.supplier_id || !invoiceForm.branch_id || !invoiceForm.invoice_number.trim()) return showError('Select a supplier and branch, and enter the supplier invoice number.');
     if (!lines.length || lines.some(line => !line.description.trim() || Number(line.quantity) <= 0 || line.unit_cost_kes === '' || Number(line.unit_cost_kes) < 0)) return showError('Complete every invoice line before posting.');
 
-    // Strict client check before hitting DB: cannot refill more empty containers than currently in branch
-    const refillTotals = new Map<string, number>();
-    for (const line of lines) {
-      if (line.track_stock && line.stock_mode === 'refill' && line.product_id) {
-        refillTotals.set(line.product_id, (refillTotals.get(line.product_id) || 0) + Number(line.quantity));
+    // Strict client check before hitting DB: cannot refill more empty containers than currently in branch (skipped for pre-cutover historical invoices)
+    if (!isInvoicePreCutoff) {
+      const refillTotals = new Map<string, number>();
+      for (const line of lines) {
+        if (line.track_stock && line.stock_mode === 'refill' && line.product_id) {
+          refillTotals.set(line.product_id, (refillTotals.get(line.product_id) || 0) + Number(line.quantity));
+        }
       }
-    }
-    for (const [productId, requested] of refillTotals) {
-      const inv = inventory.find(r => r.branch_id === invoiceForm.branch_id && r.product_id === productId);
-      const avail = inv?.empty_units ?? 0;
-      if (requested > avail) {
-        const prodName = products.find(p => p.id === productId)?.name || 'Selected product';
-        return showError(`Cannot refill ${requested} × ${prodName}: branch only has ${avail} empty containers available.`);
+      for (const [productId, requested] of refillTotals) {
+        const inv = inventory.find(r => r.branch_id === invoiceForm.branch_id && r.product_id === productId);
+        const avail = inv?.empty_units ?? 0;
+        if (requested > avail) {
+          const prodName = products.find(p => p.id === productId)?.name || 'Selected product';
+          return showError(`Cannot refill ${requested} × ${prodName}: branch only has ${avail} empty containers available.`);
+        }
       }
     }
 
@@ -255,8 +263,8 @@ export default function PurchasesPage() {
       p_items: lines.map(line => ({
         product_id: line.product_id || null, description: line.description.trim(),
         quantity: Number(line.quantity), unit_cost_kes: Number(line.unit_cost_kes),
-        track_stock: line.track_stock,
-        stock_mode: line.track_stock ? line.stock_mode : 'none',
+        track_stock: isInvoicePreCutoff ? false : line.track_stock,
+        stock_mode: isInvoicePreCutoff ? 'none' : (line.track_stock ? line.stock_mode : 'none'),
       })),
     });
     setSaving(false);
@@ -423,8 +431,16 @@ export default function PurchasesPage() {
           <Field label="Due date"><input type="date" className={inputClass} min={invoiceForm.invoice_date} value={invoiceForm.due_date} onChange={e=>setInvoiceForm(p=>({...p,due_date:e.target.value}))} /></Field>
           <Field label="Tax / VAT"><input type="number" min="0" step="0.01" className={inputClass} value={invoiceForm.tax_kes} onChange={e=>setInvoiceForm(p=>({...p,tax_kes:e.target.value}))} /></Field>
         </section>
+        {isInvoicePreCutoff && (
+          <div className="flex items-center gap-2 rounded-md border border-sky-300 bg-sky-50 px-3 py-2 text-xs text-sky-950">
+            <Clock className="h-4 w-4 shrink-0 text-sky-700" />
+            <span>
+              <strong>Historical pre-cutover purchase</strong> (before {formatCutoffLabel(selectedInvoiceBranch?.stock_cutoff_at)} EAT): supplier invoice &amp; balance will be recorded <strong>without modifying current live stock</strong>.
+            </span>
+          </div>
+        )}
         <section className="rounded-md border border-slate-300 bg-white p-2">
-          <PurchaseInvoiceItems lines={lines} products={products} inventory={inventory} branchId={invoiceForm.branch_id || branches.find(b => b.is_active)?.id || ''} onAddProduct={addProductLine} onAddCustom={() => setLines(p => [...p, emptyLine()])} onChange={updateLine} onRemove={key => setLines(p => p.filter(l => l.key !== key))} />
+          <PurchaseInvoiceItems lines={lines} products={products} inventory={inventory} branchId={invoiceForm.branch_id || branches.find(b => b.is_active)?.id || ''} isPreCutoff={isInvoicePreCutoff} onAddProduct={addProductLine} onAddCustom={() => setLines(p => [...p, emptyLine()])} onChange={updateLine} onRemove={key => setLines(p => p.filter(l => l.key !== key))} />
           <div className="mt-2 grid items-end gap-2 border-t border-slate-200 pt-2 sm:grid-cols-[1fr_auto]">
             <Field label="Notes"><input className={inputClass} value={invoiceForm.notes} onChange={e=>setInvoiceForm(p=>({...p,notes:e.target.value}))} placeholder="Optional" /></Field>
             <div className="flex flex-wrap items-center justify-end gap-3 text-xs">

@@ -52,6 +52,7 @@ export const INITIAL_PRODUCTS: Product[] = [
   { id: 'c0013-0000-0000-0000-000000000013', name: '6KG SEAGAS', brand: 'SEAGAS', size_kg: 6, category: 'cylinder', refill_price_kes: 1350, complete_price_kes: 4800, accessory_price_kes: 0, is_active: true },
   { id: 'c0014-0000-0000-0000-000000000014', name: '6KG RAHA', brand: 'RAHA', size_kg: 6, category: 'cylinder', refill_price_kes: 1350, complete_price_kes: 4800, accessory_price_kes: 0, is_active: true },
   { id: 'c0015-0000-0000-0000-000000000015', name: '6KG BONOKO', brand: 'BONOKO', size_kg: 6, category: 'cylinder', refill_price_kes: 1350, complete_price_kes: 4800, accessory_price_kes: 0, is_active: true },
+  { id: 'c0044-0000-0000-0000-000000000044', name: '13KG SAFE GAS', brand: 'SAFE GAS', size_kg: 13, category: 'cylinder', refill_price_kes: 3100, complete_price_kes: 9000, accessory_price_kes: 0, is_active: true },
   { id: 'c0016-0000-0000-0000-000000000016', name: '13KG AFRIGAS', brand: 'AFRIGAS', size_kg: 13, category: 'cylinder', refill_price_kes: 3100, complete_price_kes: 9200, accessory_price_kes: 0, is_active: true },
   { id: 'c0017-0000-0000-0000-000000000017', name: '13KG K-GAS', brand: 'K-GAS', size_kg: 13, category: 'cylinder', refill_price_kes: 3100, complete_price_kes: 9200, accessory_price_kes: 0, is_active: true },
   { id: 'c0018-0000-0000-0000-000000000018', name: '13KG TOTAL', brand: 'TOTAL', size_kg: 13, category: 'cylinder', refill_price_kes: 3100, complete_price_kes: 9200, accessory_price_kes: 0, is_active: true },
@@ -395,6 +396,10 @@ export const INITIAL_INVENTORY: BranchInventory[] = [
   { id: 'inv-0222', branch_id: 'b4444444-4444-4444-4444-444444444444', product_id: 'a5', full_units: 39, empty_units: 0 },
   { id: 'inv-0223', branch_id: 'b4444444-4444-4444-4444-444444444444', product_id: 'a6', full_units: 20, empty_units: 0 },
   { id: 'inv-0224', branch_id: 'b4444444-4444-4444-4444-444444444444', product_id: 'a7', full_units: 26, empty_units: 0 },
+  { id: 'inv-0225', branch_id: 'b1111111-1111-1111-1111-111111111111', product_id: 'c0044-0000-0000-0000-000000000044', full_units: 18, empty_units: 6 },
+  { id: 'inv-0226', branch_id: 'b2222222-2222-2222-2222-222222222222', product_id: 'c0044-0000-0000-0000-000000000044', full_units: 14, empty_units: 4 },
+  { id: 'inv-0227', branch_id: 'b3333333-3333-3333-3333-333333333333', product_id: 'c0044-0000-0000-0000-000000000044', full_units: 16, empty_units: 5 },
+  { id: 'inv-0228', branch_id: 'b4444444-4444-4444-4444-444444444444', product_id: 'c0044-0000-0000-0000-000000000044', full_units: 12, empty_units: 3 },
 ];
 
 export const INITIAL_ORDERS: Order[] = [

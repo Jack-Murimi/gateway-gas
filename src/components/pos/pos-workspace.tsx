@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, CheckCircle2, ChevronDown, FileText, Package, Wallet } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronDown, Clock, FileText, Package, Wallet } from 'lucide-react';
 import type { Branch, BranchInventory, Customer, OrderType, PaymentMethod, PaymentStatus, Product, StaffProfile } from '@/types';
 import { Button } from '@/components/ui/button';
 import { formatKES } from '@/lib/formatters';
+import { buildSaleCreatedAt, formatCutoffLabel, isDateBeforeStockCutoff } from '@/lib/stock-cutoff';
 import { fieldClass, labelClass } from './pos-ui';
 import { groupReturns, resizeReturns } from './pos-logic';
 import { PosCartTable, newLine, type PosLine } from './pos-cart-line';
@@ -173,6 +174,15 @@ export function PosWorkspace({
   };
 
   const location = customer?.locations.find(l => l.id === locationId);
+  const activeBranch = useMemo(
+    () => activeBranches.find(b => b.id === effectiveBranchId),
+    [activeBranches, effectiveBranchId],
+  );
+  const isBranchHistorical = (bId: string) => {
+    const branch = activeBranches.find(b => b.id === bId);
+    return isDateBeforeStockCutoff(receiptDate, branch?.stock_cutoff_at);
+  };
+  const isHistoricalSale = isDateBeforeStockCutoff(receiptDate, activeBranch?.stock_cutoff_at);
 
   const validate = (needCustomer = false) => {
     const fail = (msg: string) => { setFormError(msg); return false; };
@@ -188,6 +198,7 @@ export function PosWorkspace({
     const used = new Map<string, number>();
     for (const l of cart) {
       const lineBranch = l.branchId || effectiveBranchId;
+      if (isBranchHistorical(lineBranch)) continue;
       const key = `${lineBranch}:${l.productId}`;
       used.set(key, (used.get(key) || 0) + l.quantity);
     }
@@ -200,9 +211,7 @@ export function PosWorkspace({
   };
 
   const buildSubmission = (payment: PosPayment): PosSaleSubmission => {
-    const now = new Date();
-    const [y, m, d] = receiptDate.split('-').map(Number);
-    const createdAt = y && m && d ? new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds()).toISOString() : now.toISOString();
+    const createdAt = buildSaleCreatedAt(receiptDate, activeBranch?.stock_cutoff_at);
     const phone = customer?.phones.find(p => p.is_primary)?.phone_number || customer?.phones[0]?.phone_number;
     return {
       client_request_id: requestIdRef.current,
@@ -279,6 +288,15 @@ export function PosWorkspace({
         onRider={chooseRider} onVehicle={setVehiclePlate} createCustomer={createCustomer}
       />
 
+      {isHistoricalSale && (
+        <div className="mt-2 flex items-center gap-2 rounded-md border border-sky-300 bg-sky-50 px-3 py-2 text-xs text-sky-950">
+          <Clock className="h-4 w-4 shrink-0 text-sky-700" />
+          <span>
+            <strong>Historical pre-cutover sale</strong> (before {formatCutoffLabel(activeBranch?.stock_cutoff_at)} EAT): revenue, customer ledger &amp; P&amp;L will be recorded <strong>without affecting current live stock</strong>.
+          </span>
+        </div>
+      )}
+
       <div className="mt-2 grid grid-cols-1 gap-2 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
         <section aria-label="Sale items" className="min-w-0">
           <PosProductSearch products={products} inventory={inventory} branchId={effectiveBranchId} inCart={inCart} inputRef={searchRef} onPick={addProduct} />
@@ -291,6 +309,7 @@ export function PosWorkspace({
               <PosCartTable
                 lines={cart} products={products} branches={activeBranches}
                 availableFor={line => Math.max(0, stockFor(line.branchId, line.productId) - reservedByOthers(line))}
+                isHistoricalFor={line => isBranchHistorical(line.branchId || effectiveBranchId)}
                 onChange={updateLine} onRemove={removeLine}
               />
               <p className="mt-1 text-right text-[11px] text-slate-500">{cart.length} {cart.length === 1 ? 'line' : 'lines'} · {units} {units === 1 ? 'unit' : 'units'}</p>

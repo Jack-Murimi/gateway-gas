@@ -29,6 +29,8 @@ const { parseDarajaTransTime, normalizeDarajaPayload, rankMpesaCandidates } = aw
 const { getInvoiceAgeDays, getAgingBucket, summarizeReceivablesAging, buildSalesCsv, buildPnlCsv } = await import(
   '../src/lib/finance.ts'
 );
+const { cutoffDateEAT, cutoffTimeEAT, buildCutoffTimestampEAT, isDateBeforeStockCutoff, buildSaleCreatedAt } =
+  await import('../src/lib/stock-cutoff.ts');
 
 // 1. Daraja TransTime parsing (YYYYMMDDHHmmss EAT -> UTC ISO)
 const parsedTime = parseDarajaTransTime('20261122143015');
@@ -274,4 +276,22 @@ assert.ok(pnlCsv.includes('Gateway Gas Profit & Loss Statement'));
 assert.ok(pnlCsv.includes('Bike Fuel'));
 assert.ok(pnlCsv.includes('Kileleshwa'));
 
-console.log('M-Pesa normalization/ranking, receivables aging, and CSV export assertions passed.');
+// 6. Stock cutover helpers (EAT UTC+3)
+const cutoffIso = buildCutoffTimestampEAT('2026-11-19', '00:01');
+assert.equal(cutoffIso, '2026-11-18T21:01:00.000Z');
+assert.equal(cutoffDateEAT(cutoffIso), '2026-11-19');
+assert.equal(cutoffTimeEAT(cutoffIso), '00:01');
+assert.equal(isDateBeforeStockCutoff('2026-11-18', cutoffIso), true);
+assert.equal(isDateBeforeStockCutoff('2026-11-19', cutoffIso), false);
+assert.equal(isDateBeforeStockCutoff('2026-11-22', cutoffIso), false);
+
+// Midnight edge case: recording a 2026-11-19 sale at 00:00:30 EAT still lands >= cutoff (00:01 EAT)
+const midnightRef = new Date('2026-11-21T21:00:30.000Z'); // 2026-11-22 00:00:30 EAT
+const nov19CreatedAt = buildSaleCreatedAt('2026-11-19', cutoffIso, midnightRef);
+assert.ok(new Date(nov19CreatedAt).getTime() >= new Date(cutoffIso).getTime());
+
+// Historical 2026-11-18 sale always lands strictly before cutoff
+const nov18CreatedAt = buildSaleCreatedAt('2026-11-18', cutoffIso, midnightRef);
+assert.ok(new Date(nov18CreatedAt).getTime() < new Date(cutoffIso).getTime());
+
+console.log('M-Pesa normalization/ranking, receivables aging, CSV export, and stock cutover assertions passed.');

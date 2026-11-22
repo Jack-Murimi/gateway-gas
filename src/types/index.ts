@@ -63,7 +63,7 @@ export interface Expense {
 
 export interface Branch {
   id: string; name: string; code: string; location_estate: string; contact_phone: string;
-  is_active: boolean; mpesa_shortcode?: string | null; created_at?: string;
+  is_active: boolean; mpesa_shortcode?: string | null; stock_cutoff_at?: string | null; created_at?: string;
 }
 export interface StaffProfile {
   id: string; email: string; full_name: string; phone?: string | null; role: UserRole;
@@ -101,6 +101,7 @@ export interface Order {
   delivery_estate?: string | null; delivery_address?: string | null; delivery_status: DeliveryStatus;
   payment_method: PaymentMethod; payment_status: PaymentStatus; payment_reference?: string | null;
   rider_comment?: string | null; subtotal_kes: number; delivery_fee_kes: number; total_kes: number;
+  affects_stock?: boolean;
   assigned_at?: string | null; delivered_at?: string | null; created_at: string; updated_at?: string;
   branch?: Branch; items?: OrderItem[]; rider?: StaffProfile; sales_rep?: StaffProfile;
 }

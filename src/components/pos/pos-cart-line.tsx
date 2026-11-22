@@ -47,14 +47,15 @@ interface RowProps {
   product?: Product;
   branches: Branch[];
   available: number;
+  isHistorical?: boolean;
   onChange: (patch: Partial<PosLine>) => void;
   onRemove: () => void;
 }
 
-function PosCartRow({ line, index, product, branches, available, onChange, onRemove }: RowProps) {
+function PosCartRow({ line, index, product, branches, available, isHistorical = false, onChange, onRemove }: RowProps) {
   const returnable = product ? hasEmptyState(product) : line.orderType === 'refill';
   const edited = line.unitPrice !== line.listPrice;
-  const outOfStock = line.quantity > available;
+  const outOfStock = !isHistorical && line.quantity > available;
   const isRefill = line.orderType === 'refill';
   const baseBrands = line.category === 'water' ? WATER_BRANDS : CYLINDER_BRANDS;
   const brandOptions = Array.from(new Set([line.outgoingBrand, ...baseBrands, ...line.returns]));
@@ -78,9 +79,9 @@ function PosCartRow({ line, index, product, branches, available, onChange, onRem
         <p className="truncate text-[13px] font-semibold leading-tight text-slate-900">
           <span className="mr-1.5 font-normal tabular-nums text-slate-400">{index}</span>{line.productName}
         </p>
-        <p className={`flex items-center gap-1 truncate text-[11px] leading-tight ${outOfStock ? 'font-semibold text-red-600' : 'text-slate-500'}`}>
+        <p className={`flex items-center gap-1 truncate text-[11px] leading-tight ${outOfStock ? 'font-semibold text-red-600' : isHistorical ? 'text-sky-700' : 'text-slate-500'}`}>
           {outOfStock && <AlertTriangle className="h-3 w-3 shrink-0" />}
-          {line.outgoingBrand}{size && ` ${size}`} · {outOfStock ? `only ${available} in stock` : `${available} in stock`}
+          {line.outgoingBrand}{size && ` ${size}`} · {isHistorical ? 'Pre-cutoff (no stock impact)' : outOfStock ? `only ${available} in stock` : `${available} in stock`}
           {branches.length > 1 && (
             <select aria-label="Stock location" value={line.branchId} onChange={e => onChange({ branchId: e.target.value })} className="ml-1 max-w-[110px] truncate rounded border border-slate-200 bg-white px-0.5 text-[10px] text-slate-600">
               {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -177,11 +178,12 @@ interface TableProps {
   products: Product[];
   branches: Branch[];
   availableFor: (line: PosLine) => number;
+  isHistoricalFor?: (line: PosLine) => boolean;
   onChange: (id: string, patch: Partial<PosLine>) => void;
   onRemove: (id: string) => void;
 }
 
-export function PosCartTable({ lines, products, branches, availableFor, onChange, onRemove }: TableProps) {
+export function PosCartTable({ lines, products, branches, availableFor, isHistoricalFor, onChange, onRemove }: TableProps) {
   return (
     <div className="overflow-hidden rounded-md border border-slate-300 bg-white">
       <div className={`hidden gap-x-1.5 border-b border-slate-300 bg-slate-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 md:grid ${COLS}`}>
@@ -191,7 +193,7 @@ export function PosCartTable({ lines, products, branches, availableFor, onChange
         {lines.map((line, i) => (
           <PosCartRow
             key={line.id} line={line} index={lines.length - i} product={products.find(p => p.id === line.productId)} branches={branches}
-            available={availableFor(line)} onChange={patch => onChange(line.id, patch)} onRemove={() => onRemove(line.id)}
+            available={availableFor(line)} isHistorical={isHistoricalFor ? isHistoricalFor(line) : false} onChange={patch => onChange(line.id, patch)} onRemove={() => onRemove(line.id)}
           />
         ))}
       </ul>
