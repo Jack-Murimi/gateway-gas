@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import {
   Branch,
   StaffProfile,
@@ -72,8 +72,8 @@ interface StoreContextType {
   leaderboard: RiderLeaderboardEntry[];
   shiftReports: ShiftZReport[];
   signupStaff: (email: string, password: string, full_name: string, phone: string, vehicle_plate?: string) => Promise<{ success: boolean; message: string }>;
-  approveStaff: (staffId: string, role: UserRole) => void;
-  rejectStaff: (staffId: string) => void;
+  approveStaff: (staffId: string, role: UserRole) => Promise<void>;
+  rejectStaff: (staffId: string) => Promise<void>;
   createOrder: (params: CreateOrderParams) => Promise<Order>;
   cancelOrder: (orderId: string, reason?: string) => Promise<void>;
   createCustomer: (name: string, phone: string, estate: string, specificAddress?: string) => Promise<Customer>;
@@ -85,11 +85,11 @@ interface StoreContextType {
   addCustomerLocation: (customerId: string, estate: string, specificAddress?: string, makeDefault?: boolean) => Promise<void>;
   updateCustomerLocation: (customerId: string, locationId: string, updates: { estate?: string; specific_address?: string | null; is_default?: boolean }) => Promise<void>;
   removeCustomerLocation: (customerId: string, locationId: string) => Promise<void>;
-  assignRider: (orderId: string, riderId: string) => void;
-  updateDeliveryStatus: (orderId: string, status: DeliveryStatus, comment?: string) => void;
-  updateRiderComment: (orderId: string, comment: string) => void;
+  assignRider: (orderId: string, riderId: string) => Promise<void>;
+  updateDeliveryStatus: (orderId: string, status: DeliveryStatus, comment?: string) => Promise<void>;
+  updateRiderComment: (orderId: string, comment: string) => Promise<void>;
   refreshLiveData: () => Promise<void>;
-  createBranch: (name: string, code: string, location_estate: string, contact_phone: string) => void;
+  createBranch: (name: string, code: string, location_estate: string, contact_phone: string) => Promise<void>;
   createShiftReport: (data: Omit<ShiftZReport, 'id' | 'report_number' | 'closed_at'>) => Promise<ShiftZReport>;
   resetDemoData: () => void;
   logout: () => void;
@@ -111,6 +111,23 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [customerCacheAvailable, setCustomerCacheAvailable] = useState(true);
   const [shiftReports, setShiftReports] = useState<ShiftZReport[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const loadedForUserRef = useRef<string | null>(null);
+
+  const mapProfile = (profile: any): StaffProfile => ({
+    id: profile.id,
+    email: profile.email,
+    full_name: profile.full_name,
+    phone: profile.phone ?? null,
+    role: profile.role,
+    approval_status: profile.approval_status,
+    vehicle_plate: profile.vehicle_plate ?? null,
+    avatar_url: profile.avatar_url ?? null,
+    branch_id: profile.branch_id ?? null,
+    national_id: profile.national_id ?? null,
+    notes: profile.notes ?? null,
+    created_at: profile.created_at,
+    updated_at: profile.updated_at,
+  });
 
   const refreshCustomers = useCallback(async (forceFull = false) => {
     setCustomersError(null);
@@ -156,28 +173,48 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const fetchCoreData = useCallback(async () => {
+    const supabase = createClient();
+    const [branchesRes, productsRes, inventoryRes, ordersRes, staffRes] = await Promise.all([
+      supabase.from('branches').select('*').eq('is_active', true).order('code'),
+      supabase.from('products').select('*').eq('is_active', true).order('category').order('name'),
+      supabase.from('branch_inventory').select('*'),
+      supabase.from('orders').select('*, items:order_items(*)').order('created_at', { ascending: false }).limit(200),
+      supabase.from('profiles').select('*').order('created_at', { ascending: true }),
+    ]);
+
+    if (branchesRes.error) console.error('Failed to load branches:', branchesRes.error.message);
+    else if (branchesRes.data) setBranches(branchesRes.data as Branch[]);
+
+    if (productsRes.error) console.error('Failed to load products:', productsRes.error.message);
+    else if (productsRes.data) setProducts(productsRes.data as Product[]);
+
+    if (inventoryRes.error) console.error('Failed to load inventory:', inventoryRes.error.message);
+    else if (inventoryRes.data) setInventory(inventoryRes.data as BranchInventory[]);
+
+    if (ordersRes.error) console.error('Failed to load orders:', ordersRes.error.message);
+    else if (ordersRes.data) setOrders(ordersRes.data as Order[]);
+
+    if (staffRes.error) console.error('Failed to load staff:', staffRes.error.message);
+    else if (staffRes.data) {
+      const profiles = staffRes.data.map(mapProfile);
+      setStaffList(profiles);
+      setCurrentUser((prev) => {
+        if (!prev) return prev;
+        const fresh = profiles.find((p) => p.id === prev.id);
+        return fresh ?? prev;
+      });
+    }
+  }, []);
+
   const fetchLiveData = useCallback(async () => {
     try {
-      const supabase = createClient();
-      const [branchesRes, productsRes, inventoryRes, ordersRes, staffRes] = await Promise.all([
-        supabase.from('branches').select('*').eq('is_active', true).order('code'),
-        supabase.from('products').select('*').eq('is_active', true).order('category').order('name'),
-        supabase.from('branch_inventory').select('*'),
-        supabase.from('orders').select('*, items:order_items(*)').order('created_at', { ascending: false }).limit(200),
-        supabase.from('profiles').select('*').order('created_at', { ascending: true }),
-      ]);
-
-      if (!branchesRes.error && branchesRes.data) setBranches(branchesRes.data as Branch[]);
-      if (!productsRes.error && productsRes.data) setProducts(productsRes.data as Product[]);
-      if (!inventoryRes.error && inventoryRes.data) setInventory(inventoryRes.data as BranchInventory[]);
-      if (!ordersRes.error && ordersRes.data) setOrders(ordersRes.data as Order[]);
-      if (!staffRes.error && staffRes.data) setStaffList(staffRes.data as StaffProfile[]);
-
-      await refreshCustomers();
+      await fetchCoreData();
+      void refreshCustomers();
     } catch (e) {
       console.error('Failed to load live data', e);
     }
-  }, [refreshCustomers]);
+  }, [fetchCoreData, refreshCustomers]);
 
   // Initialize session and load live data
   useEffect(() => {
@@ -197,9 +234,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
+    const supabase = createClient();
+
     (async () => {
+      let authenticatedUser: StaffProfile | null = null;
       try {
-        const supabase = createClient();
         const sessionRes = await withTimeout(supabase.auth.getSession(), 4000);
         const session = sessionRes && 'data' in sessionRes ? sessionRes.data.session : null;
 
@@ -210,54 +249,81 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           );
           const profile = profileRes && 'data' in (profileRes as any) ? (profileRes as any).data : null;
           if (mounted && profile) {
-            const u: StaffProfile = {
-              id: profile.id,
-              email: profile.email,
-              full_name: profile.full_name,
-              phone: profile.phone,
-              role: profile.role,
-              approval_status: profile.approval_status,
-              vehicle_plate: profile.vehicle_plate,
-              avatar_url: profile.avatar_url,
-            };
-            setCurrentUser(u);
-            setDemoSessionCookies(u.id, u.role, u.approval_status);
+            authenticatedUser = mapProfile(profile);
+            setCurrentUser(authenticatedUser);
+            setDemoSessionCookies(authenticatedUser.id, authenticatedUser.role, authenticatedUser.approval_status);
           }
         } else {
           clearDemoSessionCookies();
           if (mounted) setCurrentUser(null);
         }
+
+        // Load core operational data (branches, products, inventory) promptly before unblocking UI
+        // so branch pickers and POS stock are immediately populated on first paint.
+        if (mounted && authenticatedUser && authenticatedUser.approval_status === 'approved') {
+          loadedForUserRef.current = authenticatedUser.id;
+          await withTimeout(fetchCoreData(), 3000);
+        }
       } catch (e) {
         console.error('Store init error', e);
       } finally {
-        // Unblock UI quickly; load data in background.
         if (mounted) setIsLoaded(true);
       }
 
-      try {
-        await withTimeout(fetchLiveData(), 8000);
-      } catch (e) {
-        console.error('Background data load error', e);
+      if (mounted && authenticatedUser && authenticatedUser.approval_status === 'approved') {
+        void refreshCustomers();
       }
     })();
 
-    return () => { mounted = false; };
-  }, [fetchLiveData]);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (!mounted) return;
+      if (event === 'SIGNED_OUT') {
+        loadedForUserRef.current = null;
+        setCurrentUser(null);
+        setBranches([]);
+        setProducts([]);
+        setInventory([]);
+        setOrders([]);
+        setStaffList([]);
+        setCustomers([]);
+        clearDemoSessionCookies();
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [fetchCoreData, refreshCustomers]);
+
+  // Ensure live data (branches, products, inventory, orders, staff, customers) loads right after
+  // signing in via /login or switching into an approved account without requiring a full page reload.
+  useEffect(() => {
+    if (!currentUser || currentUser.approval_status !== 'approved') return;
+    if (loadedForUserRef.current === currentUser.id) return;
+    loadedForUserRef.current = currentUser.id;
+    void fetchLiveData();
+  }, [currentUser?.id, currentUser?.approval_status, fetchLiveData]);
 
   useEffect(() => {
-    if (!currentUser) return;
-    const sync = () => { if (navigator.onLine) void refreshCustomers(); };
+    if (!currentUser || currentUser.approval_status !== 'approved') return;
+    const sync = () => {
+      if (navigator.onLine) void refreshCustomers();
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') sync();
+    };
     const interval = window.setInterval(sync, 5 * 60 * 1000);
     window.addEventListener('focus', sync);
     window.addEventListener('online', sync);
-    document.addEventListener('visibilitychange', sync);
+    document.addEventListener('visibilitychange', handleVisibility);
     return () => {
       window.clearInterval(interval);
       window.removeEventListener('focus', sync);
       window.removeEventListener('online', sync);
-      document.removeEventListener('visibilitychange', sync);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [currentUser?.id, refreshCustomers]);
+  }, [currentUser?.id, currentUser?.approval_status, refreshCustomers]);
 
   // Persist only current user session hint locally (no mock business data)
   useEffect(() => {
@@ -291,28 +357,28 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const approveStaff = (staffId: string, role: UserRole) => {
-    (async () => {
-      try {
-        const supabase = createClient();
-        await supabase.from('profiles').update({ role, approval_status: 'approved', updated_at: new Date().toISOString() }).eq('id', staffId);
-        await fetchLiveData();
-        if (currentUser?.id === staffId) {
-          setCurrentUser((prev) => (prev ? { ...prev, role, approval_status: 'approved' } : null));
-          setDemoSessionCookies(staffId, role, 'approved');
-        }
-      } catch (e) { console.error(e); }
-    })();
+  const approveStaff = async (staffId: string, role: UserRole) => {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('profiles')
+      .update({ role, approval_status: 'approved', updated_at: new Date().toISOString() })
+      .eq('id', staffId);
+    if (error) throw new Error(error.message || 'Failed to approve staff member.');
+    await fetchLiveData();
+    if (currentUser?.id === staffId) {
+      setCurrentUser((prev) => (prev ? { ...prev, role, approval_status: 'approved' } : null));
+      setDemoSessionCookies(staffId, role, 'approved');
+    }
   };
 
-  const rejectStaff = (staffId: string) => {
-    (async () => {
-      try {
-        const supabase = createClient();
-        await supabase.from('profiles').update({ approval_status: 'rejected', updated_at: new Date().toISOString() }).eq('id', staffId);
-        await fetchLiveData();
-      } catch (e) { console.error(e); }
-    })();
+  const rejectStaff = async (staffId: string) => {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('profiles')
+      .update({ approval_status: 'rejected', updated_at: new Date().toISOString() })
+      .eq('id', staffId);
+    if (error) throw new Error(error.message || 'Failed to suspend staff member.');
+    await fetchLiveData();
   };
 
   const createOrder = async (params: CreateOrderParams): Promise<Order> => {
@@ -402,16 +468,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       .select('id,name,created_at,is_active,updated_at')
       .single();
     if (error || !customer) throw error || new Error('Failed to create customer');
-    const [{ error: phoneError }, { error: locError }] = await Promise.all([
-      supabase.from('customer_phones').insert({ customer_id: customer.id, phone_number: trimmedPhone, is_primary: true }),
-      supabase.from('customer_locations').insert({ customer_id: customer.id, estate: trimmedEstate, specific_address: specificAddress?.trim() || null, is_default: true }),
+    const [{ data: phoneRow, error: phoneError }, { data: locRow, error: locError }] = await Promise.all([
+      supabase.from('customer_phones').insert({ customer_id: customer.id, phone_number: trimmedPhone, is_primary: true }).select('*').single(),
+      supabase.from('customer_locations').insert({ customer_id: customer.id, estate: trimmedEstate, specific_address: specificAddress?.trim() || null, is_default: true }).select('*').single(),
     ]);
     if (phoneError) throw phoneError;
     if (locError) throw locError;
     const created: Customer = {
       ...(customer as any),
-      phones: [{ id: crypto.randomUUID(), customer_id: customer.id, phone_number: trimmedPhone, is_primary: true }],
-      locations: [{ id: crypto.randomUUID(), customer_id: customer.id, estate: trimmedEstate, specific_address: specificAddress?.trim() || null, is_default: true }],
+      phones: [phoneRow ? (phoneRow as CustomerPhone) : { id: crypto.randomUUID(), customer_id: customer.id, phone_number: trimmedPhone, is_primary: true }],
+      locations: [locRow ? (locRow as CustomerLocation) : { id: crypto.randomUUID(), customer_id: customer.id, estate: trimmedEstate, specific_address: specificAddress?.trim() || null, is_default: true }],
     };
     await upsertCachedCustomer(created);
     setCustomers(await readCachedCustomers());
@@ -444,9 +510,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const trimmed = phone.trim();
     if (!trimmed) throw new Error('Phone number is required.');
     if (makePrimary) await supabase.from('customer_phones').update({ is_primary: false }).eq('customer_id', customerId);
-    const { error } = await supabase.from('customer_phones').insert({ customer_id: customerId, phone_number: trimmed, is_primary: makePrimary, label: label?.trim() || null });
+    const { data: insertedPhone, error } = await supabase
+      .from('customer_phones')
+      .insert({ customer_id: customerId, phone_number: trimmed, is_primary: makePrimary, label: label?.trim() || null })
+      .select('*')
+      .single();
     if (error) throw error;
-    const newPhone: CustomerPhone = { id: crypto.randomUUID(), customer_id: customerId, phone_number: trimmed, is_primary: makePrimary, label: label?.trim() || null };
+    const newPhone: CustomerPhone = insertedPhone
+      ? (insertedPhone as CustomerPhone)
+      : { id: crypto.randomUUID(), customer_id: customerId, phone_number: trimmed, is_primary: makePrimary, label: label?.trim() || null };
     const now = new Date().toISOString();
     const current = customers.find(customer => customer.id === customerId);
     if (current) {
@@ -462,9 +534,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const trimmed = estate.trim();
     if (!trimmed) throw new Error('Location is required.');
     if (makeDefault) await supabase.from('customer_locations').update({ is_default: false }).eq('customer_id', customerId);
-    const { error } = await supabase.from('customer_locations').insert({ customer_id: customerId, estate: trimmed, specific_address: specificAddress?.trim() || null, is_default: makeDefault });
+    const { data: insertedLoc, error } = await supabase
+      .from('customer_locations')
+      .insert({ customer_id: customerId, estate: trimmed, specific_address: specificAddress?.trim() || null, is_default: makeDefault })
+      .select('*')
+      .single();
     if (error) throw error;
-    const newLocation: CustomerLocation = { id: crypto.randomUUID(), customer_id: customerId, estate: trimmed, specific_address: specificAddress?.trim() || null, is_default: makeDefault };
+    const newLocation: CustomerLocation = insertedLoc
+      ? (insertedLoc as CustomerLocation)
+      : { id: crypto.randomUUID(), customer_id: customerId, estate: trimmed, specific_address: specificAddress?.trim() || null, is_default: makeDefault };
     const now = new Date().toISOString();
     const current = customers.find(customer => customer.id === customerId);
     if (current) {
@@ -569,51 +647,42 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     await refreshCustomers();
   };
 
-  const assignRider = (orderId: string, riderId: string) => {
-    (async () => {
-      try {
-        const supabase = createClient();
-        await supabase.from('orders').update({ rider_id: riderId, rider_ids: [riderId], delivery_status: 'assigned', assigned_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', orderId);
-        await fetchLiveData();
-      } catch (e) { console.error(e); }
-    })();
+  const assignRider = async (orderId: string, riderId: string) => {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('orders')
+      .update({ rider_id: riderId, rider_ids: [riderId], delivery_status: 'assigned', assigned_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq('id', orderId);
+    if (error) throw new Error(error.message || 'Failed to assign rider.');
+    await fetchLiveData();
   };
 
-  const updateDeliveryStatus = (orderId: string, status: DeliveryStatus, comment?: string) => {
+  const updateDeliveryStatus = async (orderId: string, status: DeliveryStatus, comment?: string) => {
     if (status === 'cancelled') {
-      void cancelOrder(orderId, comment).catch((e) => console.error(e));
+      await cancelOrder(orderId, comment);
       return;
     }
-    (async () => {
-      try {
-        const supabase = createClient();
-        const patch: Record<string, unknown> = { delivery_status: status, updated_at: new Date().toISOString() };
-        if (comment !== undefined) patch.rider_comment = comment;
-        if (status === 'delivered') patch.delivered_at = new Date().toISOString();
-        await supabase.from('orders').update(patch).eq('id', orderId);
-        await fetchLiveData();
-      } catch (e) { console.error(e); }
-    })();
+    const supabase = createClient();
+    const patch: Record<string, unknown> = { delivery_status: status, updated_at: new Date().toISOString() };
+    if (comment !== undefined) patch.rider_comment = comment;
+    if (status === 'delivered') patch.delivered_at = new Date().toISOString();
+    const { error } = await supabase.from('orders').update(patch).eq('id', orderId);
+    if (error) throw new Error(error.message || 'Failed to update delivery status.');
+    await fetchLiveData();
   };
 
-  const updateRiderComment = (orderId: string, comment: string) => {
-    (async () => {
-      try {
-        const supabase = createClient();
-        await supabase.from('orders').update({ rider_comment: comment, updated_at: new Date().toISOString() }).eq('id', orderId);
-        await fetchLiveData();
-      } catch (e) { console.error(e); }
-    })();
+  const updateRiderComment = async (orderId: string, comment: string) => {
+    const supabase = createClient();
+    const { error } = await supabase.from('orders').update({ rider_comment: comment, updated_at: new Date().toISOString() }).eq('id', orderId);
+    if (error) throw new Error(error.message || 'Failed to save delivery note.');
+    await fetchLiveData();
   };
 
-  const createBranch = (name: string, code: string, location_estate: string, contact_phone: string) => {
-    (async () => {
-      try {
-        const supabase = createClient();
-        await supabase.from('branches').insert({ name, code, location_estate, contact_phone, is_active: true });
-        await fetchLiveData();
-      } catch (e) { console.error(e); }
-    })();
+  const createBranch = async (name: string, code: string, location_estate: string, contact_phone: string) => {
+    const supabase = createClient();
+    const { error } = await supabase.from('branches').insert({ name, code, location_estate, contact_phone, is_active: true });
+    if (error) throw new Error(error.message || 'Failed to create branch.');
+    await fetchLiveData();
   };
 
   const createShiftReport = async (data: Omit<ShiftZReport, 'id' | 'report_number' | 'closed_at'>): Promise<ShiftZReport> => {
@@ -632,8 +701,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
+    loadedForUserRef.current = null;
     setCurrentUser(null);
     clearDemoSessionCookies();
+    setBranches([]);
+    setProducts([]);
+    setInventory([]);
+    setOrders([]);
+    setStaffList([]);
     setCustomers([]);
     try {
       localStorage.removeItem('gwg_user');

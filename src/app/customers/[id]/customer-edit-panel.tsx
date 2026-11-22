@@ -370,31 +370,53 @@ export function CustomerEditPanel({
                       {!p.is_primary && (
                         <button
                           type="button"
+                          disabled={saving}
                           title="Set primary"
-                          onClick={async () => { await onUpdatePhone(customer.id, p.id, { is_primary: true }); await onRefresh(); }}
-                          className="grid h-6 w-6 place-items-center rounded border border-slate-300 bg-white text-slate-500 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700"
+                          onClick={async () => {
+                            setSaving(true);
+                            try {
+                              await onUpdatePhone(customer.id, p.id, { is_primary: true });
+                              showSuccess('Primary phone updated.');
+                              await onRefresh();
+                            } catch (err) {
+                              showError(err instanceof Error ? err.message : 'Could not update primary phone.');
+                            } finally {
+                              setSaving(false);
+                            }
+                          }}
+                          className="grid h-6 w-6 place-items-center rounded border border-slate-300 bg-white text-slate-500 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 disabled:opacity-50"
                         >
                           <Star className="h-3 w-3" />
                         </button>
                       )}
                       <button
                         type="button"
+                        disabled={saving}
                         title="Edit phone"
                         onClick={() => startEditPhone(p)}
-                        className="grid h-6 w-6 place-items-center rounded border border-slate-300 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+                        className="grid h-6 w-6 place-items-center rounded border border-slate-300 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-800 disabled:opacity-50"
                       >
                         <Pencil className="h-3 w-3" />
                       </button>
                       {customer.phones.length > 1 && (
                         <button
                           type="button"
+                          disabled={saving}
                           title="Remove phone"
                           onClick={async () => {
                             if (!window.confirm(`Remove ${p.phone_number}?`)) return;
-                            await onRemovePhone(customer.id, p.id);
-                            await onRefresh();
+                            setSaving(true);
+                            try {
+                              await onRemovePhone(customer.id, p.id);
+                              showSuccess('Phone number removed.');
+                              await onRefresh();
+                            } catch (err) {
+                              showError(err instanceof Error ? err.message : 'Could not remove phone.');
+                            } finally {
+                              setSaving(false);
+                            }
                           }}
-                          className="grid h-6 w-6 place-items-center rounded border border-slate-300 bg-white text-slate-500 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
+                          className="grid h-6 w-6 place-items-center rounded border border-slate-300 bg-white text-slate-500 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50"
                         >
                           <Trash2 className="h-3 w-3" />
                         </button>
@@ -494,33 +516,57 @@ export function CustomerEditPanel({
                       {!loc.is_default && (
                         <button
                           type="button"
+                          disabled={saving}
                           title="Set default"
-                          onClick={async () => { await onUpdateLocation(customer.id, loc.id, { is_default: true }); await onRefresh(); }}
-                          className="grid h-6 w-6 place-items-center rounded border border-slate-300 bg-white text-slate-500 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700"
+                          onClick={async () => {
+                            setSaving(true);
+                            try {
+                              await onUpdateLocation(customer.id, loc.id, { is_default: true });
+                              showSuccess('Default location updated.');
+                              await onRefresh();
+                            } catch (err) {
+                              showError(err instanceof Error ? err.message : 'Could not update default location.');
+                            } finally {
+                              setSaving(false);
+                            }
+                          }}
+                          className="grid h-6 w-6 place-items-center rounded border border-slate-300 bg-white text-slate-500 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 disabled:opacity-50"
                         >
                           <Star className="h-3 w-3" />
                         </button>
                       )}
                       <button
                         type="button"
+                        disabled={saving}
                         title="Edit location"
                         onClick={() => startEditLocation(loc)}
-                        className="grid h-6 w-6 place-items-center rounded border border-slate-300 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+                        className="grid h-6 w-6 place-items-center rounded border border-slate-300 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-800 disabled:opacity-50"
                       >
                         <Pencil className="h-3 w-3" />
                       </button>
-                      <button
-                        type="button"
-                        title="Remove location"
-                        onClick={async () => {
-                          if (!window.confirm(`Remove ${loc.estate}?`)) return;
-                          await onRemoveLocation(customer.id, loc.id);
-                          await onRefresh();
-                        }}
-                        className="grid h-6 w-6 place-items-center rounded border border-slate-300 bg-white text-slate-500 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
+                      {customer.locations.length > 1 && (
+                        <button
+                          type="button"
+                          disabled={saving}
+                          title="Remove location"
+                          onClick={async () => {
+                            if (!window.confirm(`Remove ${loc.estate}?`)) return;
+                            setSaving(true);
+                            try {
+                              await onRemoveLocation(customer.id, loc.id);
+                              showSuccess('Delivery location removed.');
+                              await onRefresh();
+                            } catch (err) {
+                              showError(err instanceof Error ? err.message : 'Could not remove location.');
+                            } finally {
+                              setSaving(false);
+                            }
+                          }}
+                          className="grid h-6 w-6 place-items-center rounded border border-slate-300 bg-white text-slate-500 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

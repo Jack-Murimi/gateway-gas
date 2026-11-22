@@ -8,15 +8,18 @@ export function OfflineBanner() {
   const [showRestored, setShowRestored] = useState(false);
 
   useEffect(() => {
+    let restoreTimer: ReturnType<typeof setTimeout> | undefined;
+
     // ponytail: navigator.onLine is sufficient for field 3G/4G disconnects; upgrade to heartbeat ping if captive portals become an issue.
     const handleOnline = () => {
       setIsOffline(false);
       setShowRestored(true);
-      const timer = setTimeout(() => setShowRestored(false), 3000);
-      return () => clearTimeout(timer);
+      if (restoreTimer) clearTimeout(restoreTimer);
+      restoreTimer = setTimeout(() => setShowRestored(false), 3000);
     };
 
     const handleOffline = () => {
+      if (restoreTimer) clearTimeout(restoreTimer);
       setIsOffline(true);
       setShowRestored(false);
     };
@@ -28,6 +31,7 @@ export function OfflineBanner() {
     }
 
     return () => {
+      if (restoreTimer) clearTimeout(restoreTimer);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };

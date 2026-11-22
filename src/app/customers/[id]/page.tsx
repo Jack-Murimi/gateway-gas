@@ -116,6 +116,7 @@ export default function CustomerDetailPage() {
     removeCustomerLocation,
     cancelOrder,
     refreshLiveData,
+    refreshCustomers,
   } = useStore();
   const { showError, showSuccess } = useToast();
 
@@ -254,7 +255,7 @@ export default function CustomerDetailPage() {
   }, [customer?.id, customer?.phones?.length, loadingCustomer, loadOrders]);
 
   const refreshAll = async () => {
-    await Promise.all([loadCustomer(), loadCylinders(), loadOrders(customer?.phones), loadAudit()]);
+    await Promise.all([loadCustomer(), loadCylinders(), loadOrders(customer?.phones), loadAudit(), refreshCustomers()]);
   };
 
   const health = useMemo(() => computePaymentHealth(orders), [orders]);

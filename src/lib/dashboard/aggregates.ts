@@ -43,7 +43,7 @@ function toMonthKey(iso: string) {
 }
 
 function paidOrders(orders: Order[]) {
-  return orders.filter((o) => o.payment_status === 'paid');
+  return orders.filter((o) => o.payment_status === 'paid' && o.delivery_status !== 'cancelled');
 }
 
 export function getSalesTrendData(
@@ -63,9 +63,10 @@ export function getSalesTrendData(
       keys.push(toDateKey(d.toISOString()));
     }
     return keys.map((key) => {
+      const [y, m, day] = key.split('-').map(Number);
       const point: SalesTrendPoint = {
         date: key,
-        label: new Intl.DateTimeFormat('en-KE', { day: 'numeric', month: 'short' }).format(new Date(key)),
+        label: new Intl.DateTimeFormat('en-KE', { day: 'numeric', month: 'short' }).format(new Date(y, m - 1, day)),
         total: 0,
       };
       branches.forEach((b) => (point[b.id] = 0));

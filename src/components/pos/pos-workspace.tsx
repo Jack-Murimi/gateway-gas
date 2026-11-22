@@ -63,8 +63,16 @@ export function PosWorkspace({
   branches, products, inventory, customers, staffList, currentUser, createCustomer, onSubmit,
   isSubmitting, completedOrderNumber, onStartNextSale,
 }: PosWorkspaceProps) {
-  const activeBranches = branches.filter(b => b.is_active);
-  const [branchId, setBranchId] = useState(activeBranches[0]?.id || branches[0]?.id || '');
+  const activeBranches = useMemo(() => branches.filter(b => b.is_active !== false), [branches]);
+  const defaultBranchId = useMemo(
+    () => activeBranches.find(b => b.id === currentUser.branch_id)?.id || activeBranches[0]?.id || '',
+    [activeBranches, currentUser.branch_id],
+  );
+  const [branchId, setBranchId] = useState(defaultBranchId);
+  const effectiveBranchId = useMemo(
+    () => (activeBranches.some(b => b.id === branchId) ? branchId : defaultBranchId),
+    [activeBranches, branchId, defaultBranchId],
+  );
   const [receiptDate, setReceiptDate] = useState(today);
   const [receiptNumber, setReceiptNumber] = useState('');
   const [isDelivery, setIsDelivery] = useState(false);
@@ -79,12 +87,27 @@ export function PosWorkspace({
   const [formError, setFormError] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
   const requestIdRef = useRef<string>(crypto.randomUUID());
+  const prefilledCustomerRef = useRef(false);
 
   const activeRiders = staffList.filter(s => s.role === 'rider' && s.approval_status === 'approved');
   const canEditDate = ['admin', 'director', 'operator'].includes(currentUser.role);
   const total = cart.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);
   const units = cart.reduce((sum, l) => sum + l.quantity, 0);
   const inCart = useMemo(() => new Set(cart.map(l => l.productId)), [cart]);
+
+  useEffect(() => {
+    if (!effectiveBranchId) return;
+    if (branchId !== effectiveBranchId) {
+      setBranchId(effectiveBranchId);
+    }
+    setCart(prev => {
+      const needsFix = prev.some(l => !l.branchId || !activeBranches.some(b => b.id === l.branchId));
+      if (!needsFix) return prev;
+      return prev.map(l =>
+        !l.branchId || !activeBranches.some(b => b.id === l.branchId) ? { ...l, branchId: effectiveBranchId } : l,
+      );
+    });
+  }, [effectiveBranchId, branchId, activeBranches]);
 
   const chooseCustomer = (next: Customer | null) => {
     setCustomer(next);
@@ -94,12 +117,19 @@ export function PosWorkspace({
   };
 
   useEffect(() => {
+    if (prefilledCustomerRef.current || customers.length === 0) return;
     const id = new URLSearchParams(window.location.search).get('customerId');
-    const match = id ? customers.find(c => c.id === id) : null;
-    if (match) chooseCustomer(match);
-    // Run once when customers first load.
+    if (!id) {
+      prefilledCustomerRef.current = true;
+      return;
+    }
+    const match = customers.find(c => c.id === id);
+    if (match) {
+      prefilledCustomerRef.current = true;
+      chooseCustomer(match);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customers.length > 0]);
+  }, [customers]);
 
   const stockFor = (branch: string, productId: string) =>
     inventory.find(r => r.branch_id === branch && r.product_id === productId)?.full_units ?? 0;
@@ -110,8 +140,8 @@ export function PosWorkspace({
     setFormError('');
     requestIdRef.current = crypto.randomUUID();
     setCart(prev => {
-      const existing = prev.find(l => l.productId === product.id && l.branchId === branchId);
-      if (!existing) return [newLine(product, branchId), ...prev];
+      const existing = prev.find(l => l.productId === product.id && l.branchId === effectiveBranchId);
+      if (!existing) return [newLine(product, effectiveBranchId), ...prev];
       const quantity = existing.quantity + 1;
       return prev.map(l => l.id === existing.id
         ? { ...l, quantity, returns: l.orderType === 'refill' ? resizeReturns(l.returns, quantity, l.outgoingBrand) : [] }
@@ -129,6 +159,8 @@ export function PosWorkspace({
   };
 
   const changeBranch = (id: string) => {
+    requestIdRef.current = crypto.randomUUID();
+    setFormError('');
     setBranchId(id);
     setCart(prev => prev.map(l => ({ ...l, branchId: id })));
   };
@@ -136,13 +168,14 @@ export function PosWorkspace({
   const chooseRider = (id: string) => {
     setRiderId(id);
     const plate = activeRiders.find(r => r.id === id)?.vehicle_plate;
-    setVehiclePlate(plate || (id ? vehiclePlate : ''));
+    setVehiclePlate(plate || '');
   };
 
   const location = customer?.locations.find(l => l.id === locationId);
 
   const validate = (needCustomer = false) => {
     const fail = (msg: string) => { setFormError(msg); return false; };
+    if (!effectiveBranchId) return fail('Select a branch.');
     if (!cart.length) return fail('Add at least one product.');
     if (!receiptNumber.trim()) return fail('Receipt number is required.');
     if (needCustomer && !customer) return fail('Select a customer to create an invoice.');
@@ -153,7 +186,8 @@ export function PosWorkspace({
     }
     const used = new Map<string, number>();
     for (const l of cart) {
-      const key = `${l.branchId}:${l.productId}`;
+      const lineBranch = l.branchId || effectiveBranchId;
+      const key = `${lineBranch}:${l.productId}`;
       used.set(key, (used.get(key) || 0) + l.quantity);
     }
     for (const [key, qty] of used) {
@@ -171,7 +205,7 @@ export function PosWorkspace({
     const phone = customer?.phones.find(p => p.is_primary)?.phone_number || customer?.phones[0]?.phone_number;
     return {
       client_request_id: requestIdRef.current,
-      branch_id: branchId, is_pos_walkin: !isDelivery, customer_id: customer?.id || null,
+      branch_id: effectiveBranchId, is_pos_walkin: !isDelivery, customer_id: customer?.id || null,
       receipt_number: receiptNumber.trim(), created_at: createdAt,
       customer_name: customer?.name?.trim() || phone || 'Walk-in Counter Customer',
       customer_phone: phone || '+254700000000',
@@ -184,7 +218,7 @@ export function PosWorkspace({
       payment_reference: payment.reference, delivery_fee_kes: 0,
       items: cart.flatMap(l => {
         const base = {
-          product_id: l.productId, branch_id: l.branchId, order_type: l.orderType,
+          product_id: l.productId, branch_id: l.branchId || effectiveBranchId, order_type: l.orderType,
           outgoing_brand: l.outgoingBrand, cylinder_size_kg: l.cylinderSizeKg, unit_price_kes: l.unitPrice,
         };
         if (l.orderType !== 'refill') return [{ ...base, quantity: l.quantity }];
@@ -233,7 +267,7 @@ export function PosWorkspace({
   return (
     <div className="mx-auto w-full max-w-[1440px] px-2 pb-32 pt-2 text-left sm:px-4 lg:px-5 lg:pb-24 xl:pb-6">
       <PosCustomerPanel
-        branches={activeBranches} branchId={branchId} receiptNumber={receiptNumber}
+        branches={activeBranches} branchId={effectiveBranchId} receiptNumber={receiptNumber}
         receiptDate={receiptDate} maxDate={today()} canEditDate={canEditDate}
         customers={customers} customer={customer} isDelivery={isDelivery} locationId={locationId}
         riders={activeRiders} riderId={riderId} vehiclePlate={vehiclePlate}
@@ -244,7 +278,7 @@ export function PosWorkspace({
 
       <div className="mt-2 grid grid-cols-1 gap-2 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
         <section aria-label="Sale items" className="min-w-0">
-          <PosProductSearch products={products} inventory={inventory} branchId={branchId} inCart={inCart} inputRef={searchRef} onPick={addProduct} />
+          <PosProductSearch products={products} inventory={inventory} branchId={effectiveBranchId} inCart={inCart} inputRef={searchRef} onPick={addProduct} />
           {cart.length === 0 ? (
             <div className="mt-2 flex items-center justify-center gap-2 rounded-md border border-dashed border-slate-300 bg-white px-3 py-6 text-xs text-slate-500">
               <Package className="h-4 w-4 text-slate-300" />No items

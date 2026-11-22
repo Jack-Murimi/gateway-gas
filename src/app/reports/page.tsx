@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useStore } from '@/context/store-context';
 import { ShiftZReport } from '@/types';
 import {
@@ -32,34 +32,59 @@ function todayISO(): string {
   return `${d.getFullYear()}-${month}-${day}`;
 }
 
+function localDateISO(iso?: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${month}-${day}`;
+}
+
 export default function ReportsPage() {
   const { currentUser, branches, orders, shiftReports, createShiftReport } = useStore();
   const { showSuccess, showError } = useToast();
 
-  const [selectedBranchId, setSelectedBranchId] = useState<string>(branches[0]?.id || '');
+  const activeBranches = useMemo(() => branches.filter((b) => b.is_active !== false), [branches]);
+  const defaultBranchId = useMemo(
+    () => activeBranches.find((b) => b.id === currentUser?.branch_id)?.id || activeBranches[0]?.id || '',
+    [activeBranches, currentUser?.branch_id],
+  );
+  const [selectedBranchId, setSelectedBranchId] = useState<string>(defaultBranchId);
+  const effectiveBranchId = useMemo(
+    () => (activeBranches.some((b) => b.id === selectedBranchId) ? selectedBranchId : defaultBranchId),
+    [activeBranches, selectedBranchId, defaultBranchId],
+  );
   const [selectedDate, setSelectedDate] = useState<string>(todayISO());
   const [declaredCash, setDeclaredCash] = useState<string>('');
   const [operatorNotes, setOperatorNotes] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [printReport, setPrintReport] = useState<ShiftZReport | null>(null);
 
-  const activeBranch = branches.find((b) => b.id === selectedBranchId) || branches[0];
+  useEffect(() => {
+    if (effectiveBranchId && selectedBranchId !== effectiveBranchId) {
+      setSelectedBranchId(effectiveBranchId);
+    }
+  }, [effectiveBranchId, selectedBranchId]);
+
+  const activeBranch = activeBranches.find((b) => b.id === effectiveBranchId) || activeBranches[0];
 
   // 1. Check if a report was already generated for this branch & date
   const existingReport = useMemo(() => {
     return shiftReports.find(
-      (r) => r.branch_id === selectedBranchId && r.shift_date === selectedDate
+      (r) => r.branch_id === effectiveBranchId && r.shift_date === selectedDate
     );
-  }, [shiftReports, selectedBranchId, selectedDate]);
+  }, [shiftReports, effectiveBranchId, selectedDate]);
 
-  // 2. Filter orders matching branch and date
+  // 2. Filter non-cancelled orders matching branch and local date
   const matchingOrders = useMemo(() => {
+    if (!effectiveBranchId) return [];
     return orders.filter((o) => {
-      if (o.branch_id !== selectedBranchId) return false;
-      const orderDate = o.created_at ? o.created_at.slice(0, 10) : '';
-      return orderDate === selectedDate;
+      if (o.delivery_status === 'cancelled') return false;
+      if (o.branch_id !== effectiveBranchId) return false;
+      return localDateISO(o.created_at) === selectedDate;
     });
-  }, [orders, selectedBranchId, selectedDate]);
+  }, [orders, effectiveBranchId, selectedDate]);
 
   // 3. Calculate live revenue & payment breakdown
   const metrics = useMemo(() => {
@@ -73,8 +98,7 @@ export default function ReportsPage() {
     const brandCounts: Record<string, { brand: string; size_kg: number | null; full_sold: number; empty_in: number }> = {};
 
     matchingOrders.forEach((o) => {
-      // Count revenue only for paid sales or walk-ins
-      const isPaid = o.payment_status === 'paid' || o.delivery_status === 'delivered';
+      const isPaid = o.payment_status === 'paid';
       const orderRev = isPaid ? o.total_kes : 0;
       totalRevenue += orderRev;
 
@@ -137,6 +161,10 @@ export default function ReportsPage() {
   const handleCloseShift = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
+    if (!effectiveBranchId) {
+      showError('Select a station branch first.');
+      return;
+    }
 
     if (declaredCash.trim() === '') {
       showError('Please enter the declared physical cash counted in the drawer.');
@@ -146,7 +174,7 @@ export default function ReportsPage() {
     setIsSubmitting(true);
     try {
       const report = await createShiftReport({
-        branch_id: selectedBranchId,
+        branch_id: effectiveBranchId,
         branch_name: activeBranch?.name || 'All branches',
         operator_id: currentUser.id,
         operator_name: currentUser.full_name,
@@ -180,6 +208,19 @@ export default function ReportsPage() {
       window.print();
     }, 150);
   };
+
+  if (
+    !currentUser ||
+    currentUser.approval_status !== 'approved' ||
+    !['admin', 'director', 'operator', 'sales_rep'].includes(currentUser.role)
+  ) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-16 text-center">
+        <h1 className="text-xl font-bold text-slate-900">Access restricted</h1>
+        <p className="mt-1 text-sm text-slate-500">Shift reports require an approved station staff account.</p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -292,15 +333,20 @@ export default function ReportsPage() {
               <Building2 className="w-3.5 h-3.5 text-orange-600" /> Station Branch
             </label>
             <select
-              value={selectedBranchId}
+              value={effectiveBranchId}
               onChange={(e) => setSelectedBranchId(e.target.value)}
-              className="w-full min-h-[44px] px-3 bg-slate-50 border-2 border-slate-300 rounded-xl text-sm font-bold focus:border-orange-500 focus:outline-none"
+              disabled={activeBranches.length === 0}
+              className="w-full min-h-[44px] px-3 bg-slate-50 border-2 border-slate-300 rounded-xl text-sm font-bold focus:border-orange-500 focus:outline-none disabled:opacity-60"
             >
-              {branches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name} ({b.code})
-                </option>
-              ))}
+              {activeBranches.length === 0 ? (
+                <option value="">Loading branches…</option>
+              ) : (
+                activeBranches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name} ({b.code})
+                  </option>
+                ))
+              )}
             </select>
           </div>
 

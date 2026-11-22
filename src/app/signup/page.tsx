@@ -12,14 +12,13 @@ import { normalizeKenyanPhone } from '@/lib/formatters';
 
 export default function SignupPage() {
   const router = useRouter();
-  const { signupStaff, branches } = useStore();
+  const { signupStaff } = useStore();
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [roleHint, setRoleHint] = useState<'sales_rep' | 'rider' | 'operator'>('sales_rep');
   const [vehiclePlate, setVehiclePlate] = useState('');
-  const [selectedBranchId, setSelectedBranchId] = useState(branches[0]?.id || '');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -193,21 +192,9 @@ export default function SignupPage() {
               />
             )}
 
-            {/* Branch Hub Choice */}
-            <div className="space-y-1.5 text-left">
-              <label className="block text-sm font-medium text-slate-700">Primary branch</label>
-              <select
-                value={selectedBranchId}
-                onChange={(e) => setSelectedBranchId(e.target.value)}
-                className="w-full min-h-[44px] rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 transition-colors hover:border-slate-400 focus:border-orange-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-100"
-              >
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name} ({b.code}) — {b.location_estate}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <p className="text-xs text-slate-500">
+              Your role and station branch will be assigned by an administrator when your account is approved.
+            </p>
 
             <Input
               label="Password"

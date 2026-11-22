@@ -24,7 +24,7 @@ import { formatKES, displayKenyanPhone, formatShortDate } from '@/lib/formatters
 
 export default function RiderPage() {
   const { currentUser, orders, leaderboard, updateDeliveryStatus, updateRiderComment } = useStore();
-  const { showSuccess } = useToast();
+  const { showSuccess, showError } = useToast();
 
   const [activeTab, setActiveTab] = useState<'runs' | 'leaderboard'>('runs');
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
@@ -49,21 +49,30 @@ export default function RiderPage() {
     (o) => o.delivery_status !== 'delivered' && o.delivery_status !== 'cancelled'
   );
   const completedDeliveries = myDeliveries.filter((o) => o.delivery_status === 'delivered');
+  const myLeaderboardStats = leaderboard.find((e) => e.rider_id === currentUser.id);
 
-  const handleStatusChange = (orderId: string, status: DeliveryStatus) => {
-    updateDeliveryStatus(orderId, status);
-    if (status === 'delivered') {
-      showSuccess(`Order delivered successfully! Well done.`);
-    } else if (status === 'in_transit') {
-      showSuccess(`Status updated: On the way.`);
+  const handleStatusChange = async (orderId: string, status: DeliveryStatus) => {
+    try {
+      await updateDeliveryStatus(orderId, status);
+      if (status === 'delivered') {
+        showSuccess(`Order delivered successfully! Well done.`);
+      } else if (status === 'in_transit') {
+        showSuccess(`Status updated: On the way.`);
+      }
+    } catch (e) {
+      showError(e instanceof Error ? e.message : 'Failed to update delivery status.');
     }
   };
 
-  const handleSaveComment = (orderId: string) => {
+  const handleSaveComment = async (orderId: string) => {
     const text = commentInputs[orderId];
     if (text !== undefined) {
-      updateRiderComment(orderId, text);
-      showSuccess('Delivery note updated in station log.');
+      try {
+        await updateRiderComment(orderId, text);
+        showSuccess('Delivery note updated in station log.');
+      } catch (e) {
+        showError(e instanceof Error ? e.message : 'Failed to save delivery note.');
+      }
     }
   };
 
@@ -98,7 +107,7 @@ export default function RiderPage() {
           </div>
           <div className="bg-slate-800/80 p-3 rounded-2xl border border-slate-700">
             <div className="text-2xl font-black text-sky-400">
-              {completedDeliveries.length > 0 ? '18m' : '—'}
+              {myLeaderboardStats && myLeaderboardStats.avg_delivery_minutes > 0 ? `${myLeaderboardStats.avg_delivery_minutes}m` : '—'}
             </div>
             <div className="text-[11px] font-bold uppercase text-slate-400 mt-0.5">Avg Time</div>
           </div>
@@ -195,7 +204,11 @@ export default function RiderPage() {
                           {item.quantity}x {item.outgoing_brand} {item.cylinder_size_kg ? `${item.cylinder_size_kg}kg` : ''}
                         </span>
                         <span className="text-xs font-bold text-orange-700">
-                          {item.order_type === 'refill' ? `Swap with empty ${item.incoming_brand || item.outgoing_brand}` : 'New Cylinder'}
+                          {item.order_type === 'refill'
+                            ? `Swap with empty ${item.incoming_brand || item.outgoing_brand}`
+                            : item.order_type === 'complete'
+                              ? 'New Cylinder'
+                              : 'Direct Item'}
                         </span>
                       </div>
                     ))}
@@ -269,11 +282,11 @@ export default function RiderPage() {
             })
           )}
 
-          {/* Completed Today Section (Collapsible) */}
+          {/* Completed Deliveries Section */}
           {completedDeliveries.length > 0 && (
             <div className="pt-4 border-t-2 border-slate-200">
               <h3 className="text-sm font-black uppercase tracking-wider text-slate-500 mb-2">
-                Delivered Today ({completedDeliveries.length})
+                Recent Completed Deliveries ({completedDeliveries.length})
               </h3>
               <div className="space-y-2">
                 {completedDeliveries.slice(0, 5).map((o) => (

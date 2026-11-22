@@ -19,7 +19,7 @@ const numberOrZero = (value: string) => {
 
 export default function InventoryTransfersPage() {
   const router = useRouter();
-  const { currentUser, branches, products, inventory } = useStore();
+  const { currentUser, branches, products, inventory, refreshLiveData } = useStore();
   const { showError, showSuccess } = useToast();
   const [fromId, setFromId] = useState('');
   const [toId, setToId] = useState('');
@@ -29,8 +29,7 @@ export default function InventoryTransfersPage() {
 
   const approved = currentUser?.approval_status === 'approved';
   const canTransfer = approved && !!currentUser && ['admin', 'director', 'operator'].includes(currentUser.role);
-  const source = branches.find(b => b.id === fromId);
-  const destination = branches.find(b => b.id === toId);
+  const activeBranches = useMemo(() => branches.filter(b => b.is_active !== false), [branches]);
   const stockMap = useMemo(() => {
     const map = new Map<string, { full: number; empty: number }>();
     inventory.forEach(r => map.set(`${r.branch_id}:${r.product_id}`, { full: r.full_units ?? 0, empty: r.empty_units ?? 0 }));
@@ -38,11 +37,12 @@ export default function InventoryTransfersPage() {
   }, [inventory]);
   const selectedIds = new Set(lines.map(line => line.productId));
   const availableProductGroups = useMemo(
-    () => groupProducts(products.filter(p => !selectedIds.has(p.id)), p => p),
+    () => groupProducts(products.filter(p => p.is_active !== false && !selectedIds.has(p.id)), p => p),
     [products, lines]
   );
   const lineErrors = lines.map(line => {
-    const p = products.find(item => item.id === line.productId)!;
+    const p = products.find(item => item.id === line.productId);
+    if (!p) return { invalid: true, filled: 0, empty: 0, stock: { full: 0, empty: 0 } };
     const stock = stockMap.get(`${fromId}:${p.id}`) ?? { full: 0, empty: 0 };
     const filled = numberOrZero(line.filled);
     const empty = numberOrZero(line.empty);
@@ -50,6 +50,11 @@ export default function InventoryTransfersPage() {
     return { invalid, filled, empty, stock };
   });
   const valid = !!fromId && !!toId && fromId !== toId && lines.length > 0 && lineErrors.every(e => !e.invalid);
+
+  const handleFromChange = (nextFromId: string) => {
+    setFromId(nextFromId);
+    if (nextFromId && nextFromId === toId) setToId('');
+  };
 
   const addProduct = () => {
     if (!addingId || selectedIds.has(addingId)) return;
@@ -79,8 +84,9 @@ export default function InventoryTransfersPage() {
         p_lines: payload,
       });
       if (error) throw error;
+      await refreshLiveData();
       showSuccess(`Transfer completed: ${lines.length} product${lines.length === 1 ? '' : 's'} moved.`);
-      window.setTimeout(() => { window.location.href = '/inventory'; }, 700);
+      router.push('/inventory');
     } catch (error) {
       showError(error instanceof Error ? error.message : 'Transfer failed. No confirmation was received.');
       setSaving(false);
@@ -100,14 +106,14 @@ export default function InventoryTransfersPage() {
       <h2 className="text-sm font-bold text-slate-900">Transfer route</h2>
       <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-end">
         <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-600">From branch</span>
-          <select value={fromId} onChange={e => setFromId(e.target.value)} className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100">
-            <option value="">Select source branch</option>{branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          <select value={fromId} onChange={e => handleFromChange(e.target.value)} disabled={activeBranches.length === 0} className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100">
+            <option value="">{activeBranches.length === 0 ? 'Loading branches…' : 'Select source branch'}</option>{activeBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         </label>
         <div className="hidden h-11 w-10 items-center justify-center text-slate-400 sm:flex"><ArrowLeftRight className="h-5 w-5" /></div>
         <label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-600">To branch</span>
-          <select value={toId} onChange={e => setToId(e.target.value)} className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100">
-            <option value="">Select destination branch</option>{branches.filter(b => b.id !== fromId).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          <select value={toId} onChange={e => setToId(e.target.value)} disabled={activeBranches.length === 0} className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100">
+            <option value="">{activeBranches.length === 0 ? 'Loading branches…' : 'Select destination branch'}</option>{activeBranches.filter(b => b.id !== fromId).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         </label>
       </div>
@@ -134,7 +140,8 @@ export default function InventoryTransfersPage() {
       {lines.length === 0 ? <div className="px-5 pb-8 pt-5 text-center"><Package className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-2 text-sm font-semibold text-slate-700">No products added yet</p><p className="mt-1 text-xs text-slate-500">Choose products above to build this transfer.</p></div> :
         <div className="divide-y divide-slate-100">
           {lines.map((line, index) => {
-            const p = products.find(item => item.id === line.productId)!;
+            const p = products.find(item => item.id === line.productId);
+            if (!p) return null;
             const error = lineErrors[index];
             return <div key={line.productId} className="grid gap-3 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_120px_120px_36px] sm:items-center sm:px-5">
               <div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-900">{p.name}</p><p className="mt-0.5 text-xs text-slate-500">{p.brand}{p.size_kg ? ` · ${p.size_kg}kg` : ''} · Available: {error.stock.full} filled{hasEmptyState(p) ? ` / ${error.stock.empty} empty` : ''}</p></div>

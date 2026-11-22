@@ -22,7 +22,7 @@ import { formatKES, formatShortDate, displayKenyanPhone } from '@/lib/formatters
 
 export default function OperationsPage() {
   const { currentUser, branches, orders, staffList, assignRider, updateDeliveryStatus } = useStore();
-  const { showSuccess } = useToast();
+  const { showSuccess, showError } = useToast();
   const [selectedBranchId, setSelectedBranchId] = useState<string>('all');
 
   if (!currentUser || !['admin', 'director', 'operator'].includes(currentUser.role)) {
@@ -55,25 +55,44 @@ export default function OperationsPage() {
   const assignedOrders = sortedOrders.filter((o) => o.delivery_status === 'assigned');
   const inTransitOrders = sortedOrders.filter((o) => o.delivery_status === 'in_transit');
 
-  const handleAssign = (orderId: string, riderId: string) => {
+  const handleAssign = async (orderId: string, riderId: string) => {
     if (!riderId) return;
-    assignRider(orderId, riderId);
-    const rider = approvedRiders.find((r) => r.id === riderId);
-    showSuccess(`Order assigned to ${rider?.full_name || 'Rider'}`);
+    try {
+      await assignRider(orderId, riderId);
+      const rider = approvedRiders.find((r) => r.id === riderId);
+      showSuccess(`Order assigned to ${rider?.full_name || 'Rider'}`);
+    } catch (e) {
+      showError(e instanceof Error ? e.message : 'Failed to assign rider.');
+    }
+  };
+
+  const handleStatusUpdate = async (orderId: string, status: DeliveryStatus, successMsg: string) => {
+    try {
+      await updateDeliveryStatus(orderId, status);
+      showSuccess(successMsg);
+    } catch (e) {
+      showError(e instanceof Error ? e.message : 'Failed to update delivery status.');
+    }
   };
 
   const renderOrderCard = (order: typeof orders[0]) => {
     const branch = branches.find((b) => b.id === order.branch_id);
-    const assignedRider = staffList.find((s) => s.id === order.rider_id);
 
     return (
       <div
         key={order.id}
         className="p-4 bg-white rounded-2xl border-2 border-slate-200 hover:border-slate-300 shadow-sm space-y-3 text-left transition"
       >
-        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-          <div className="font-mono text-sm font-black text-slate-900">{order.order_number}</div>
-          <span className="text-xs font-bold text-slate-400">{formatShortDate(order.created_at)}</span>
+        <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="font-mono text-sm font-black text-slate-900 truncate">{order.order_number}</span>
+            {branch && (
+              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 shrink-0">
+                {branch.name}
+              </span>
+            )}
+          </div>
+          <span className="text-xs font-bold text-slate-400 shrink-0">{formatShortDate(order.created_at)}</span>
         </div>
 
         <div>
@@ -99,7 +118,7 @@ export default function OperationsPage() {
           <label className="block text-[11px] font-bold text-slate-500 mb-1">Assigned Motorbike Rider</label>
           <select
             value={order.rider_id || ''}
-            onChange={(e) => handleAssign(order.id, e.target.value)}
+            onChange={(e) => void handleAssign(order.id, e.target.value)}
             className="w-full min-h-[44px] text-xs font-bold px-2.5 bg-slate-50 border-2 border-slate-300 rounded-xl focus:border-orange-500 focus:outline-none"
           >
             <option value="">-- Choose Rider to Dispatch --</option>
@@ -115,10 +134,7 @@ export default function OperationsPage() {
         {order.delivery_status === 'assigned' && (
           <Button
             size="sm"
-            onClick={() => {
-              updateDeliveryStatus(order.id, 'in_transit');
-              showSuccess('Order marked In Transit');
-            }}
+            onClick={() => void handleStatusUpdate(order.id, 'in_transit', 'Order marked In Transit')}
             className="w-full min-h-[40px] text-xs font-black bg-amber-600 hover:bg-amber-700 border-amber-600"
           >
             Mark Dispatched (On the Way)
@@ -129,10 +145,7 @@ export default function OperationsPage() {
           <Button
             size="sm"
             variant="success"
-            onClick={() => {
-              updateDeliveryStatus(order.id, 'delivered');
-              showSuccess('Order marked Delivered');
-            }}
+            onClick={() => void handleStatusUpdate(order.id, 'delivered', 'Order marked Delivered')}
             className="w-full min-h-[40px] text-xs font-black"
           >
             Mark Delivered & Complete

@@ -146,7 +146,7 @@ export default function HomePage() {
   }
 
   const todayKey = localDateKey(new Date());
-  const todayOrders = orders.filter((order) => localDateKey(order.created_at) === todayKey);
+  const todayOrders = orders.filter((order) => order.delivery_status !== 'cancelled' && localDateKey(order.created_at) === todayKey);
   const myOrdersToday = todayOrders.filter((order) => order.sales_rep_id === currentUser.id);
   const recentMyOrders = [...myOrdersToday].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 6);
 

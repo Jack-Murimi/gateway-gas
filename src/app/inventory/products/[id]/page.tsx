@@ -291,7 +291,7 @@ export default function ProductDetailPage() {
         .limit(300);
       if (branchFilter !== 'all') q = q.eq('branch_id', branchFilter);
       if (actionFilter !== 'all') q = q.eq('action', actionFilter);
-      if (dayFilter) q = q.gte('created_at', `${dayFilter}T00:00:00`).lte('created_at', `${dayFilter}T23:59:59.999`);
+      if (dayFilter) q = q.gte('created_at', `${dayFilter}T00:00:00+03:00`).lte('created_at', `${dayFilter}T23:59:59.999+03:00`);
       return q;
     };
 

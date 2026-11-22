@@ -17,7 +17,7 @@ export function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTarget = safeInternalPath(searchParams.get('redirect'));
-  const { setCurrentUser, staffList } = useStore();
+  const { setCurrentUser, staffList, refreshLiveData } = useStore();
 
   const [view, setView] = useState<'signin' | 'reset'>('signin');
   const [resetPrefill, setResetPrefill] = useState('');
@@ -35,9 +35,12 @@ export function LoginContent() {
       setCurrentUser(user);
       localStorage.setItem('gwg_user', JSON.stringify(user));
       setDemoSessionCookies(user.id, user.role, user.approval_status);
+      if (user.approval_status === 'approved') {
+        void refreshLiveData();
+      }
       goNext(user);
     },
-    [setCurrentUser, goNext]
+    [setCurrentUser, refreshLiveData, goNext]
   );
 
   const handleDemoSelect = useCallback(

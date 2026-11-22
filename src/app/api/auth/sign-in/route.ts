@@ -54,7 +54,7 @@ export async function POST(req: Request) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, email, full_name, phone, role, approval_status, vehicle_plate')
+    .select('id, email, full_name, phone, role, approval_status, vehicle_plate, branch_id, national_id, notes')
     .eq('id', data.user.id)
     .maybeSingle();
 

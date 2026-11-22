@@ -167,6 +167,7 @@ export default function InventoryPage() {
         mode={tab}
         branches={branches}
         branchId={branchId}
+        defaultBranchId={currentUser?.branch_id}
         onBranchChange={setBranchId}
         products={products}
         inventory={inventory}

@@ -149,17 +149,25 @@ export default function StaffManagementPage() {
   const defaultPendingRole = (staff: StaffProfile): UserRole =>
     pendingRoles[staff.id] ?? (staff.vehicle_plate ? 'rider' : 'sales_rep');
 
-  const handleQuickApprove = (staff: StaffProfile) => {
+  const handleQuickApprove = async (staff: StaffProfile) => {
     const role = defaultPendingRole(staff);
-    approveStaff(staff.id, role);
-    showSuccess(`Approved ${staff.full_name} as ${ROLE_META[role].label}.`);
+    try {
+      await approveStaff(staff.id, role);
+      showSuccess(`Approved ${staff.full_name} as ${ROLE_META[role].label}.`);
+    } catch (e) {
+      showError(e instanceof Error ? e.message : 'Failed to approve staff member.');
+    }
   };
 
-  const handleQuickReject = (staff: StaffProfile) => {
+  const handleQuickReject = async (staff: StaffProfile) => {
     if (staff.id === currentUser.id) return showError('You cannot suspend your own account.');
     if (!window.confirm(`Suspend / reject ${staff.full_name}'s access?`)) return;
-    rejectStaff(staff.id);
-    showSuccess(`${staff.full_name} access revoked.`);
+    try {
+      await rejectStaff(staff.id);
+      showSuccess(`${staff.full_name} access revoked.`);
+    } catch (e) {
+      showError(e instanceof Error ? e.message : 'Failed to suspend staff member.');
+    }
   };
 
   const handleSaveStaff = async (e: React.FormEvent) => {
@@ -628,9 +636,13 @@ export default function StaffManagementPage() {
                     ) : (
                       <button
                         type="button"
-                        onClick={() => {
-                          approveStaff(selected.id, form.role);
-                          showSuccess(`${selected.full_name} approved as ${ROLE_META[form.role].label}.`);
+                        onClick={async () => {
+                          try {
+                            await approveStaff(selected.id, form.role);
+                            showSuccess(`${selected.full_name} approved as ${ROLE_META[form.role].label}.`);
+                          } catch (e) {
+                            showError(e instanceof Error ? e.message : 'Failed to approve staff member.');
+                          }
                         }}
                         className="inline-flex h-8 items-center gap-1 rounded border border-emerald-300 bg-emerald-50 px-2.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
                       >

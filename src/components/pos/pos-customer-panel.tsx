@@ -97,7 +97,11 @@ export function PosCustomerPanel(p: Props) {
         <div className="col-span-4 lg:col-span-1">
           <label htmlFor="pos-branch" className={labelClass}>Branch</label>
           <select id="pos-branch" className={fieldClass} value={p.branchId} onChange={e => p.onBranch(e.target.value)} disabled={p.branches.length < 2}>
-            {p.branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            {p.branches.length === 0 ? (
+              <option value="">Loading branches…</option>
+            ) : (
+              p.branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)
+            )}
           </select>
         </div>
         <div role="group" aria-label="Sale mode" className="col-span-4 flex h-8 items-center rounded bg-slate-100 p-0.5 lg:col-span-1">

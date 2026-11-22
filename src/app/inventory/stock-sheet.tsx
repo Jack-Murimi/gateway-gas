@@ -24,6 +24,7 @@ interface Props {
   mode: StockTakeMode;
   branches: Branch[];
   branchId: string;
+  defaultBranchId?: string | null;
   onBranchChange: (branchId: string) => void;
   products: Product[];
   inventory: BranchInventory[];
@@ -32,11 +33,15 @@ interface Props {
 }
 
 export function StockSheet({
-  mode, branches, branchId, onBranchChange, products, inventory, canEdit, onApplied,
+  mode, branches, branchId, defaultBranchId, onBranchChange, products, inventory, canEdit, onApplied,
 }: Props) {
   const { showError, showSuccess } = useToast();
-  const activeBranches = useMemo(() => branches.filter(b => b.is_active), [branches]);
-  const targetBranchId = branchId !== 'all' && activeBranches.some(b => b.id === branchId) ? branchId : activeBranches[0]?.id || '';
+  const activeBranches = useMemo(() => branches.filter(b => b.is_active !== false), [branches]);
+  const fallbackBranchId = useMemo(
+    () => (defaultBranchId && activeBranches.some(b => b.id === defaultBranchId) ? defaultBranchId : activeBranches[0]?.id || ''),
+    [activeBranches, defaultBranchId],
+  );
+  const targetBranchId = branchId !== 'all' && activeBranches.some(b => b.id === branchId) ? branchId : fallbackBranchId;
   const activeBranch = useMemo(() => activeBranches.find(b => b.id === targetBranchId), [activeBranches, targetBranchId]);
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -47,6 +52,7 @@ export function StockSheet({
   const [category, setCategory] = useState<Category>('all');
   const [onlyChanged, setOnlyChanged] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [checkingInitial, setCheckingInitial] = useState(false);
   const [initialInfo, setInitialInfo] = useState<{ stockDate?: string | null; takenAt: string; actor?: string } | null>(null);
   const [postDateOrderCount, setPostDateOrderCount] = useState(0);
   const [activeCell, setActiveCell] = useState<{ productId: string; name: string; field: 'full' | 'empty' } | null>(null);
@@ -74,8 +80,15 @@ export function StockSheet({
   useEffect(() => { loadDrafts(false); }, [loadDrafts, targetBranchId, mode]);
 
   useEffect(() => {
-    if (mode !== 'initial' || !targetBranchId) { setInitialInfo(null); return; }
+    if (mode !== 'initial' || !targetBranchId) {
+      setInitialInfo(null);
+      setCheckingInitial(false);
+      return;
+    }
     let live = true;
+    setCheckingInitial(true);
+    setInitialInfo(null);
+    setPostDateOrderCount(0);
     const supabase = createClient();
     const loadInitialInfo = async () => {
       let res = await supabase
@@ -99,6 +112,9 @@ export function StockSheet({
       }
 
       if (!live) return;
+      if (res.error) {
+        console.error('Could not check initial stock status:', res.error.message);
+      }
       const data = res.data as any;
       const actor = data?.actor;
       setInitialInfo(
@@ -110,13 +126,14 @@ export function StockSheet({
             }
           : null,
       );
+      setCheckingInitial(false);
     };
     void loadInitialInfo();
     return () => { live = false; };
   }, [mode, targetBranchId]);
 
   useEffect(() => {
-    if (mode !== 'initial' || !targetBranchId || !stockDate || initialInfo) {
+    if (mode !== 'initial' || !targetBranchId || !stockDate || checkingInitial || initialInfo) {
       setPostDateOrderCount(0);
       return;
     }
@@ -127,13 +144,13 @@ export function StockSheet({
       .select('id', { count: 'exact', head: true })
       .eq('branch_id', targetBranchId)
       .neq('delivery_status', 'cancelled')
-      .gt('created_at', `${stockDate}T23:59:59.999`)
+      .gt('created_at', `${stockDate}T23:59:59.999+03:00`)
       .then(({ count }) => {
         if (!live) return;
         setPostDateOrderCount(count ?? 0);
       });
     return () => { live = false; };
-  }, [mode, targetBranchId, stockDate, initialInfo]);
+  }, [mode, targetBranchId, stockDate, checkingInitial, initialInfo]);
 
   const parse = (v: string | undefined, fallback: number) => {
     if (v === undefined || v.trim() === '') return fallback;
@@ -228,7 +245,7 @@ export function StockSheet({
   const patch = (productId: string, part: Partial<Draft>) =>
     setDrafts(prev => ({ ...prev, [productId]: { ...(prev[productId] || { full: '0', empty: '0' }), ...part } }));
 
-  const locked = !canEdit || (mode === 'initial' && Boolean(initialInfo));
+  const locked = !canEdit || !targetBranchId || (mode === 'initial' && (checkingInitial || Boolean(initialInfo)));
   const needNote = mode === 'adjustment';
 
   const submit = async (e: React.FormEvent) => {
@@ -304,9 +321,19 @@ export function StockSheet({
     <form onSubmit={submit} className="space-y-2">
       <section className={`grid grid-cols-2 items-end gap-1.5 rounded-md border border-slate-300 bg-white p-2 sm:grid-cols-4 ${mode === 'initial' ? 'lg:grid-cols-[170px_145px_minmax(0,1fr)_115px_minmax(0,1fr)_auto]' : 'lg:grid-cols-[180px_minmax(0,1fr)_120px_minmax(0,1.2fr)_auto]'}`}>
         <div>
-          <label className={labelClass}>Branch *</label>
-          <select value={targetBranchId} onChange={e => onBranchChange(e.target.value)} className={fieldClass}>
-            {activeBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          <label htmlFor="stock-sheet-branch" className={labelClass}>Branch *</label>
+          <select
+            id="stock-sheet-branch"
+            value={targetBranchId}
+            onChange={e => onBranchChange(e.target.value)}
+            disabled={activeBranches.length === 0}
+            className={fieldClass}
+          >
+            {activeBranches.length === 0 ? (
+              <option value="">Loading branches…</option>
+            ) : (
+              activeBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)
+            )}
           </select>
         </div>
         {mode === 'initial' && (

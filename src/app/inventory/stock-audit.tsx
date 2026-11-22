@@ -66,7 +66,7 @@ export function StockAudit({ branches, branchId, onBranchChange }: { branches: B
         .limit(250);
       if (branchId !== 'all') q = q.eq('branch_id', branchId);
       if (action !== 'all') q = q.eq('action', action);
-      if (day) q = q.gte('created_at', `${day}T00:00:00`).lte('created_at', `${day}T23:59:59.999`);
+      if (day) q = q.gte('created_at', `${day}T00:00:00+03:00`).lte('created_at', `${day}T23:59:59.999+03:00`);
       return q;
     };
     let { data, error } = await runQuery(true);
