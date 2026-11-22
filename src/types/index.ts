@@ -63,7 +63,7 @@ export interface Expense {
 
 export interface Branch {
   id: string; name: string; code: string; location_estate: string; contact_phone: string;
-  is_active: boolean; created_at?: string;
+  is_active: boolean; mpesa_shortcode?: string | null; created_at?: string;
 }
 export interface StaffProfile {
   id: string; email: string; full_name: string; phone?: string | null; role: UserRole;
@@ -83,7 +83,7 @@ export interface BranchInventory {
 export interface OrderItem {
   id: string; order_id: string; product_id: string; order_type: OrderType;
   outgoing_brand: string; incoming_brand?: string | null; cylinder_size_kg?: number | null;
-  quantity: number; unit_price_kes: number; subtotal_kes: number; branch_id?: string | null;
+  quantity: number; unit_price_kes: number; unit_cost_kes?: number | null; subtotal_kes: number; branch_id?: string | null;
 }
 export interface CustomerPhone { id: string; customer_id: string; phone_number: string; is_primary: boolean; label?: string | null; }
 export interface CustomerLocation {
@@ -107,11 +107,96 @@ export interface Order {
 export interface ShiftZReport {
   id: string; report_number: string; branch_id: string; branch_name: string; operator_id: string;
   operator_name: string; shift_date: string; closed_at: string; total_sales_count: number;
-  total_revenue_kes: number; mpesa_total_kes: number; cash_total_kes: number; bank_total_kes: number;
+  total_revenue_kes: number; unpaid_sales_count?: number; unpaid_total_kes?: number;
+  mpesa_total_kes: number; cash_total_kes: number; bank_total_kes: number;
   expected_cash_kes: number; declared_cash_kes: number; cash_variance_kes: number;
   cylinders_sold_count: number; accessories_sold_count: number;
   cylinder_breakdown: Array<{brand:string;size_kg:number|null;full_sold:number;empty_in:number}>;
-  notes?: string;
+  notes?: string | null;
+}
+export interface ShiftDaySummary {
+  total_sales_count: number;
+  total_revenue_kes: number;
+  unpaid_sales_count: number;
+  unpaid_total_kes: number;
+  mpesa_total_kes: number;
+  cash_total_kes: number;
+  bank_total_kes: number;
+  cylinders_sold_count: number;
+  accessories_sold_count: number;
+  cylinder_breakdown: Array<{ brand: string; size_kg: number | null; full_sold: number; empty_in: number }>;
+}
+export type MpesaTransactionStatus = 'unmatched' | 'matched' | 'ignored';
+export interface MpesaTransaction {
+  id: string;
+  trans_id: string;
+  trans_time: string;
+  trans_amount: number;
+  business_short_code: string;
+  bill_ref_number?: string | null;
+  msisdn?: string | null;
+  payer_name?: string | null;
+  branch_id?: string | null;
+  matched_order_id?: string | null;
+  matched_at?: string | null;
+  matched_by?: string | null;
+  status: MpesaTransactionStatus;
+  notes?: string | null;
+  created_at: string;
+  branch?: { id: string; name: string; code: string } | null;
+  matched_order?: { id: string; order_number: string; receipt_number?: string | null; customer_name: string; total_kes: number } | null;
+}
+export interface FinancialSummary {
+  start_date: string;
+  end_date: string;
+  branch_id: string | null;
+  orders_count: number;
+  paid_orders_count: number;
+  unpaid_orders_count: number;
+  revenue_billed_kes: number;
+  revenue_collected_kes: number;
+  revenue_unpaid_kes: number;
+  cogs_kes: number;
+  items_missing_cost_count: number;
+  total_items_count: number;
+  gross_profit_kes: number;
+  gross_margin_pct: number;
+  expenses_total_kes: number;
+  expenses_hq_kes: number;
+  expenses_by_category: Array<{ category: ExpenseCategory; total_kes: number; count: number }>;
+  net_profit_kes: number;
+  branch_breakdown: Array<{
+    branch_id: string;
+    branch_name: string;
+    branch_code: string;
+    orders_count: number;
+    revenue_kes: number;
+    collected_kes: number;
+    cogs_kes: number;
+    gross_profit_kes: number;
+    expenses_kes: number;
+    net_contribution_kes: number;
+  }>;
+  monthly_trend: Array<{
+    month: string;
+    label: string;
+    revenue_kes: number;
+    cogs_kes: number;
+    gross_profit_kes: number;
+    expenses_kes: number;
+    net_profit_kes: number;
+  }>;
+  cashflow: {
+    sales_cash_in_kes: number;
+    sales_mpesa_in_kes: number;
+    sales_bank_in_kes: number;
+    total_inflows_kes: number;
+    expenses_out_kes: number;
+    supplier_payments_out_kes: number;
+    net_cashflow_kes: number;
+    total_receivables_kes: number;
+    total_payables_kes: number;
+  };
 }
 export interface RiderLeaderboardEntry {
   rider_id: string; rider_name: string; vehicle_plate?: string | null; total_assigned: number;

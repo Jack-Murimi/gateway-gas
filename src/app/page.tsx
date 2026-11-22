@@ -300,7 +300,7 @@ export default function HomePage() {
               </Link>
             )}
             {unpaidOrdersToday.length > 0 && (
-              <Link href="/reports" className="flex items-center justify-between rounded-md border border-white/70 bg-white px-3 py-2 text-sm hover:border-orange-200">
+              <Link href="/sales?tab=unpaid" className="flex items-center justify-between rounded-md border border-white/70 bg-white px-3 py-2 text-sm hover:border-orange-200">
                 <span className="flex items-center gap-2 text-slate-700"><Wallet className="h-4 w-4 text-orange-600" />Unpaid today</span>
                 <span className="font-semibold text-orange-700">{unpaidOrdersToday.length}</span>
               </Link>

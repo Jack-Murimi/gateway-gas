@@ -32,6 +32,7 @@ export interface PosSaleSubmission {
   payment_method: PaymentMethod;
   payment_status: PaymentStatus;
   payment_reference?: string;
+  mpesa_transaction_id?: string | null;
   delivery_fee_kes: number;
   items: Array<{
     product_id: string; branch_id: string; order_type: OrderType; outgoing_brand: string;
@@ -215,7 +216,9 @@ export function PosWorkspace({
       vehicle_plate: isDelivery ? vehiclePlate || null : null,
       lpo_number: lpoNumber.trim() || undefined, sale_comment: saleComment.trim() || undefined,
       payment_method: payment.method, payment_status: payment.status,
-      payment_reference: payment.reference, delivery_fee_kes: 0,
+      payment_reference: payment.reference,
+      mpesa_transaction_id: payment.mpesaTransactionId || null,
+      delivery_fee_kes: 0,
       items: cart.flatMap(l => {
         const base = {
           product_id: l.productId, branch_id: l.branchId || effectiveBranchId, order_type: l.orderType,
@@ -330,7 +333,11 @@ export function PosWorkspace({
 
       {showPayment && (
         <PosPaymentModal
-          total={total} isSubmitting={isSubmitting} onClose={() => setShowPayment(false)}
+          total={total}
+          branchId={effectiveBranchId}
+          branchShortcode={activeBranches.find(b => b.id === effectiveBranchId)?.mpesa_shortcode}
+          isSubmitting={isSubmitting}
+          onClose={() => setShowPayment(false)}
           onConfirm={payment => void onSubmit(buildSubmission(payment))}
         />
       )}

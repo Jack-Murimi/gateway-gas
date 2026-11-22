@@ -42,6 +42,7 @@ interface CreateOrderParams {
   payment_method: PaymentMethod;
   payment_status: PaymentStatus;
   payment_reference?: string;
+  mpesa_transaction_id?: string | null;
   delivery_fee_kes: number;
   items: Array<{
     product_id: string;
@@ -90,7 +91,12 @@ interface StoreContextType {
   updateRiderComment: (orderId: string, comment: string) => Promise<void>;
   refreshLiveData: () => Promise<void>;
   createBranch: (name: string, code: string, location_estate: string, contact_phone: string) => Promise<void>;
-  createShiftReport: (data: Omit<ShiftZReport, 'id' | 'report_number' | 'closed_at'>) => Promise<ShiftZReport>;
+  createShiftReport: (data: {
+    branch_id: string;
+    shift_date: string;
+    declared_cash_kes: number;
+    notes?: string;
+  }) => Promise<ShiftZReport>;
   resetDemoData: () => void;
   logout: () => void;
 }
@@ -175,12 +181,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const fetchCoreData = useCallback(async () => {
     const supabase = createClient();
-    const [branchesRes, productsRes, inventoryRes, ordersRes, staffRes] = await Promise.all([
+    const [branchesRes, productsRes, inventoryRes, ordersRes, staffRes, shiftRes] = await Promise.all([
       supabase.from('branches').select('*').eq('is_active', true).order('code'),
       supabase.from('products').select('*').eq('is_active', true).order('category').order('name'),
       supabase.from('branch_inventory').select('*'),
       supabase.from('orders').select('*, items:order_items(*)').order('created_at', { ascending: false }).limit(200),
       supabase.from('profiles').select('*').order('created_at', { ascending: true }),
+      supabase.from('shift_reports').select('*').order('shift_date', { ascending: false }).order('closed_at', { ascending: false }).limit(60),
     ]);
 
     if (branchesRes.error) console.error('Failed to load branches:', branchesRes.error.message);
@@ -204,6 +211,23 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const fresh = profiles.find((p) => p.id === prev.id);
         return fresh ?? prev;
       });
+    }
+
+    if (!shiftRes.error && shiftRes.data) {
+      setShiftReports(
+        (shiftRes.data as any[]).map((r) => ({
+          ...r,
+          total_revenue_kes: Number(r.total_revenue_kes || 0),
+          unpaid_total_kes: Number(r.unpaid_total_kes || 0),
+          mpesa_total_kes: Number(r.mpesa_total_kes || 0),
+          cash_total_kes: Number(r.cash_total_kes || 0),
+          bank_total_kes: Number(r.bank_total_kes || 0),
+          expected_cash_kes: Number(r.expected_cash_kes || 0),
+          declared_cash_kes: Number(r.declared_cash_kes || 0),
+          cash_variance_kes: Number(r.cash_variance_kes || 0),
+          cylinder_breakdown: Array.isArray(r.cylinder_breakdown) ? r.cylinder_breakdown : [],
+        })) as ShiftZReport[],
+      );
     }
   }, []);
 
@@ -401,6 +425,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       payment_method: params.payment_method,
       payment_status: params.payment_status,
       payment_reference: params.payment_reference || null,
+      mpesa_transaction_id: params.mpesa_transaction_id || null,
       delivery_fee_kes: params.delivery_fee_kes,
       created_at: params.created_at || new Date().toISOString(),
     };
@@ -685,14 +710,36 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     await fetchLiveData();
   };
 
-  const createShiftReport = async (data: Omit<ShiftZReport, 'id' | 'report_number' | 'closed_at'>): Promise<ShiftZReport> => {
-    // Store locally for now; persist to DB if shift_reports table exists.
-    const closedAt = new Date().toISOString();
-    const count = shiftReports.length + 1;
-    const branchCode = branches.find((b) => b.id === data.branch_id)?.code.split('-')[0] || 'STN';
-    const reportNumber = `Z-${branchCode}-${data.shift_date.replace(/-/g, '')}-${String(count).padStart(2, '0')}`;
-    const report: ShiftZReport = { ...data, id: crypto.randomUUID(), report_number: reportNumber, closed_at: closedAt };
-    setShiftReports((prev) => [report, ...prev]);
+  const createShiftReport = async (data: {
+    branch_id: string;
+    shift_date: string;
+    declared_cash_kes: number;
+    notes?: string;
+  }): Promise<ShiftZReport> => {
+    const supabase = createClient();
+    const { data: saved, error } = await supabase.rpc('close_shift_report', {
+      p_branch_id: data.branch_id,
+      p_shift_date: data.shift_date,
+      p_declared_cash_kes: data.declared_cash_kes,
+      p_notes: data.notes?.trim() || null,
+    });
+    if (error || !saved) {
+      throw new Error(error?.message || 'Failed to save shift close report.');
+    }
+    const r = saved as any;
+    const report: ShiftZReport = {
+      ...r,
+      total_revenue_kes: Number(r.total_revenue_kes || 0),
+      unpaid_total_kes: Number(r.unpaid_total_kes || 0),
+      mpesa_total_kes: Number(r.mpesa_total_kes || 0),
+      cash_total_kes: Number(r.cash_total_kes || 0),
+      bank_total_kes: Number(r.bank_total_kes || 0),
+      expected_cash_kes: Number(r.expected_cash_kes || 0),
+      declared_cash_kes: Number(r.declared_cash_kes || 0),
+      cash_variance_kes: Number(r.cash_variance_kes || 0),
+      cylinder_breakdown: Array.isArray(r.cylinder_breakdown) ? r.cylinder_breakdown : [],
+    };
+    setShiftReports((prev) => [report, ...prev.filter((item) => item.id !== report.id)]);
     return report;
   };
 
@@ -710,6 +757,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setOrders([]);
     setStaffList([]);
     setCustomers([]);
+    setShiftReports([]);
     try {
       localStorage.removeItem('gwg_user');
       localStorage.removeItem('gwg_demo_user_id');
