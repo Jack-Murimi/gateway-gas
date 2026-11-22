@@ -1,7 +1,7 @@
 cylinder
 
 13kg
-Afrigas, K-gas, Total, Ola, Progas, Tosha, Lake, Hashi, Supa, Jatel, Seagas, Raha, Bonoko
+Safe Gas, Afrigas, K-gas, Total, Ola, Progas, Tosha, Lake, Hashi, Supa, Jatel, Seagas, Raha, Bonoko
 
 6kg 
 Afrigas, K-gas, Total, Ola, Progas, Tosha, Lake, Hashi, Supa, Jatel, Seagas, Raha, Bonoko
